@@ -1,0 +1,36 @@
+{
+  "name": "@yumerijs/core",
+  "version": "1.0.0",
+  "description": "Core module for yumeri",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WindyPear-Team/yumeri.git"
+  },
+  "keywords": [
+    "yumeri",
+    "API"
+  ],
+  "author": "WindyPear-Team,FireGuo",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/WindyPear-Team/yumeri/issues"
+  },
+  "homepage": "https://github.com/WindyPear-Team/yumeri#readme",
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  }
+}
