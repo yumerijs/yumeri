@@ -4,12 +4,14 @@ node_modules/
 # 忽略 dist 或 build 目录 (及其所有内容)
 dist/
 build/
+plugins/
 
 # 忽略所有 .log 文件
 *.log
 
 # 忽略 .env 文件 (敏感信息)
 .env
+config.yml
 
 # 忽略操作系统生成的文件
 .DS_Store
