@@ -1,14 +1,18 @@
 {
   "name": "yumeri",
-  "version": "1.0.0",
+  "version": "1.0.6",
   "description": "基于nodejs的API管理平台",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "index.js"
   ],
+  "bin": {
+    "yumeri": "dist/run.js"
+  },
   "scripts": {
-    "start": "node dist/index.js",
+    "start": "node dist/run.js",
     "build": "tsc",
     "prepublishOnly": "npm run build"
   },

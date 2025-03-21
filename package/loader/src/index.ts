@@ -1,4 +1,5 @@
 import * as path from 'path';
+import { Core } from '@yumerijs/core';
 import * as fs from 'fs';
 import { promisify } from 'util';
 import { exec } from 'child_process';
@@ -7,7 +8,7 @@ import { satisfies } from 'semver';
 const execAsync = promisify(exec);
 
 interface Plugin {
-  apply: (core: any) => Promise<void>; //  这里 any 替换为你的 Core 类型
+  apply: (core: Core) => Promise<void>;
 }
 
 class PluginLoader {
@@ -51,7 +52,7 @@ class PluginLoader {
     }
 
     try {
-      const plugin = await this.loadPluginFromPath(pluginPath);
+      const plugin = await this.loadPluginFromPath(pluginPath, config);
       this.pluginCache[pluginName] = plugin;
       return plugin;
     } catch (e) {

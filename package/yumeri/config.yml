@@ -22,13 +22,7 @@ middleware:
 
 # 插件配置
 plugins:
-  - name: 'plugin-foo'  # 插件名称或 npm 包名
-    config:             # 插件配置
-      option1: 'value1'
-      option2: 123
-  - name: './plugins/local-plugin' # 本地插件路径
-    config:
-      enabled: true
+  - './plugins/yumeri-plugin-server' # 本地插件路径
 
 # 鉴权配置 (示例)
 auth:
