@@ -2,6 +2,7 @@
   import * as fs from 'fs';
   import * as path from 'path';
   import { Config } from './config';
+  import { Command } from './command';
 
   interface Plugin {
     apply: (core: Core, config: Config) => Promise<void>;
@@ -15,11 +16,12 @@
     // 可以根据需要添加配置项
   }
 
-  class Core {
+  export class Core {
     public plugins: { [name: string]: Plugin } = {};
     public config: any = null;
     private eventListeners: { [event: string]: ((...args: any[]) => Promise<void>)[] } = {};
     private components: { [name: string]: any } = {};
+    public commands: Record<string, Command> = {};
 
     constructor(options?: CoreOptions) {
       //  可以根据 options 初始化
@@ -103,6 +105,19 @@
         console.log(`No listeners for event "${event}".`);
       }
     }
-  }
+    
+    command(name: string): Command {
+        const command = new Command(this, name); // 传递 Core 实例
+        this.commands[name] = command;
+        return command;
+    }
 
-  export default Core;
+    // 用于执行指令
+    executeCommand(name: string, session: any, ...args: any[]): any {
+        const command = this.commands[name];
+        if (command) {
+            return command.execute(session, ...args);
+        }
+        return null;
+    }
+  }

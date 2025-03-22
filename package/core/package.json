@@ -1,6 +1,6 @@
 {
   "name": "@yumerijs/core",
-  "version": "1.0.2",
+  "version": "1.0.8",
   "description": "Core module for yumeri",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "build": "tsc",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "yarn build"
   },
   "repository": {
     "type": "git",

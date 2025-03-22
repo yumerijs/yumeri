@@ -1,17 +1,24 @@
-import { Session } from './session';
-import Core from './core';
-
+import { Core } from './core'; // 假设 Core 类在 core.ts 文件中
 
 export class Command {
-  public command: string;
-  public session: Session;
-  constructor(command: string, session: Session) {
-    this.command = command;
-    this.session = session
-  }
-  
-  excute(core: Core) {
-    core.emit('onexcute',this.session);
-    core.emit('oncommand',this.command,this.session)
-  }
+    name: string;
+    actionFn: Function | null = null;
+    core: Core;
+
+    constructor(core: Core, name: string) {
+        this.core = core; // 接收 Core 实例
+        this.name = name;
+    }
+
+    action(fn: Function): this {
+        this.actionFn = fn;
+        return this; // 返回 this 以支持链式调用
+    }
+
+    execute(session: any, ...args: any[]): any {
+        if (this.actionFn) {
+            return this.actionFn(session, ...args);
+        }
+        return null;
+    }
 }

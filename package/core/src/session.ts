@@ -2,8 +2,8 @@ import crypto from 'crypto';
 
 export class Session {
     public ip: string;
-    public cookie: string;
-    public query: string | undefined;
+    public cookie: Record<string, string>;
+    public query: Record<string, string> | undefined;
     public sessionid: string;
     public data: Record<string, any> = {};
 
@@ -13,21 +13,13 @@ export class Session {
      *  @cookie: string，会话cookie
      *  @query: string，请求字符串
      */
-    constructor(ip: string, cookie: string, query?: string){
+    constructor(ip: string, cookie: Record<string, string>, query?: Record<string, string>){
         this.ip  = ip;
         this.cookie = cookie;
         this.query = query;
 
-        let jsoncookie: any;
-        try {
-             jsoncookie = JSON.parse(this.cookie);
-        } catch (error) {
-            console.error("Error parsing cookie:", error);
-            jsoncookie = {};
-        }
-
-        if (jsoncookie.sessionid) {
-            this.sessionid = jsoncookie.sessionid;
+        if (cookie.sessionid) {
+            this.sessionid = cookie.sessionid;
         }
         else {
             this.sessionid = this.generateId(this.ip);
@@ -68,22 +60,4 @@ export class Session {
     public destroy(): void {
         this.clearData(); // 清理会话数据
     }
-// 从请求路径提取指令和剩余的查询字符串
-  private getCommand(): { command: string | null, queryString: string | null } {
-    try {
-      const jsoncookie = JSON.parse(this.cookie);
-      if (jsoncookie.requestPath) {
-        const path = jsoncookie.requestPath;
-        const pathParts = path.split('?'); // 分割路径和查询字符串
-        const command = pathParts[0].substring(1); // 移除开头的 '/' (如果存在)
-        const queryString = pathParts.length > 1 ? pathParts[1] : null; // 获取查询字符串，若没有则为 null
-
-        return { command: command || null, queryString };
-      }
-      return { command: null, queryString: null };
-    } catch (e) {
-      console.error('Could not extract path from cookie', e);
-      return { command: null, queryString: null };
-    }
-  }
 }
