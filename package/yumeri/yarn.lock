@@ -10,25 +10,33 @@
     undici-types "~6.20.0"
 
 "@yumerijs/core@^1.0.0", "@yumerijs/core@^1.0.1":
-  version "1.0.4"
-  resolved "https://registry.npmjs.org/@yumerijs/core/-/core-1.0.4.tgz#242528b6b96cd8fe0b04fd0c2c14519b1e322736"
-  integrity sha512-iH9b6gA4FjMcTEA8As5KKfoBd9HBn25RzbRINGZpxUYODyyQQg4yvbcbSN0ScOxu5AaFdkbdUP7N/ZJASKasww==
+  version "1.0.8"
+  resolved "https://registry.npmjs.org/@yumerijs/core/-/core-1.0.8.tgz#bc3a89518e4fad277527ff777578f14c06a60143"
+  integrity sha512-dBasOqDsn9/l98gwpYoY/Y4wt2gQVcvLW7eA2QC0on5jpMvR+6L7QKoF6BJ2RVT4A3S4EF6UopDmKVUDGiwDoQ==
   dependencies:
     js-sha256 "^0.11.0"
     js-yaml "^4.1.0"
 
 "@yumerijs/loader@^1.0.0":
-  version "1.0.1"
-  resolved "https://registry.npmjs.org/@yumerijs/loader/-/loader-1.0.1.tgz#084b6037266063ea3ff55980a228078710954976"
-  integrity sha512-l2/88ogFXVvrKcAEpNrhzrmVKnjAjAEiiNbLGjxkoFuqcDCRcsNdM6sPiHzar4i5s8hg5VxLHjz0gj8zVWA8iw==
+  version "1.0.2"
+  resolved "https://registry.npmjs.org/@yumerijs/loader/-/loader-1.0.2.tgz#531d29981e4a2daa0d5977fc4580f2f6355f9bac"
+  integrity sha512-fugvuzwG22WKOA3JmTowj3icb2sLDMNneM6NKVoqyKSjECLi6grGgXadH4Trd1VpIoxsZNnsNXBZOWMQEBgmKw==
   dependencies:
     "@yumerijs/core" "^1.0.1"
+    chokidar "^4.0.3"
     semver "^7.7.1"
 
 argparse@^2.0.1:
   version "2.0.1"
   resolved "https://registry.npmjs.org/argparse/-/argparse-2.0.1.tgz#246f50f3ca78a3240f6c997e8a9bd1eac49e4b38"
   integrity sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q==
+
+chokidar@^4.0.3:
+  version "4.0.3"
+  resolved "https://registry.npmjs.org/chokidar/-/chokidar-4.0.3.tgz#7be37a4c03c9aee1ecfe862a4a23b2c70c205d30"
+  integrity sha512-Qgzu8kfBvo+cA4962jnP1KkS6Dop5NS6g7R5LFYJr4b8Ub94PPQXUksCw9PvXoeXPRRddRNC5C1JQUR2SMGtnA==
+  dependencies:
+    readdirp "^4.0.1"
 
 js-sha256@^0.11.0:
   version "0.11.0"
@@ -41,6 +49,11 @@ js-yaml@^4.1.0:
   integrity sha512-wpxZs9NoxZaJESJGIZTyDEaYpl0FKSA+FB9aJiyemKhMwkxQg63h4T1KJgUGHpTqPDNRcmmYLugrRjJlBtWvRA==
   dependencies:
     argparse "^2.0.1"
+
+readdirp@^4.0.1:
+  version "4.1.2"
+  resolved "https://registry.npmjs.org/readdirp/-/readdirp-4.1.2.tgz#eb85801435fbf2a7ee58f19e0921b068fc69948d"
+  integrity sha512-GDhwkLfywWL2s6vEjyhri+eXmfH6j1L7JE27WhqLeYzoh/A3DBaYGEj2H/HFZCn/kMfim73FXxEJTw06WtxQwg==
 
 semver@^7.7.1:
   version "7.7.1"
