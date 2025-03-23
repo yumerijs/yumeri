@@ -2,12 +2,12 @@ import { Core } from '@yumerijs/core';
 import PluginLoader from '@yumerijs/loader';
 
 async function main() {
-  const core = new Core();
   const loader = new PluginLoader();
+  const core = new Core(loader);
 
   try {
     await core.loadConfig('./config.yml');
-    await core.loadPlugins(loader);
+    await core.loadPlugins();
 
     // ...
   } catch (err) {

@@ -1,17 +1,26 @@
+/**
+ * @time: 2025/03/24 00:19
+ * @author: FireGuo
+ * WindyPear-Team All right reserved
+ **/ 
   import * as yaml from 'js-yaml';
   import * as fs from 'fs';
   import * as path from 'path';
   import { Config } from './config';
   import { Command } from './command';
+  import chokidar from 'chokidar';
 
   interface Plugin {
     apply: (core: Core, config: Config) => Promise<void>;
   }
 
   interface PluginLoader {
-    load: (pluginName: string) => Promise<Plugin>;
-  }
-
+  load(pluginName: string): Promise<Plugin>;
+  unloadPlugin(pluginName: string): Promise<void>;
+  checkPluginDependencies(pluginPath: string): Promise<boolean>;
+  installPluginDependencies(pluginName: string): Promise<void>;
+  watchPlugins(core: Core, config: Config, pluginsDir: string): void;
+}
   interface CoreOptions {
     // 可以根据需要添加配置项
   }
@@ -22,9 +31,10 @@
     private eventListeners: { [event: string]: ((...args: any[]) => Promise<void>)[] } = {};
     private components: { [name: string]: any } = {};
     public commands: Record<string, Command> = {};
+    private pluginLoader: PluginLoader;
 
-    constructor(options?: CoreOptions) {
-      //  可以根据 options 初始化
+    constructor(pluginLoader: PluginLoader) {
+      this.pluginLoader = pluginLoader;
     }
 
     // 加载配置文件
@@ -39,33 +49,114 @@
       }
     }
 
+    async getPluginConfig(pluginName: string): Promise<Config> {
+      for (const plugins of this.config.plugins) {
+        if (plugins.name == pluginName) {
+          const config = new Config(plugins.name, plugins.config);
+          return config;
+        }
+      }
+      return new Config(pluginName);
+    }
     // 加载插件
-    async loadPlugins(pluginLoader: PluginLoader): Promise<void> {
+    async loadPlugins(): Promise<void> {
       if (!this.config || !this.config.plugins) {
         console.log('No plugins to load.');
         return;
       }
-
       for (const plugins of this.config.plugins) {
         try {
           console.log(`Loading plugin: ${plugins.name}`);
           const config = new Config(plugins.name, plugins.config);
-
-          const plugin = await pluginLoader.load(plugins.name);
-
-          this.plugins[plugins.name] = plugin;
-          console.log(`Plugin ${plugins.name} loaded.`);
-
-          if (plugin.apply) {
-            console.log(`Applying plugin: ${plugins.name}`);
-            await plugin.apply(this, config);
-            console.log(`Plugin ${plugins.name} applied.`);
-          }
+          await this.loadPlugin(plugins.name, config);
         } catch (err) {
           console.error(`Failed to load plugin ${plugins.name}:`, err);
         }
       }
+      this.watchPlugins(this);
     }
+    
+    async loadPlugin(name: string, config: Config) {
+      const plugin = await this.pluginLoader.load(name);
+
+      this.plugins[name] = plugin;
+      console.log(`Plugin ${name} loaded.`);
+
+      if (plugin.apply) {
+        console.log(`Applying plugin: ${name}`);
+        await plugin.apply(this, config);
+        console.log(`Plugin ${name} applied.`);
+      }
+    }
+      /**
+       * 监听插件目录，实现热重载
+       * @param core Core实例
+       * @param config Config实例
+       * @param pluginsDir 插件目录
+       */
+  watchPlugins(core: Core, pluginsDir: string = 'plugins') {
+    const watcher = chokidar.watch(pluginsDir, {
+      ignored: /(^|[/\\])\../, // 忽略点文件
+      persistent: true,
+      ignoreInitial: true,
+      awaitWriteFinish: {
+        stabilityThreshold: 200,
+        pollInterval: 100
+      }
+    });
+
+    watcher.on('add', async (changePath) => {
+          if (changePath.endsWith('.ts') || changePath.endsWith('.js')) return;
+          //console.log(`New plugin detected: ${pluginName}`);
+          const pluginName = changePath.split('/')[1];
+          try {
+              // 仅加载目录名作为插件名
+              const pluginDirName = path.basename(pluginName);
+              const config = await core.getPluginConfig(pluginName);
+              await core.loadPlugin(pluginName, config);
+              
+              core.emit('plugin-loaded', pluginName);
+
+          } catch (error) {
+              console.error(`Failed to load new plugin ${pluginName}:`, error);
+          }
+      });
+
+    watcher.on('change', async (changePath) => {
+        if (!changePath.endsWith('.ts')) return;
+        const pluginName = changePath.split('/')[1];
+        console.log(`Plugin changed: ${pluginName}`);
+        try {
+            const pluginDirName = path.dirname(pluginName);
+            const config = await core.getPluginConfig(pluginName);
+            //const pluginDirName = path.basename(pluginName);
+            await core.pluginLoader.unloadPlugin(pluginName);
+            await core.loadPlugin(pluginName, config);
+            
+            core.emit('plugin-reloaded', pluginName);
+        } catch (error) {
+            console.error(`Failed to reload plugin ${pluginName}:`, error);
+        }
+    });
+
+    watcher.on('unlink', async (changePath) => {
+        if (!changePath.endsWith('.ts')) return;
+        const pluginName = changePath.split('/')[1];
+        console.log(`Plugin removed: ${pluginName}`);
+        try {
+            //const pluginDirName = path.dirname(pluginName);
+            //const pluginDirName = path.basename(pluginName);
+            await core.pluginLoader.unloadPlugin(pluginName);
+            core.emit('plugin-unloaded', pluginName);
+        } catch (error) {
+            console.error(`Failed to unload plugin ${pluginName}:`, error);
+        }
+    });
+
+    console.log(`Watching for plugin changes in ${pluginsDir}`);
+  }
+  
+  
 
     // 注册组件
     registerComponent(name: string, component: any): void {
@@ -120,4 +211,6 @@
         }
         return null;
     }
+
+
   }

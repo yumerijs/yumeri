@@ -27,6 +27,12 @@ class PluginLoader {
     this.config = config || null;
     this.isDev = process.env.NODE_ENV === 'development';
     this.pluginsDir = pluginsDir;
+    tsNode.register({
+                        transpileOnly: true, // Use transpileOnly for faster compilation
+                        compilerOptions: {
+                            module: 'CommonJS' // Ensure CommonJS for compatibility with require
+                        }
+                    });
   }
 
   setCoreAndConfig(core: Core, config: Config) {
@@ -94,24 +100,39 @@ class PluginLoader {
    */
   private async loadPluginFromPath(pluginPath: string, isLocalPlugin: boolean): Promise<Plugin> {
     try {
-      let targetPath = pluginPath;
-      if (isLocalPlugin && this.isDev) {
-        const targetPath = path.join(pluginPath, 'src', 'index.ts');
-        if (!fs.existsSync(targetPath)) {
-            throw new Error(`src/index.ts not found in ${pluginPath}`);
+
+        let targetPath = pluginPath;
+        if (isLocalPlugin && this.isDev) {
+            // 开发模式下，加载 src 目录下的 ts 文件
+            targetPath = path.join(pluginPath, 'src', 'index.ts');
+            if (!fs.existsSync(targetPath)) {
+                throw new Error(`src/index.ts not found in ${pluginPath}`);
+            }
+
+             // 检查目标文件是否是 TypeScript 文件
+            if (targetPath.endsWith('.ts')) {
+                // 使用 require 加载 TypeScript 模块
+                const module = require(targetPath);
+                return module;
+            } else {
+                  // 使用 require 加载 js 模块
+                const module = require(targetPath);
+                return module;
+            }
+
+        } else {
+             targetPath = require.resolve(pluginPath);
         }
-        const module = await import(pathToFileURL(targetPath).toString());
-        return module;
-      } else {
-        targetPath = require.resolve(pluginPath);
+
+        //使用require加载
         const pluginModule = require(targetPath);
-         return pluginModule
-      }
+        return pluginModule
+
     } catch (e) {
-      console.error(`Error loading plugin from path ${pluginPath}:`, e);
-      throw e;
+        console.error(`Error loading plugin from path ${pluginPath}:`, e);
+        throw e;
     }
-  }
+}
 
   /**
    * 卸载插件
@@ -166,70 +187,6 @@ class PluginLoader {
       console.error(`Error installing dependencies for plugin ${pluginName}:`, error);
       throw error;
     }
-  }
-
-  /**
-   * 监听插件目录，实现热重载
-   * @param core Core实例
-   * @param config Config实例
-   * @param pluginsDir 插件目录
-   */
-  watchPlugins(core: Core, config: Config, pluginsDir: string = 'plugins') {
-    const watcher = chokidar.watch(pluginsDir, {
-      ignored: /(^|[/\\])\../, // 忽略点文件
-      persistent: true,
-      ignoreInitial: true,
-      awaitWriteFinish: {
-        stabilityThreshold: 200,
-        pollInterval: 100
-      }
-    });
-
-    watcher.on('add', async (pluginName) => {
-          if (pluginName.endsWith('.ts') || pluginName.endsWith('.js')) return;
-          console.log(`New plugin detected: ${pluginName}`);
-          try {
-              // 仅加载目录名作为插件名
-              const pluginDirName = path.basename(pluginName);
-              await this.load(pluginDirName);
-              if (this.core && this.config)
-                  this.core.emit('plugin-loaded', pluginName);
-
-          } catch (error) {
-              console.error(`Failed to load new plugin ${pluginName}:`, error);
-          }
-      });
-
-    watcher.on('change', async (pluginName) => {
-        if (!pluginName.endsWith('.ts')) return;
-        console.log(`Plugin changed: ${pluginName}`);
-        try {
-            const pluginDirName = path.dirname(pluginName);
-            //const pluginDirName = path.basename(pluginName);
-            await this.unloadPlugin(pluginDirName);
-            await this.load(pluginDirName);
-            if (this.core && this.config)
-               this.core.emit('plugin-reloaded', pluginName);
-        } catch (error) {
-            console.error(`Failed to reload plugin ${pluginName}:`, error);
-        }
-    });
-
-    watcher.on('unlink', async (pluginName) => {
-        if (!pluginName.endsWith('.ts')) return;
-        console.log(`Plugin removed: ${pluginName}`);
-        try {
-            const pluginDirName = path.dirname(pluginName);
-            //const pluginDirName = path.basename(pluginName);
-            await this.unloadPlugin(pluginDirName);
-            if (this.core && this.config)
-                this.core.emit('plugin-unloaded', pluginName);
-        } catch (error) {
-            console.error(`Failed to unload plugin ${pluginName}:`, error);
-        }
-    });
-
-    console.log(`Watching for plugin changes in ${pluginsDir}`);
   }
 }
 
