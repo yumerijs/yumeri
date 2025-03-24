@@ -1,5 +1,5 @@
 /**
- * @time: 2025/03/24 00:19
+ * @time: 2025/03/24 12:26
  * @author: FireGuo
  * WindyPear-Team All right reserved
  **/ 
@@ -12,6 +12,7 @@
 
   interface Plugin {
     apply: (core: Core, config: Config) => Promise<void>;
+    disable: (core: Core) => Promise<void>;
   }
 
   interface PluginLoader {
@@ -73,7 +74,9 @@
           console.error(`Failed to load plugin ${plugins.name}:`, err);
         }
       }
-      this.watchPlugins(this);
+      if(process.env.NODE_ENV === 'development'){
+        this.watchPlugins(this);
+      }
     }
     
     async loadPlugin(name: string, config: Config) {
@@ -104,7 +107,7 @@
         pollInterval: 100
       }
     });
-
+    /*
     watcher.on('add', async (changePath) => {
           if (changePath.endsWith('.ts') || changePath.endsWith('.js')) return;
           //console.log(`New plugin detected: ${pluginName}`);
@@ -121,7 +124,7 @@
               console.error(`Failed to load new plugin ${pluginName}:`, error);
           }
       });
-
+    */
     watcher.on('change', async (changePath) => {
         if (!changePath.endsWith('.ts')) return;
         const pluginName = changePath.split('/')[1];
@@ -130,7 +133,14 @@
             const pluginDirName = path.dirname(pluginName);
             const config = await core.getPluginConfig(pluginName);
             //const pluginDirName = path.basename(pluginName);
+            const plugin = core.plugins[pluginName];
+            if (plugin.disable) {
+              //console.log(`Applying plugin: ${name}`);
+              await plugin.disable(core);
+              //console.log(`Plugin ${name} applied.`);
+            }
             await core.pluginLoader.unloadPlugin(pluginName);
+            delete core.plugins[pluginName];
             await core.loadPlugin(pluginName, config);
             
             core.emit('plugin-reloaded', pluginName);
@@ -144,9 +154,14 @@
         const pluginName = changePath.split('/')[1];
         console.log(`Plugin removed: ${pluginName}`);
         try {
-            //const pluginDirName = path.dirname(pluginName);
-            //const pluginDirName = path.basename(pluginName);
+            const plugin = core.plugins[pluginName];
+            if (plugin.disable) {
+              //console.log(`Applying plugin: ${name}`);
+              await plugin.disable(core);
+              //console.log(`Plugin ${name} applied.`);
+            }
             await core.pluginLoader.unloadPlugin(pluginName);
+            delete core.plugins[pluginName];
             core.emit('plugin-unloaded', pluginName);
         } catch (error) {
             console.error(`Failed to unload plugin ${pluginName}:`, error);
@@ -170,6 +185,11 @@
     // 获取组件
     getComponent(name: string): any {
       return this.components[name];
+    }
+    
+    // 取消注册组件
+    unregisterComponent(name: string): void {
+        delete this.components[name];
     }
 
     // 事件系统：监听事件

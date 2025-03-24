@@ -1,3 +1,9 @@
+/**
+ * @time: 2025/03/24 12:26
+ * @author: FireGuo
+ * WindyPear-Team All right reserved
+ **/ 
+
 import crypto from 'crypto';
 
 export class Session {
@@ -29,6 +35,10 @@ export class Session {
     }
 
     // 生成 sessionid
+    /*
+     *  @ip: string，用户IP
+     *  @option: string，选项
+     */
     private generateId(ip: string, option?: string): string {
         const sessionId = this.md5(ip + Date.now().toString() + Math.random().toString()); // 添加随机性
         return sessionId;
@@ -56,7 +66,7 @@ export class Session {
        this.data = {};
     }
 
-    // （可选）销毁会话
+    // 销毁会话
     public destroy(): void {
         this.clearData(); // 清理会话数据
     }

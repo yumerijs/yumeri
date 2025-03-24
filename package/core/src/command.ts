@@ -1,4 +1,10 @@
-import { Core } from './core'; // 假设 Core 类在 core.ts 文件中
+/**
+ * @time: 2025/03/24 12:26
+ * @author: FireGuo
+ * WindyPear-Team All right reserved
+ **/ 
+
+import { Core } from './core';
 
 export class Command {
     name: string;
