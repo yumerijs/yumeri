@@ -1,6 +1,6 @@
 {
   "name": "@yumerijs/loader",
-  "version": "1.0.6",
+  "version": "1.0.8",
   "description": "Module loader for yumeri",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

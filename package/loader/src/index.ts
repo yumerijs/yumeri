@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { Core, Config } from '@yumerijs/core';
+import { Core, Config, Logger } from '@yumerijs/core';
 import * as fs from 'fs';
 import { promisify } from 'util';
 import { exec } from 'child_process';
@@ -12,6 +12,7 @@ const execAsync = promisify(exec);
 
 interface Plugin {
   apply: (core: Core, config: Config) => Promise<void>;
+  disable: (core: Core) => Promise<void>;
 }
 
 class PluginLoader {
@@ -20,6 +21,7 @@ class PluginLoader {
   private config: Config | null = null;
   private isDev: boolean = false;
   private pluginsDir: string = 'plugins'; // Default plugins directory
+  private logger = new Logger('loader');
 
   constructor(core?: Core, config?: Config, pluginsDir: string = 'plugins') {
     this.pluginCache = {};
@@ -48,7 +50,7 @@ class PluginLoader {
    */
   async load(pluginName: string): Promise<Plugin> {
       if (this.pluginCache[pluginName]) {
-          console.log(`Returning cached plugin: ${pluginName}`);
+          this.logger.info(`Returning cached plugin: ${pluginName}`);
           return this.pluginCache[pluginName];
       }
 
@@ -86,7 +88,7 @@ class PluginLoader {
           this.pluginCache[pluginName] = plugin;
           return plugin;
       } catch (e) {
-          console.error(`Failed to load plugin from ${pluginPath}:`, e);
+          this.logger.error(`Failed to load plugin from ${pluginPath}:`, e);
           throw e;
       }
   }
@@ -129,16 +131,11 @@ class PluginLoader {
         return pluginModule
 
     } catch (e) {
-        console.error(`Error loading plugin from path ${pluginPath}:`, e);
+        this.logger.error(`Error loading plugin from path ${pluginPath}:`, e);
         throw e;
     }
 }
-
-  /**
-   * 卸载插件
-   * @param pluginName 插件名称
-   */
-  /**
+  /*
    * 卸载插件
    * @param pluginName 插件名称
    */
@@ -157,8 +154,8 @@ class PluginLoader {
         delete require.cache[resolvedPath];
     }
 
-    console.log(`Plugin unloaded: ${pluginName}`);
-}
+    this.logger.info(`Plugin unloaded: ${pluginName}`);
+  }
 
   /**
    * 检查插件的依赖是否满足.
@@ -176,15 +173,15 @@ class PluginLoader {
    */
   async installPluginDependencies(pluginName: string): Promise<void> {
     try {
-      console.log(`Installing dependencies for plugin: ${pluginName}`);
+      this.logger.info(`Installing dependencies for plugin: ${pluginName}`);
       const { stdout, stderr } = await execAsync(`npm install ${pluginName} --save`);
-      console.log(`stdout: ${stdout}`);
+      this.logger.info(`stdout: ${stdout}`);
       if (stderr) {
-        console.error(`stderr: ${stderr}`);
+        this.logger.error(`stderr: ${stderr}`);
       }
-      console.log(`Dependencies installed for plugin: ${pluginName}`);
+      this.logger.info(`Dependencies installed for plugin: ${pluginName}`);
     } catch (error: any) {
-      console.error(`Error installing dependencies for plugin ${pluginName}:`, error);
+      this.logger.error(`Error installing dependencies for plugin ${pluginName}:`, error);
       throw error;
     }
   }
