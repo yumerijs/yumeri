@@ -1,8 +1,8 @@
 /**
- * @time: 2025/03/24 12:26
+ * @time: 2025/03/26 12:36
  * @author: FireGuo
  * WindyPear-Team All right reserved
- **/ 
+ **/
 
 import crypto from 'crypto';
 
@@ -12,7 +12,10 @@ export class Session {
     public query: Record<string, string> | undefined;
     public sessionid: string;
     public data: Record<string, any> = {};
-
+    public newCookie: Record<string, string> = {};
+    public head: Record<string, any> = {};
+    public status: number = 200;
+    public body: string = '';
 
     /*
      *  @ip: string，用户IP
@@ -23,14 +26,13 @@ export class Session {
         this.ip  = ip;
         this.cookie = cookie;
         this.query = query;
-
+        this.head['Content-Type'] = 'text/plain';
         if (cookie.sessionid) {
             this.sessionid = cookie.sessionid;
         }
         else {
             this.sessionid = this.generateId(this.ip);
-            // TODO: 在这里设置 cookie，将 sessionid 返回给客户端
-            // 例如设置响应头 Set-Cookie: sessionid=xxx; HttpOnly
+            this.newCookie.sessionid = this.sessionid;
         }
     }
 
@@ -70,4 +72,34 @@ export class Session {
     public destroy(): void {
         this.clearData(); // 清理会话数据
     }
+
+    public setMime(mimeType: 'png' | 'jpg' | 'jpeg' | 'pdf' | 'plain' | 'html' | 'json' | 'xml' | string): void {
+    switch (mimeType) {
+      case 'png':
+        this.head['Content-Type'] = 'image/png';
+        break;
+      case 'jpg':
+      case 'jpeg':
+        this.head['Content-Type'] = 'image/jpeg';
+        break;
+      case 'pdf':
+        this.head['Content-Type'] = 'application/pdf';
+        break;
+      case 'plain':
+        this.head['Content-Type'] = 'text/plain';
+        break;
+      case 'html':
+        this.head['Content-Type'] = 'text/html';
+        break;
+      case 'json':
+        this.head['Content-Type'] = 'application/json';
+        break;
+      case 'xml':
+        this.head['Content-Type'] = 'application/xml';
+        break;
+      default:
+        this.head['Content-Type'] = mimeType; // 原样使用，可以支持自定义类型
+        break;
+    }
+  }
 }
