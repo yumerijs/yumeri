@@ -11,3 +11,4 @@ config.yml
 *.userprefs
 tmp/
 temp/
+.yarn/
