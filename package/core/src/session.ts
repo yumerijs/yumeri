@@ -15,7 +15,7 @@ export class Session {
     public newCookie: Record<string, string> = {};
     public head: Record<string, any> = {};
     public status: number = 200;
-    public body: string = '';
+    public body: any;
 
     /*
      *  @ip: string，用户IP

@@ -9,6 +9,7 @@ import * as path from 'path';
 import { Config } from './config';
 import { Logger } from './logger';
 import { Command } from './command';
+import { Session } from './session';
 import chokidar from 'chokidar';
 
 interface Plugin {
@@ -202,7 +203,7 @@ export class Core {
   }
 
   // 执行指令
-  async executeCommand(name: string, session: any, ...args: any[]): Promise<{ result: any, session: any } | null> {
+  async executeCommand(name: string, session: any, ...args: any[]): Promise<Session | null> {
     const command = this.commands[name];
     if (command) {
       return await command.execute(session, ...args);

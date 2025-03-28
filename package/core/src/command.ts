@@ -5,6 +5,7 @@
  **/
 
 import { Core } from './core';
+import { Session } from './session';
 
 interface ActionFn {
   (session: any, ...args: any[]): Promise<any>;
@@ -25,7 +26,7 @@ export class Command {
     return this;
   }
 
-  async execute(session: any, ...args: any[]): Promise<{ result: any; session: any } | null> {
+  async execute(session: any, ...args: any[]): Promise<Session | null> {
     if (this.actionFn) {
       await this.actionFn(session, ...args);
       return session;
