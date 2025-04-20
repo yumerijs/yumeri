@@ -1,5 +1,5 @@
 /**
- * @time: 2025/03/25 18:01
+ * @time: 2025/04/20 11:45
  * @author: FireGuo
  * WindyPear-Team All right reserved
  **/
@@ -15,6 +15,7 @@ import chokidar from 'chokidar';
 interface Plugin {
   apply: (core: Core, config: Config) => Promise<void>;
   disable: (core: Core) => Promise<void>;
+  // Note: depend and provide are handled after plugin load due to loader constraints
 }
 
 interface PluginLoader {
@@ -28,13 +29,15 @@ interface CoreOptions {
 }
 
 export class Core {
-  public plugins: { [name: string]: Plugin } = {};
+  public plugins: { [name: string]: Plugin & { depend?: string[]; provide?: string[] } } = {};
   public config: any = null;
   private eventListeners: { [event: string]: ((...args: any[]) => Promise<void>)[] } = {};
   private components: { [name: string]: any } = {};
   public commands: Record<string, Command> = {};
   private pluginLoader: PluginLoader;
   private logger = new Logger('core');
+  private providedComponents: { [name: string]: string } = {}; // componentName: pluginName
+  private pluginModules: { [name: string]: any } = {}; // Store imported plugin modules
 
   constructor(pluginLoader: PluginLoader) {
     this.pluginLoader = pluginLoader;
@@ -61,42 +64,138 @@ export class Core {
     }
     return new Config(pluginName);
   }
+
+  private async importPluginModule(pluginName: string): Promise<any | undefined> {
+    try {
+      // Assuming plugin files are in a 'plugins' directory and follow a naming convention
+      const pluginPath = path.resolve('plugins', pluginName, 'index.js'); // Or .ts if you're using ts-node
+      if (fs.existsSync(pluginPath)) {
+        const module = await import(pluginPath);
+        return module;
+      }
+      const alternativePath = path.resolve('plugins', `${pluginName}.js`); // Or .ts
+      if (fs.existsSync(alternativePath)) {
+        const module = await import(alternativePath);
+        return module;
+      }
+      this.logger.warn(`Could not find main file (index.js or ${pluginName}.js/ts) for plugin: ${pluginName}`);
+      return undefined;
+    } catch (error) {
+      this.logger.error(`Error importing plugin module for ${pluginName}:`, error);
+      return undefined;
+    }
+  }
+
   // 加载插件
   async loadPlugins(): Promise<void> {
     if (!this.config || !this.config.plugins) {
       this.logger.info('No plugins to load.');
       return;
     }
-    for (const plugins of this.config.plugins) {
-      try {
-        this.logger.info(`Loading plugin: ${plugins.name}`);
-        const config = new Config(plugins.name, plugins.config);
-        await this.loadPlugin(plugins.name, config);
-      } catch (err) {
-        this.logger.error(`Failed to load plugin ${plugins.name}:`, err);
+
+    const pluginsToLoad = [...this.config.plugins];
+    const loadedPluginNames: string[] = [];
+    let loadAttempted: { [name: string]: boolean } = {};
+    let remainingPlugins = [...pluginsToLoad];
+
+    while (remainingPlugins.length > 0) {
+      let loadedInThisPass = false;
+      const nextRemainingPlugins: any[] = [];
+
+      for (const pluginConfig of remainingPlugins) {
+        const pluginName = pluginConfig.name;
+        if (loadedPluginNames.includes(pluginName) || loadAttempted[`${pluginName}`]) {
+          continue;
+        }
+        loadAttempted[`${pluginName}`] = true;
+
+        try {
+          this.logger.info(`Attempting to load plugin: ${pluginName}`);
+          const pluginInstance = await this.pluginLoader.load(pluginName);
+          const pluginModule = await this.importPluginModule(pluginName);
+
+          if (pluginInstance && pluginModule) {
+            const depend: string[] | undefined = pluginModule.depend;
+            const provide: string[] | undefined = pluginModule.provide;
+
+            const unmetDependencies = depend?.filter(dep => !this.components.hasOwnProperty(dep)) || [];
+
+            if (unmetDependencies.length === 0) {
+              this.plugins[`${pluginName}`] = Object.assign(pluginInstance, { depend, provide });
+              this.pluginModules[`${pluginName}`] = pluginModule;
+              this.logger.info(`Plugin ${pluginName} loaded.`);
+              loadedPluginNames.push(pluginName);
+              loadedInThisPass = true;
+
+              if (provide) {
+                for (const componentName of provide) {
+                  if (this.providedComponents.hasOwnProperty(componentName)) {
+                    this.logger.error(
+                      `Multiple plugins provide the component "${componentName}". Provided by "${this.providedComponents[`${componentName}`]}" and "${pluginName}". Only the first loaded will be active.`
+                    );
+                  } else {
+                    this.providedComponents[`${componentName}`] = pluginName;
+                  }
+                }
+              }
+            } else {
+              nextRemainingPlugins.push(pluginConfig);
+              this.logger.warn(
+                `Plugin ${pluginName} has unmet dependencies: ${unmetDependencies.join(', ')}. Will try again later.`
+              );
+            }
+          } else {
+            this.logger.warn(`Plugin "${pluginName}" could not be loaded or its module could not be imported.`);
+          }
+        } catch (err) {
+          this.logger.error(`Failed to load or process plugin ${pluginName}:`, err);
+        }
+      }
+
+      if (!loadedInThisPass && nextRemainingPlugins.length === remainingPlugins.length && remainingPlugins.length > 0) {
+        this.logger.error(
+          'Detected circular or unresolvable plugin dependencies. Remaining plugins:',
+          nextRemainingPlugins.map(p => p.name)
+        );
+        break; // Prevent infinite loop
+      }
+
+      remainingPlugins = nextRemainingPlugins;
+    }
+
+    // Apply plugins now that (hopefully) dependencies are loaded
+    for (const pluginName of loadedPluginNames) {
+      const plugin = this.plugins[`${pluginName}`];
+      const config = await this.getPluginConfig(pluginName);
+      if (plugin && plugin.apply) {
+        this.logger.info(`Applying plugin: ${pluginName}`);
+        await plugin.apply(this, config);
+        this.logger.info(`Plugin ${name} applied.`);
+        // Register provided components after apply, in case apply logic influences it
+        const provide = plugin.provide;
+        if (provide) {
+          for (const componentName of provide) {
+            this.registerComponent(componentName, plugin); // Register the plugin instance as the component
+          }
+        }
       }
     }
+
+    if (remainingPlugins.length > 0) {
+      this.logger.warn(
+        'Some plugins could not be fully loaded due to unresolved dependencies:',
+        remainingPlugins.map(p => p.name)
+      );
+    }
+
     if (process.env.NODE_ENV === 'development') {
       this.watchPlugins(this);
     }
   }
 
-  async loadPlugin(name: string, config: Config) {
-    const plugin = await this.pluginLoader.load(name);
-
-    this.plugins[name] = plugin;
-    this.logger.info(`Plugin ${name} loaded.`);
-
-    if (plugin.apply) {
-      this.logger.info(`Applying plugin: ${name}`);
-      await plugin.apply(this, config);
-      this.logger.info(`Plugin ${name} applied.`);
-    }
-  }
   /**
    * 监听插件目录，实现热重载
    * @param core Core实例
-   * @param config Config实例
    * @param pluginsDir 插件目录
    */
   watchPlugins(core: Core, pluginsDir: string = 'plugins') {
@@ -111,79 +210,124 @@ export class Core {
       },
     });
     watcher.on('change', async (changePath) => {
-      if (!changePath.endsWith('.ts')) return;
-      const pluginName = changePath.split('/')[1];
-      this.logger.info(`Plugin changed: ${pluginName}`);
-      try {
-        const pluginDirName = path.dirname(pluginName);
-        const config = await core.getPluginConfig(pluginName);
-        const plugin = core.plugins[pluginName];
-        if (plugin.disable) {
-          await plugin.disable(core);
-        }
-        await core.pluginLoader.unloadPlugin(pluginName);
-        delete core.plugins[pluginName];
-        await core.loadPlugin(pluginName, config);
+      if (!changePath.endsWith('.ts') && !changePath.endsWith('.js')) return;
+      const parts = changePath.split(path.sep);
+      if (parts.length < 2) return;
+      const pluginName = parts.slice(0, 2).join(path.sep);
+      const simplePluginName = parts.length >= 2 ? parts.slice(0, 2).join('/') : path.basename(changePath, path.extname(changePath));
 
-        core.emit('plugin-reloaded', pluginName);
-      } catch (error) {
-        this.logger.error(`Failed to reload plugin ${pluginName}:`, error);
-      }
+      this.logger.info(`Plugin file changed: ${simplePluginName}`);
+      this.reloadPlugin(simplePluginName, core);
+    });
+
+    watcher.on('add', async (changePath) => {
+      if (!changePath.endsWith('.ts') && !changePath.endsWith('.js')) return;
+      const parts = changePath.split(path.sep);
+      if (parts.length < 2) return;
+      const pluginName = parts.slice(0, 2).join(path.sep);
+      const simplePluginName = parts.length >= 2 ? parts.slice(0, 2).join('/') : path.basename(changePath, path.extname(changePath));
+
+      this.logger.info(`New plugin file added: ${simplePluginName}`);
+      await this.loadPlugins();
     });
 
     watcher.on('unlink', async (changePath) => {
-      if (!changePath.endsWith('.ts')) return;
-      const pluginName = changePath.split('/')[1];
-      this.logger.info(`Plugin removed: ${pluginName}`);
-      try {
-        const plugin = core.plugins[pluginName];
-        if (plugin.disable) {
-          await plugin.disable(core);
-        }
-        await core.pluginLoader.unloadPlugin(pluginName);
-        delete core.plugins[pluginName];
-        core.emit('plugin-unloaded', pluginName);
-      } catch (error) {
-        this.logger.error(`Failed to unload plugin ${pluginName}:`, error);
-      }
+      if (!changePath.endsWith('.ts') && !changePath.endsWith('.js')) return;
+      const parts = changePath.split(path.sep);
+      if (parts.length < 2) return;
+      const pluginName = parts.slice(0, 2).join(path.sep);
+      const simplePluginName = parts.length >= 2 ? parts.slice(0, 2).join('/') : path.basename(changePath, path.extname(changePath));
+
+      this.logger.info(`Plugin file removed: ${simplePluginName}`);
+      await this.unloadPluginAndEmit(simplePluginName, core);
     });
 
     logger.info(`Watching for plugin changes in ${pluginsDir}`);
   }
 
+  private async reloadPlugin(pluginName: string, core: Core) {
+    try {
+      const config = await core.getPluginConfig(pluginName);
+      const plugin = core.plugins[`${pluginName}`];
+      if (plugin && plugin.disable) {
+        await plugin.disable(core);
+      }
+      await core.pluginLoader.unloadPlugin(pluginName);
+      delete core.plugins[`${pluginName}`];
+      delete this.pluginModules[`${pluginName}`];
+      // Temporarily remove provided components from this plugin
+      for (const componentName in this.providedComponents) {
+        if (this.providedComponents[`${componentName}`] === pluginName) {
+          delete this.components[`${componentName}`];
+          delete this.providedComponents[`${componentName}`];
+        }
+      }
+
+      await this.loadPlugins();
+
+      core.emit('plugin-reloaded', pluginName);
+    } catch (error) {
+      this.logger.error(`Failed to reload plugin ${pluginName}:`, error);
+    }
+  }
+
+  private async unloadPluginAndEmit(pluginName: string, core: Core) {
+    try {
+      const plugin = core.plugins[`${pluginName}`];
+      if (plugin && plugin.disable) {
+        await plugin.disable(core);
+      }
+      await core.pluginLoader.unloadPlugin(pluginName);
+      delete core.plugins[`${pluginName}`];
+      delete this.pluginModules[`${pluginName}`];
+      // Remove provided components from this plugin
+      for (const componentName in this.providedComponents) {
+        if (this.providedComponents[`${componentName}`] === pluginName) {
+          delete this.components[`${componentName}`];
+          delete this.providedComponents[`${componentName}`];
+        }
+      }
+      core.emit('plugin-unloaded', pluginName);
+    } catch (error) {
+      this.logger.error(`Failed to unload plugin ${pluginName}:`, error);
+    }
+  }
+
   // 注册组件
   registerComponent(name: string, component: any): void {
-    if (this.components[name]) {
-      this.logger.warn(`Component "${name}" already registered.`);
+    if (this.components.hasOwnProperty(name)) {
+      this.logger.warn(`Component "${name}" already registered by plugin "${this.providedComponents[`${name}`]}".`);
+      return;
     }
-    this.components[name] = component;
+    this.components[`${name}`] = component;
     this.logger.info(`Component "${name}" registered.`);
   }
 
   // 获取组件
   getComponent(name: string): any {
-    return this.components[name];
+    return this.components[`${name}`];
   }
 
   // 取消注册组件
   unregisterComponent(name: string): void {
-    delete this.components[name];
+    delete this.components[`${name}`];
+    delete this.providedComponents[`${name}`];
   }
 
   // 事件系统：监听事件
   on(event: string, listener: (...args: any[]) => Promise<void>): void {
-    if (!this.eventListeners[event]) {
-      this.eventListeners[event] = [];
+    if (!this.eventListeners[`${event}`]) {
+      this.eventListeners[`${event}`] = [];
     }
-    this.eventListeners[event].push(listener);
+    this.eventListeners[`${event}`].push(listener);
     this.logger.info(`Listener added for event "${event}".`);
   }
 
   // 事件系统：触发事件
   async emit(event: string, ...args: any[]): Promise<void> {
-    if (this.eventListeners[event]) {
+    if (this.eventListeners[`${event}`]) {
       this.logger.info(`Emitting event "${event}" with args:`, args);
-      for (const listener of this.eventListeners[event]) {
+      for (const listener of this.eventListeners[`${event}`]) {
         try {
           await listener(...args);
         } catch (err) {
@@ -198,13 +342,13 @@ export class Core {
   // 定义指令
   command(name: string): Command {
     const command = new Command(this, name); // 传递 Core 实例
-    this.commands[name] = command;
+    this.commands[`${name}`] = command;
     return command;
   }
 
   // 执行指令
   async executeCommand(name: string, session: any, ...args: any[]): Promise<Session | null> {
-    const command = this.commands[name];
+    const command = this.commands[`${name}`];
     if (command) {
       return await command.execute(session, ...args);
     }
