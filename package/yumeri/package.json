@@ -8,9 +8,7 @@
     "dist",
     "index.js"
   ],
-  "bin": {
-    "yumeri": "dist/run.js"
-  },
+  "bin": "dist/run.js",
   "scripts": {
     "start": "node dist/run.js",
     "build": "tsc",
