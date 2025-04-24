@@ -240,7 +240,7 @@ if (loadedInThisPass && pluginInstance && pluginInstance.apply) {
       const simplePluginName = parts.length >= 2 ? parts.slice(0, 2).join('/') : path.basename(changePath, path.extname(changePath));
 
       this.logger.info(`New plugin file added: ${simplePluginName}`);
-      await this.loadPlugins();
+      this.reloadPlugin(simplePluginName, core);
     });
 
     watcher.on('unlink', async (changePath) => {
@@ -260,22 +260,22 @@ if (loadedInThisPass && pluginInstance && pluginInstance.apply) {
   private async reloadPlugin(pluginName: string, core: Core) {
     try {
       const config = await core.getPluginConfig(pluginName);
-      const plugin = core.plugins[`${pluginName}`];
+      const plugin = await core.pluginLoader.load(pluginName);
       if (plugin && plugin.disable) {
         await plugin.disable(core);
       }
-      await core.pluginLoader.unloadPlugin(pluginName);
-      delete core.plugins[`${pluginName}`];
-      delete this.pluginModules[`${pluginName}`];
-      // Temporarily remove provided components from this plugin
-      for (const componentName in this.providedComponents) {
-        if (this.providedComponents[`${componentName}`] === pluginName) {
-          delete this.components[`${componentName}`];
-          delete this.providedComponents[`${componentName}`];
+      if (plugin.provide) {
+        for (let providedmodules of plugin.provide) {
+          if (this.components[`${providedmodules}`]) {
+            this.unregisterComponent(providedmodules);
+          }
         }
       }
-
-      await this.loadPlugins();
+      await core.pluginLoader.unloadPlugin(pluginName);
+      if (plugin && plugin.apply) {
+        await plugin.apply(core, config);
+      }
+      this.pluginLoader.logger.info(`apply plugin ${pluginName}`);
 
       core.emit('plugin-reloaded', pluginName);
     } catch (error) {
@@ -332,7 +332,7 @@ if (loadedInThisPass && pluginInstance && pluginInstance.apply) {
       this.eventListeners[`${event}`] = [];
     }
     this.eventListeners[`${event}`].push(listener);
-    this.logger.info(`Listener added for event "${event}".`);
+    //this.logger.info(`Listener added for event "${event}".`);
   }
 
   // 事件系统：触发事件
@@ -347,7 +347,7 @@ if (loadedInThisPass && pluginInstance && pluginInstance.apply) {
         }
       }
     } else {
-      this.logger.info(`No listeners for event "${event}".`);
+      //this.logger.info(`No listeners for event "${event}".`);
     }
   }
 
