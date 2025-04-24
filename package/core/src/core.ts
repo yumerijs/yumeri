@@ -85,30 +85,45 @@ export class Core {
   }
 
   // 加载插件
-  async loadPlugins(): Promise<void> {
-    if (!this.config || !this.config.plugins) {
-      this.logger.info('No plugins to load.');
+async loadPlugins(): Promise<void> {
+    // 检查 plugins 配置是否存在且是对象类型
+    if (!this.config || typeof this.config.plugins !== 'object' || this.config.plugins === null) {
+      this.logger.info('No plugins configuration found or it is not an object. No plugins to load.');
       return;
     }
 
-    const pluginsToLoad = [...this.config.plugins];
+    // 获取所有需要加载的插件名
+    const pluginNamesToLoad = Object.keys(this.config.plugins);
+
+    if (pluginNamesToLoad.length === 0) {
+       this.logger.info('Plugins configuration is empty. No plugins to load.');
+       return;
+    }
+
     const loadedPluginNames: string[] = [];
+    // 使用对象来跟踪尝试加载的插件名
     let loadAttempted: { [name: string]: boolean } = {};
-    let remainingPlugins = [...pluginsToLoad];
+    // 使用插件名数组来管理剩余待加载的插件
+    let remainingPluginNames = [...pluginNamesToLoad];
 
-    while (remainingPlugins.length > 0) {
+    // 多次尝试加载插件，直到所有插件加载完毕或检测到循环依赖
+    while (remainingPluginNames.length > 0) {
       let loadedInThisPass = false;
-      const nextRemainingPlugins: any[] = [];
+      // 用于存储下一轮尝试加载的插件名
+      const nextRemainingPluginNames: string[] = [];
 
-      for (const pluginConfig of remainingPlugins) {
-        const pluginName = pluginConfig.name;
+      // 遍历当前剩余待加载的插件名
+      for (const pluginName of remainingPluginNames) {
+        // 如果插件已经加载或已尝试加载，则跳过
         if (loadedPluginNames.includes(pluginName) || loadAttempted[`${pluginName}`]) {
           continue;
         }
+        // 标记该插件已尝试加载
         loadAttempted[`${pluginName}`] = true;
 
         try {
           this.logger.info(`Attempting to load plugin: ${pluginName}`);
+          // 使用插件名加载插件实例和模块
           const pluginInstance = await this.pluginLoader.load(pluginName);
           const pluginModule = await this.importPluginModule(pluginName);
 
@@ -116,15 +131,18 @@ export class Core {
             const depend: string[] | undefined = pluginModule.depend;
             const provide: string[] | undefined = pluginModule.provide;
 
+            // 检查依赖是否满足 (此处仍然检查 this.components，请确保 this.components 在此阶段已包含必要的基准组件)
             const unmetDependencies = depend?.filter(dep => !this.components.hasOwnProperty(dep)) || [];
 
             if (unmetDependencies.length === 0) {
+              // 将加载成功并满足依赖的插件存储起来
               this.plugins[`${pluginName}`] = Object.assign(pluginInstance, { depend, provide });
               this.pluginModules[`${pluginName}`] = pluginModule;
               this.logger.info(`Plugin ${pluginName} loaded.`);
               loadedPluginNames.push(pluginName);
-              loadedInThisPass = true;
+              loadedInThisPass = true; // 标记本轮有插件加载成功
 
+              // 记录该插件提供了哪些组件
               if (provide) {
                 for (const componentName of provide) {
                   if (this.providedComponents.hasOwnProperty(componentName)) {
@@ -137,7 +155,8 @@ export class Core {
                 }
               }
             } else {
-              nextRemainingPlugins.push(pluginConfig);
+              // 如果存在未满足的依赖，将插件名放回下一轮尝试加载列表
+              nextRemainingPluginNames.push(pluginName);
               this.logger.warn(
                 `Plugin ${pluginName} has unmet dependencies: ${unmetDependencies.join(', ')}. Will try again later.`
               );
@@ -147,45 +166,54 @@ export class Core {
           }
         } catch (err) {
           this.logger.error(`Failed to load or process plugin ${pluginName}:`, err);
+          // 如果加载或处理失败，不将其加入下一轮尝试列表，但也不标记为已加载成功
         }
       }
 
-      if (!loadedInThisPass && nextRemainingPlugins.length === remainingPlugins.length && remainingPlugins.length > 0) {
+      // 如果本轮没有插件加载成功，并且剩余插件列表没有变化，则检测到循环或无法解决的依赖
+      if (!loadedInThisPass && nextRemainingPluginNames.length === remainingPluginNames.length && remainingPluginNames.length > 0) {
         this.logger.error(
           'Detected circular or unresolvable plugin dependencies. Remaining plugins:',
-          nextRemainingPlugins.map(p => p.name)
+          nextRemainingPluginNames.map(name => name) // 映射回插件名
         );
-        break; // Prevent infinite loop
+        break; // 防止无限循环
       }
 
-      remainingPlugins = nextRemainingPlugins;
+      // 更新剩余待加载插件列表为下一轮的列表
+      remainingPluginNames = nextRemainingPluginNames;
     }
 
-    // Apply plugins now that (hopefully) dependencies are loaded
+    // 在所有可加载的插件加载完毕后，遍历已成功加载的插件并应用它们
     for (const pluginName of loadedPluginNames) {
       const plugin = this.plugins[`${pluginName}`];
-      const config = await this.getPluginConfig(pluginName);
+      // 获取该插件的独立配置
+      const config = await this.getPluginConfig(pluginName); // 确保 getPluginConfig 方法能够根据插件名从 this.config.plugins 获取配置
       if (plugin && plugin.apply) {
         this.logger.info(`Applying plugin: ${pluginName}`);
+        // 调用插件的 apply 方法，并传入其配置
         await plugin.apply(this, config);
-        this.logger.info(`Plugin ${name} applied.`);
-        // Register provided components after apply, in case apply logic influences it
-        const provide = plugin.provide;
+        // 使用 pluginName
+        this.logger.info(`Plugin ${pluginName} applied.`);
+        // 在 apply 之后注册提供的组件，以便其他部分可以使用
+        const provide = plugin.provide; // 从加载的插件对象中获取 provide 列表
         if (provide) {
           for (const componentName of provide) {
-            this.registerComponent(componentName, plugin); // Register the plugin instance as the component
+            // 将插件实例注册为提供的组件，名称为 componentName
+            this.registerComponent(componentName, plugin);
           }
         }
       }
     }
 
-    if (remainingPlugins.length > 0) {
+    // 警告未加载成功的插件
+    if (remainingPluginNames.length > 0) {
       this.logger.warn(
-        'Some plugins could not be fully loaded due to unresolved dependencies:',
-        remainingPlugins.map(p => p.name)
+        'Some plugins could not be fully loaded due to unresolved dependencies or errors:',
+        remainingPluginNames.map(name => name) // 映射回插件名
       );
     }
 
+    // 开发环境下监听插件变化
     if (process.env.NODE_ENV === 'development') {
       this.watchPlugins(this);
     }
