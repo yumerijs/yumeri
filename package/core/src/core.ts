@@ -56,13 +56,11 @@ export class Core {
   }
 
   async getPluginConfig(pluginName: string): Promise<Config> {
-    for (const plugins of this.config.plugins) {
-      if (plugins.name == pluginName) {
-        const config = new Config(plugins.name, plugins.config);
-        return config;
-      }
+    if (!this.config.pluginName) {
+      return new Config(pluginName);
     }
-    return new Config(pluginName);
+    const config = new Config(pluginName, this.config.pluginName);
+    return config;
   }
 
   private async importPluginModule(pluginName: string): Promise<any | undefined> {
