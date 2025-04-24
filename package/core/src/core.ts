@@ -15,6 +15,8 @@ import chokidar from 'chokidar';
 interface Plugin {
   apply: (core: Core, config: Config) => Promise<void>;
   disable: (core: Core) => Promise<void>;
+  depend: Array<string>;
+  provide: Array<string>;
   // Note: depend and provide are handled after plugin load due to loader constraints
 }
 
@@ -23,6 +25,7 @@ interface PluginLoader {
   unloadPlugin(pluginName: string): Promise<void>;
   checkPluginDependencies(pluginPath: string): Promise<boolean>;
   installPluginDependencies(pluginName: string): Promise<void>;
+  logger: Logger;
 }
 interface CoreOptions {
   // TODO: Core的配置项
@@ -62,7 +65,7 @@ export class Core {
     const config = new Config(pluginName, this.config.pluginName);
     return config;
   }
-
+/*
   private async importPluginModule(pluginName: string): Promise<any | undefined> {
     try {
       // Assuming plugin files are in a 'plugins' directory and follow a naming convention
@@ -83,7 +86,7 @@ export class Core {
       return undefined;
     }
   }
-
+*/
   // 加载插件
 async loadPlugins(): Promise<void> {
     // 检查 plugins 配置是否存在且是对象类型
@@ -125,11 +128,11 @@ async loadPlugins(): Promise<void> {
           this.logger.info(`Attempting to load plugin: ${pluginName}`);
           // 使用插件名加载插件实例和模块
           const pluginInstance = await this.pluginLoader.load(pluginName);
-          const pluginModule = await this.importPluginModule(pluginName);
+          //const pluginModule = await this.importPluginModule(pluginName);
 
-          if (pluginInstance && pluginModule) {
-            const depend: string[] | undefined = pluginModule.depend;
-            const provide: string[] | undefined = pluginModule.provide;
+          if (pluginInstance) {
+            const depend: string[] | undefined = pluginInstance.depend;
+            const provide: string[] | undefined = pluginInstance.provide;
 
             // 检查依赖是否满足 (此处仍然检查 this.components，请确保 this.components 在此阶段已包含必要的基准组件)
             const unmetDependencies = depend?.filter(dep => !this.components.hasOwnProperty(dep)) || [];
@@ -137,11 +140,15 @@ async loadPlugins(): Promise<void> {
             if (unmetDependencies.length === 0) {
               // 将加载成功并满足依赖的插件存储起来
               this.plugins[`${pluginName}`] = Object.assign(pluginInstance, { depend, provide });
-              this.pluginModules[`${pluginName}`] = pluginModule;
-              this.logger.info(`Plugin ${pluginName} loaded.`);
+              //this.pluginModules[`${pluginName}`] = pluginModule;
+              //this.logger.info(`Plugin ${pluginName} loaded.`);
               loadedPluginNames.push(pluginName);
               loadedInThisPass = true; // 标记本轮有插件加载成功
-
+if (loadedInThisPass && pluginInstance && pluginInstance.apply) {
+        await pluginInstance.apply(this, await this.getPluginConfig(pluginName));
+        // 使用 pluginName
+        this.pluginLoader.logger.info(`apply plugin ${pluginName}`);
+      }
               // 记录该插件提供了哪些组件
               if (provide) {
                 for (const componentName of provide) {
@@ -157,19 +164,19 @@ async loadPlugins(): Promise<void> {
             } else {
               // 如果存在未满足的依赖，将插件名放回下一轮尝试加载列表
               nextRemainingPluginNames.push(pluginName);
-              this.logger.warn(
+              /*this.logger.warn(
                 `Plugin ${pluginName} has unmet dependencies: ${unmetDependencies.join(', ')}. Will try again later.`
-              );
+              );*/
             }
           } else {
-            this.logger.warn(`Plugin "${pluginName}" could not be loaded or its module could not be imported.`);
+            //this.logger.warn(`Plugin "${pluginName}" could not be loaded or its module could not be imported.`);
           }
         } catch (err) {
-          this.logger.error(`Failed to load or process plugin ${pluginName}:`, err);
+          this.pluginLoader.logger.error(`Failed to load or process plugin ${pluginName}:`, err);
           // 如果加载或处理失败，不将其加入下一轮尝试列表，但也不标记为已加载成功
         }
       }
-
+      
       // 如果本轮没有插件加载成功，并且剩余插件列表没有变化，则检测到循环或无法解决的依赖
       if (!loadedInThisPass && nextRemainingPluginNames.length === remainingPluginNames.length && remainingPluginNames.length > 0) {
         this.logger.error(
@@ -178,32 +185,11 @@ async loadPlugins(): Promise<void> {
         );
         break; // 防止无限循环
       }
-
+      
       // 更新剩余待加载插件列表为下一轮的列表
       remainingPluginNames = nextRemainingPluginNames;
     }
-
-    // 在所有可加载的插件加载完毕后，遍历已成功加载的插件并应用它们
-    for (const pluginName of loadedPluginNames) {
-      const plugin = this.plugins[`${pluginName}`];
-      // 获取该插件的独立配置
-      const config = await this.getPluginConfig(pluginName); // 确保 getPluginConfig 方法能够根据插件名从 this.config.plugins 获取配置
-      if (plugin && plugin.apply) {
-        this.logger.info(`Applying plugin: ${pluginName}`);
-        // 调用插件的 apply 方法，并传入其配置
-        await plugin.apply(this, config);
-        // 使用 pluginName
-        this.logger.info(`Plugin ${pluginName} applied.`);
-        // 在 apply 之后注册提供的组件，以便其他部分可以使用
-        const provide = plugin.provide; // 从加载的插件对象中获取 provide 列表
-        if (provide) {
-          for (const componentName of provide) {
-            // 将插件实例注册为提供的组件，名称为 componentName
-            this.registerComponent(componentName, plugin);
-          }
-        }
-      }
-    }
+    
 
     // 警告未加载成功的插件
     if (remainingPluginNames.length > 0) {
