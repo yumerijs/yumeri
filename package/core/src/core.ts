@@ -229,7 +229,7 @@ if (loadedInThisPass && pluginInstance && pluginInstance.apply) {
       const simplePluginName = parts.length >= 2 ? parts.slice(0, 2).join('/') : path.basename(changePath, path.extname(changePath));
 
       this.logger.info(`Plugin file changed: ${simplePluginName}`);
-      this.reloadPlugin(simplePluginName, core);
+      this.reloadPlugin(pluginName, core);
     });
 
     watcher.on('add', async (changePath) => {
@@ -240,7 +240,7 @@ if (loadedInThisPass && pluginInstance && pluginInstance.apply) {
       const simplePluginName = parts.length >= 2 ? parts.slice(0, 2).join('/') : path.basename(changePath, path.extname(changePath));
 
       this.logger.info(`New plugin file added: ${simplePluginName}`);
-      this.reloadPlugin(simplePluginName, core);
+      this.reloadPlugin(pluginName, core);
     });
 
     watcher.on('unlink', async (changePath) => {
@@ -251,7 +251,7 @@ if (loadedInThisPass && pluginInstance && pluginInstance.apply) {
       const simplePluginName = parts.length >= 2 ? parts.slice(0, 2).join('/') : path.basename(changePath, path.extname(changePath));
 
       this.logger.info(`Plugin file removed: ${simplePluginName}`);
-      await this.unloadPluginAndEmit(simplePluginName, core);
+      await this.unloadPluginAndEmit(pluginName, core);
     });
 
     logger.info(`Watching for plugin changes in ${pluginsDir}`);
