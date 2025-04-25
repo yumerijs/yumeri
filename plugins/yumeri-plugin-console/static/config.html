@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>插件配置</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: row;
+            width: 100%;
+        }
+
+        .sidebar {
+            width: 250px;
+            background-color: #f0f0f0;
+            padding: 20px;
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .sidebar nav ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .sidebar nav ul li {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #ccc;
+        }
+
+        .sidebar nav ul li:hover {
+            background-color: #ddd;
+        }
+
+        .main-content {
+            flex-grow: 1;
+            padding: 20px;
+        }
+
+        .toggle-sidebar {
+            display: none;
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px;
+            border: none;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+
+        .save-button {
+            background-color: #007BFF;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            cursor: pointer;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                position: fixed;
+                top: 0;
+                left: 0;
+                height: 100%;
+                z-index: 10;
+                background-color: rgba(0, 0, 0, 0.8);
+                color: white;
+                transform: translateX(-100%);
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .toggle-sidebar {
+                display: block;
+                position: absolute;
+                top: 10px;
+                left: 10px;
+            }
+
+            .main-content {
+                padding-top: 60px;
+            }
+        }
+
+        /* Notification style */
+        .notification {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px 30px;
+            border-radius: 5px;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s, top 0.3s;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+            font-size: 16px;
+        }
+
+        .notification.show {
+            top: 50px;
+            opacity: 1;
+        }
+
+        .notification.error {
+            background-color: #f44336;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <aside class="sidebar">
+            <button class="toggle-sidebar">☰</button>
+            <nav>
+                <ul id="plugin-list">
+                    <!-- 插件列表 -->
+                </ul>
+            </nav>
+        </aside>
+        <main class="main-content">
+            <h2 id="plugin-title">请选择插件</h2>
+            <div id="configuration-area">
+                <!-- Plugin configuration -->
+                <p>请从左侧选择一个插件进行配置。</p>
+            </div>
+            <button class="save-button">保存</button>
+        </main>
+    </div>
+
+    <div id="notification" class="notification">
+        <!-- Notification message -->
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const sidebar = document.querySelector('.sidebar');
+        const toggleSidebarButton = document.querySelector('.toggle-sidebar');
+        const pluginList = document.getElementById('plugin-list');
+        const configurationArea = document.getElementById('configuration-area');
+        const pluginTitle = document.getElementById('plugin-title');
+        const saveButton = document.querySelector('.save-button');
+        const notification = document.getElementById('notification');
+
+        let currentPluginName = null; // 用于存储当前选中的插件名称
+
+        // Toggle sidebar
+        toggleSidebarButton.addEventListener('click', function () {
+            sidebar.classList.toggle('open');
+        });
+
+        // Function to fetch and populate the plugin list
+        async function fetchPluginList() {
+            try {
+                const response = await fetch('/console/api/getplugins');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const plugins = await response.json();
+
+                pluginList.innerHTML = ''; // 清空现有列表
+                plugins.forEach(pluginName => {
+                    const listItem = document.createElement('li');
+                    listItem.textContent = pluginName;
+                    listItem.dataset.plugin = pluginName;
+                    listItem.addEventListener('click', function () {
+                        loadPluginConfiguration(pluginName);
+                        if (window.innerWidth <= 768) {
+                            sidebar.classList.remove('open');
+                        }
+                    });
+                    pluginList.appendChild(listItem);
+                });
+            } catch (error) {
+                console.error('Failed to fetch plugin list:', error);
+                pluginList.innerHTML = '<li>Failed to load plugins.</li>';
+            }
+        }
+
+        // Function to load plugin configuration
+        async function loadPluginConfiguration(pluginName) {
+            try {
+                // 存储当前选中的插件名称
+                currentPluginName = pluginName;
+                const response = await fetch(`/console/api/config?name=${pluginName}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const config = await response.json(); // 后端需要返回 [[key, value], [key, value]] 这样的结构来兼容这里
+
+                let configContent = '';
+                 // 我假设这里的 config 仍然是 [{"key":"value"}, {"key2":"value2"}] 这样的数组，因为你的后端需要适配它
+                if (Array.isArray(config)) {
+                     config.forEach(item => {
+                        const key = Object.keys(item)[0]; // 假设每个对象只有一个 key
+                        if (key) {
+                           const value = item[key];
+                           configContent += `<label for="${key}">${key}:</label>
+                                              <input type="text" id="${key}" value="${value}" data-key="${key}"><br>`;
+                        }
+                    });
+                } else {
+                    // 如果后端返回的不是数组，显示错误信息
+                     configContent = '<p>Invalid configuration format received from server.</p>';
+                }
+
+
+                pluginTitle.textContent = `${pluginName} 配置`;
+                configurationArea.innerHTML = configContent;
+
+                // **** 重要改动 ****
+                // 不再在这里添加事件监听器，只在 DOMContentLoaded 时添加一次
+
+            } catch (error) {
+                console.error('Failed to load plugin configuration:', error);
+                configurationArea.innerHTML = '<p>Failed to load configuration.</p>';
+            }
+        }
+
+        // **** 重要改动 ****
+        // 在 DOMContentLoaded 时只给 saveButton 添加一个永久的事件监听器
+        saveButton.addEventListener('click', async function() {
+            // 只有当 currentPluginName 有值时才尝试保存
+            if (!currentPluginName) {
+                showNotification('Please select a plugin first.', 'error');
+                return;
+            }
+
+            let configData = []; // 构建要发送的数组
+            document.querySelectorAll('#configuration-area input[type="text"]').forEach(input => {
+                 // 确保 input.dataset.key 存在
+                 if (input.dataset.key) {
+                     let item = {};
+                     item[input.dataset.key] = input.value;  // create an object for each key-value pair
+                     configData.push(item); // push the object to the array
+                 }
+            });
+
+            try {
+                 console.log('Frontend sending JSON:', configData); // 打印发送的数据
+                const jsonContent = JSON.stringify(configData);
+                // 使用存储的 currentPluginName 发送请求
+                const url = `/console/api/setconfig?name=${currentPluginName}&content=${encodeURIComponent(jsonContent)}`;
+                const response = await fetch(url);
+
+                if (!response.ok) {
+                    // 尝试解析错误信息
+                    const errorResult = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
+                    throw new Error(errorResult.error || `HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                 // 根据后端返回的 success 或 error 字段显示通知
+                showNotification(result.success || result.error, result.success ? 'success' : 'error');
+
+            } catch (error) {
+                console.error('Failed to save configuration:', error);
+                 // 确保显示的是错误消息
+                showNotification(`${error.message}`, 'error');
+            }
+        });
+
+
+        // Function to show notification
+        function showNotification(message, type = 'success') {
+            notification.textContent = message;
+            notification.className = `notification show ${type === 'error' ? 'error' : ''}`;
+            setTimeout(() => {
+                notification.classList.remove('show');
+                 notification.className = 'notification'; // 移除 show 和 error 类
+            }, 3000); // Hide after 3 seconds
+        }
+
+        // Fetch the plugin list when the page loads
+        fetchPluginList();
+    });
+    </script>
+</body>
+
+</html>
