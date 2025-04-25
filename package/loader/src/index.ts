@@ -113,9 +113,9 @@ class PluginLoader {
             // 开发模式下，加载 src 目录下的 ts 文件
             jsonPath= path.join(pluginPath, 'package.json');
             let jsoncontent = fs.readFileSync(jsonPath, 'utf-8');
-            let targetPath = path.join(pluginPath, JSON.parse(jsoncontent).main);
+            let targetPath = path.join(pluginPath, JSON.parse(jsoncontent).dev);
             if (!fs.existsSync(targetPath)) {
-                throw new Error(`src/index.ts not found in ${pluginPath}`);
+                throw new Error(`devfile not found in ${pluginPath}`);
             }
 
              // 检查目标文件是否是 TypeScript 文件
