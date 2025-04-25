@@ -59,36 +59,15 @@ export class Core {
   }
 
   async getPluginConfig(pluginName: string): Promise<Config> {
-    if (!this.config.pluginName) {
+    if (!this.config.plugins[pluginName]) {
       return new Config(pluginName);
     }
-    const config = new Config(pluginName, this.config.pluginName);
+    const config = new Config(pluginName, this.config.plugins[pluginName]);
     return config;
   }
-/*
-  private async importPluginModule(pluginName: string): Promise<any | undefined> {
-    try {
-      // Assuming plugin files are in a 'plugins' directory and follow a naming convention
-      const pluginPath = path.resolve('plugins', pluginName, 'index.js'); // Or .ts if you're using ts-node
-      if (fs.existsSync(pluginPath)) {
-        const module = await import(pluginPath);
-        return module;
-      }
-      const alternativePath = path.resolve('plugins', `${pluginName}.js`); // Or .ts
-      if (fs.existsSync(alternativePath)) {
-        const module = await import(alternativePath);
-        return module;
-      }
-      this.logger.warn(`Could not find main file (index.js or ${pluginName}.js/ts) for plugin: ${pluginName}`);
-      return undefined;
-    } catch (error) {
-      this.logger.error(`Error importing plugin module for ${pluginName}:`, error);
-      return undefined;
-    }
-  }
-*/
+
   // 加载插件
-async loadPlugins(): Promise<void> {
+  async loadPlugins(): Promise<void> {
     // 检查 plugins 配置是否存在且是对象类型
     if (!this.config || typeof this.config.plugins !== 'object' || this.config.plugins === null) {
       this.logger.info('No plugins configuration found or it is not an object. No plugins to load.');
@@ -99,8 +78,8 @@ async loadPlugins(): Promise<void> {
     const pluginNamesToLoad = Object.keys(this.config.plugins);
 
     if (pluginNamesToLoad.length === 0) {
-       this.logger.info('Plugins configuration is empty. No plugins to load.');
-       return;
+      this.logger.info('Plugins configuration is empty. No plugins to load.');
+      return;
     }
 
     const loadedPluginNames: string[] = [];
@@ -144,11 +123,11 @@ async loadPlugins(): Promise<void> {
               //this.logger.info(`Plugin ${pluginName} loaded.`);
               loadedPluginNames.push(pluginName);
               loadedInThisPass = true; // 标记本轮有插件加载成功
-if (loadedInThisPass && pluginInstance && pluginInstance.apply) {
-        await pluginInstance.apply(this, await this.getPluginConfig(pluginName));
-        // 使用 pluginName
-        this.pluginLoader.logger.info(`apply plugin ${pluginName}`);
-      }
+              if (loadedInThisPass && pluginInstance && pluginInstance.apply) {
+                await pluginInstance.apply(this, await this.getPluginConfig(pluginName));
+                // 使用 pluginName
+                this.pluginLoader.logger.info(`apply plugin ${pluginName}`);
+              }
               // 记录该插件提供了哪些组件
               if (provide) {
                 for (const componentName of provide) {
@@ -176,7 +155,7 @@ if (loadedInThisPass && pluginInstance && pluginInstance.apply) {
           // 如果加载或处理失败，不将其加入下一轮尝试列表，但也不标记为已加载成功
         }
       }
-      
+
       // 如果本轮没有插件加载成功，并且剩余插件列表没有变化，则检测到循环或无法解决的依赖
       if (!loadedInThisPass && nextRemainingPluginNames.length === remainingPluginNames.length && remainingPluginNames.length > 0) {
         this.logger.error(
@@ -185,11 +164,11 @@ if (loadedInThisPass && pluginInstance && pluginInstance.apply) {
         );
         break; // 防止无限循环
       }
-      
+
       // 更新剩余待加载插件列表为下一轮的列表
       remainingPluginNames = nextRemainingPluginNames;
     }
-    
+
 
     // 警告未加载成功的插件
     if (remainingPluginNames.length > 0) {
@@ -262,7 +241,7 @@ if (loadedInThisPass && pluginInstance && pluginInstance.apply) {
       const config = await core.getPluginConfig(pluginName);
       const plugin = await core.pluginLoader.load(pluginName);
       if (plugin && plugin.disable) {
-        await plugin.disable(core); 
+        await plugin.disable(core);
       }
       if (plugin.provide) {
         for (let providedmodules of plugin.provide) {
