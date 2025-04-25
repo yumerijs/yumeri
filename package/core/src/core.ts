@@ -262,7 +262,7 @@ if (loadedInThisPass && pluginInstance && pluginInstance.apply) {
       const config = await core.getPluginConfig(pluginName);
       const plugin = await core.pluginLoader.load(pluginName);
       if (plugin && plugin.disable) {
-        await plugin.disable(core);
+        await plugin.disable(core); 
       }
       if (plugin.provide) {
         for (let providedmodules of plugin.provide) {

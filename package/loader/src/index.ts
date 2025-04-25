@@ -59,8 +59,13 @@ class PluginLoader {
 
       // 1. 检查是否是本地插件目录下的插件
       const localPluginPath = path.resolve(this.pluginsDir, pluginName);
+      const localPluginPath1 = path.resolve(pluginName);
       if (fs.existsSync(localPluginPath)) {
           pluginPath = localPluginPath;
+          isLocalPlugin = true;
+      }
+      else if (fs.existsSync(localPluginPath1)) {
+          pluginPath = localPluginPath1;
           isLocalPlugin = true;
       }
       // 2. 检查是否是绝对路径或相对路径
@@ -102,11 +107,13 @@ class PluginLoader {
    */
   private async loadPluginFromPath(pluginPath: string, isLocalPlugin: boolean): Promise<Plugin> {
     try {
-
+        let jsonPath;
         let targetPath = pluginPath;
         if (isLocalPlugin && this.isDev) {
             // 开发模式下，加载 src 目录下的 ts 文件
-            targetPath = path.join(pluginPath, 'src', 'index.ts');
+            jsonPath= path.join(pluginPath, 'package.json');
+            let jsoncontent = fs.readFileSync(jsonPath, 'utf-8');
+            let targetPath = path.join(pluginPath, JSON.parse(jsoncontent).main);
             if (!fs.existsSync(targetPath)) {
                 throw new Error(`src/index.ts not found in ${pluginPath}`);
             }
