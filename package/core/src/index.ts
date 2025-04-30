@@ -9,5 +9,6 @@ import { Session } from './session';
 import { Command } from './command';
 import { Config } from './config';
 import { Logger } from './logger';
+import { Platform } from './platform';
 
-export { Core, Session, Command, Config, Logger };
+export { Core, Session, Command, Config, Logger, Platform };

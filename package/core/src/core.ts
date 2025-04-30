@@ -10,6 +10,7 @@ import { Config } from './config';
 import { Logger } from './logger';
 import { Command } from './command';
 import { Session } from './session';
+import { Platform } from './platform';
 import chokidar from 'chokidar';
 
 interface Plugin {
@@ -34,13 +35,14 @@ interface CoreOptions {
 export class Core {
   public plugins: { [name: string]: Plugin & { depend?: string[]; provide?: string[] } } = {};
   public config: any = null;
+  public platforms: Platform[] = [];
   private eventListeners: { [event: string]: ((...args: any[]) => Promise<void>)[] } = {};
   private components: { [name: string]: any } = {};
   public commands: Record<string, Command> = {};
   private pluginLoader: PluginLoader;
   private logger = new Logger('core');
-  private providedComponents: { [name: string]: string } = {}; // componentName: pluginName
-  private pluginModules: { [name: string]: any } = {}; // Store imported plugin modules
+  private providedComponents: { [name: string]: string } = {};
+  private pluginModules: { [name: string]: any } = {};
 
   constructor(pluginLoader: PluginLoader) {
     this.pluginLoader = pluginLoader;
@@ -344,5 +346,9 @@ export class Core {
       return await command.execute(session, ...args);
     }
     return null;
+  }
+  registerPlatform(platform: Platform): any {
+    this.platforms.push(platform);
+    return platform.startPlatform(this);
   }
 }

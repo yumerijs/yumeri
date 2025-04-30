@@ -5,6 +5,7 @@
  **/
 
 import crypto from 'crypto';
+import { Platform } from './platform';
 
 export class Session {
     public ip: string;
@@ -16,16 +17,18 @@ export class Session {
     public head: Record<string, any> = {};
     public status: number = 200;
     public body: any;
+    public platform: Platform;
 
     /*
      *  @ip: string，用户IP
      *  @cookie: string，会话cookie
      *  @query: string，请求字符串
      */
-    constructor(ip: string, cookie: Record<string, string>, query?: Record<string, string>){
+    constructor(ip: string, cookie: Record<string, string>, platform: Platform, query?: Record<string, string>){
         this.ip  = ip;
         this.cookie = cookie;
         this.query = query;
+        this.platform = platform;
         this.head['Content-Type'] = 'text/plain';
         if (cookie.sessionid) {
             this.sessionid = cookie.sessionid;
@@ -98,8 +101,16 @@ export class Session {
         this.head['Content-Type'] = 'application/xml';
         break;
       default:
-        this.head['Content-Type'] = mimeType; // 原样使用，可以支持自定义类型
+        this.head['Content-Type'] = mimeType;
         break;
     }
+  }
+
+  public send(data: any): any {
+    return this.platform.sendMessage(this, data);
+  }
+
+  public endsession(message: any): any {
+    return this.platform.terminationSession(this, message);
   }
 }
