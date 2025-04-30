@@ -98,7 +98,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@yumerijs/core@npm:1.0.33, @yumerijs/core@npm:^1.0.1, @yumerijs/core@workspace:package/core":
+"@yumerijs/core@npm:^1.0.1, @yumerijs/core@npm:^1.0.33, @yumerijs/core@workspace:package/core":
   version: 0.0.0-use.local
   resolution: "@yumerijs/core@workspace:package/core"
   dependencies:
@@ -329,7 +329,7 @@ __metadata:
   resolution: "yumeri@workspace:package/yumeri"
   dependencies:
     "@types/node": "npm:^22.13.10"
-    "@yumerijs/core": "npm:1.0.33"
+    "@yumerijs/core": "npm:^1.0.33"
     "@yumerijs/loader": "npm:^1.0.0"
     typescript: "npm:^5.8.2"
   bin:
