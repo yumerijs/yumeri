@@ -33,7 +33,7 @@
     "typescript": "^5.8.2"
   },
   "dependencies": {
-    "@yumerijs/core": "^1.0.0",
+    "@yumerijs/core": "^1.0.33",
     "@yumerijs/loader": "^1.0.0"
   }
 }
