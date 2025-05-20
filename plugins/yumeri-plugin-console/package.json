@@ -32,6 +32,8 @@
     "typescript": "^5.8.2"
   },
   "dependencies": {
-    "yumeri": "^1.0.0"
+    "js-yaml": "^4.1.0",
+    "yumeri": "workspace:^",
+    "yumeri-plugin-server": "workspace:^"
   }
 }

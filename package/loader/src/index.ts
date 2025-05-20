@@ -122,36 +122,52 @@ class PluginLoader {
                 // 开发模式下，加载 src 目录下的 ts 文件
                 jsonPath = path.join(pluginPath, 'package.json');
                 let jsoncontent = fs.readFileSync(jsonPath, 'utf-8');
-                let targetPath = path.join(pluginPath, JSON.parse(jsoncontent).dev);
+                targetPath = path.join(pluginPath, JSON.parse(jsoncontent).dev);
                 if (!fs.existsSync(targetPath)) {
                     throw new Error(`devfile not found in ${pluginPath}`);
                 }
 
                 // 检查目标文件是否是 TypeScript 文件
                 if (targetPath.endsWith('.ts')) {
-                    // 使用 require 加载 TypeScript 模块
+                    // 清除该文件的缓存，确保获取最新版本
+                    const resolvedPath = require.resolve(targetPath);
+                    if (require.cache[resolvedPath]) {
+                        delete require.cache[resolvedPath];
+                    }
+                    
+                    // 使用 ts-node 重新编译并加载 TypeScript 模块
                     const module = require(targetPath);
                     return module;
                 } else {
+                    // 清除该文件的缓存，确保获取最新版本
+                    const resolvedPath = require.resolve(targetPath);
+                    if (require.cache[resolvedPath]) {
+                        delete require.cache[resolvedPath];
+                    }
+                    
                     // 使用 require 加载 js 模块
                     const module = require(targetPath);
                     return module;
                 }
-
             } else {
                 targetPath = require.resolve(pluginPath);
+                
+                // 清除该文件的缓存，确保获取最新版本
+                if (require.cache[targetPath]) {
+                    delete require.cache[targetPath];
+                }
             }
 
-            //使用require加载
+            // 使用require加载
             const pluginModule = require(targetPath);
-            return pluginModule
-
+            return pluginModule;
         } catch (e) {
             this.logger.error(`Error loading plugin from path ${pluginPath}:`, e);
             throw e;
         }
     }
-    /*
+    
+    /**
      * 卸载插件
      * @param pluginName 插件名称
      */
@@ -162,15 +178,18 @@ class PluginLoader {
 
         delete this.pluginCache[pluginName];
 
-        // Clear the module from the require cache
-        const pluginPath = path.resolve(this.pluginsDir, pluginName, 'src', 'index.ts');
-        const resolvedPath = pathToFileURL(pluginPath).toString();
+        try {
+            // 清除插件相关的所有模块缓存
+            Object.keys(require.cache).forEach(key => {
+                if (key.includes(pluginName)) {
+                    delete require.cache[key];
+                }
+            });
 
-        if (require.cache[resolvedPath]) {
-            delete require.cache[resolvedPath];
+            this.logger.info(`Plugin unloaded: ${pluginName}`);
+        } catch (error) {
+            this.logger.error(`Error unloading plugin ${pluginName}:`, error);
         }
-
-        this.logger.info(`Plugin unloaded: ${pluginName}`);
     }
 
     /**

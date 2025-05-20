@@ -18,6 +18,7 @@ export class Session {
     public status: number = 200;
     public body: any;
     public platform: Platform;
+    public properties?: Record<string, any> = {};
 
     /*
      *  @ip: string，用户IP

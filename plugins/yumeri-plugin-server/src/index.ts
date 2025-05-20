@@ -1,4 +1,4 @@
-import { Core, Config, Session, Logger } from 'yumeri';
+import { Core, Config, Session, Logger, Platform, ConfigSchema } from 'yumeri';
 import * as fs from 'fs';
 import * as mime from 'mime-types';
 import http from 'http';
@@ -14,25 +14,119 @@ const logger = new Logger('server');
 
 export const provide = ['server'];
 
-export class Server {
+/**
+ * 服务器配置接口
+ */
+export interface ServerConfig {
+  /**
+   * 服务器监听端口
+   * @default 14510
+   */
+  port: number;
+  
+  /**
+   * 服务器监听地址
+   * @default "0.0.0.0"
+   */
+  host: string;
+  
+  /**
+   * 是否启用CORS
+   * @default true
+   */
+  enableCors: boolean;
+  
+  /**
+   * 静态文件目录
+   * @default "static"
+   */
+  staticDir: string;
+}
+
+/**
+ * 默认服务器配置
+ */
+export const config = {
+  schema: {
+    port: {
+      type: 'number',
+      default: 14510,
+      description: '服务器监听端口'
+    },
+    host: {
+      type: 'string',
+      default: '0.0.0.0',
+      description: '服务器监听地址'
+    },
+    enableCors: {
+      type: 'boolean',
+      default: true,
+      description: '是否启用CORS'
+    },
+    staticDir: {
+      type: 'string',
+      default: 'static',
+      description: '静态文件目录'
+    }
+  } as Record<string, ConfigSchema>
+};
+
+export class Server extends Platform {
   private core: Core;
   private port: number;
   private host: string;
   private httpServer: http.Server | null = null;
+  private enableCors: boolean;
+  private staticDir: string;
 
-
-  constructor(core: Core, port: number = 14510, host: string = '0.0.0.0') {
+  constructor(core: Core, config?: Partial<ServerConfig>) {
+    super(config);
     this.core = core;
-    this.port = port;
-    this.host = host;
+    this.port = this.getConfig<number>('port', 14510);
+    this.host = this.getConfig<string>('host', '0.0.0.0');
+    this.enableCors = this.getConfig<boolean>('enableCors', true);
+    this.staticDir = this.getConfig<string>('staticDir', 'static');
   }
 
-  async start(): Promise<void> {
+  terminationSession(session: Session, message: any) {
+    session.send(message);
+  }
+
+  getPlatformId(): string {
+    return 'server';
+  }
+
+  getPlatformStatus() {
+    return {
+      port: this.port,
+      host: this.host,
+      running: this.status === 'running',
+      enableCors: this.enableCors,
+      staticDir: this.staticDir
+    };
+  }
+
+  getPlatformVersionCode(): string {
+    //自动返回npm包版本
+    return require('../package.json').version;
+  }
+
+  getPlatformName(): string {
+    return 'http';
+  }
+
+  async startPlatform(core?: Core): Promise<void> {
+    if (core) {
+      this.core = core;
+    }
+    
+    this.status = 'starting';
+    this.emit('starting');
+    
     return new Promise((resolve, reject) => {
       this.httpServer = http.createServer(async (req, res) => {
-
         // 处理 CORS 预检请求
-        if (req.method === 'OPTIONS') {
+        if (req.method === 'OPTIONS' && this.enableCors) {
           res.writeHead(204, {
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -56,7 +150,8 @@ export class Server {
 
         const clientip = this.getClientIP(req);
         const clientcookie = this.parseCookies(req);
-        const session = new Session(clientip, clientcookie, params);    // 假设 Session 类已定义
+        const session = this.createSession(clientip, clientcookie, params);
+        session.properties = {req: req, res: res};
 
         let commandname = '';
         let path = '';
@@ -86,10 +181,16 @@ export class Server {
                   if (session != null) {
                     let head = session.head;
                     head['Set-Cookie'] = session.newCookie;
-                    head['Access-Control-Allow-Origin'] = '*';//允许跨域
+                    if (this.enableCors) {
+                      head['Access-Control-Allow-Origin'] = '*'; //允许跨域
+                    }
                     res.writeHead(session.status ?? 200, head);
                   } else {
-                    res.writeHead(200, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' }); //允许跨域
+                    const headers: http.OutgoingHttpHeaders = { 'Content-Type': 'text/plain' };
+                    if (this.enableCors) {
+                      headers['Access-Control-Allow-Origin'] = '*'; //允许跨域
+                    }
+                    res.writeHead(200, headers);
                   }
                   if (session != null) {
                     res.end(session.body);
@@ -100,7 +201,6 @@ export class Server {
 
             } catch (jsonError) {
               try {
-
                 const postData = new URLSearchParams(body as Record<string, string>);
                 for (const [key, value] of postData.entries()) {
                   params[key] = value;
@@ -111,10 +211,16 @@ export class Server {
                     if (session != null) {
                       let head = session.head;
                       head['Set-Cookie'] = session.newCookie;
-                      head['Access-Control-Allow-Origin'] = '*';//允许跨域
+                      if (this.enableCors) {
+                        head['Access-Control-Allow-Origin'] = '*'; //允许跨域
+                      }
                       res.writeHead(session.status ?? 200, head);
                     } else {
-                      res.writeHead(200, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' });//允许跨域
+                      const headers: http.OutgoingHttpHeaders = { 'Content-Type': 'text/plain' };
+                      if (this.enableCors) {
+                        headers['Access-Control-Allow-Origin'] = '*'; //允许跨域
+                      }
+                      res.writeHead(200, headers);
                     }
                     if (session != null) {
                       res.end(session.body);
@@ -126,7 +232,7 @@ export class Server {
               } catch (urlError) {
                 res.writeHead(400, { 'Content-Type': 'text/plain' });
                 res.end('Invalid POST data');
-                logger.error('Invalid POST data', urlError); // 假设 logger 已定义
+                logger.error('Invalid POST data', urlError);
               }
             }
           });
@@ -151,10 +257,16 @@ export class Server {
                     head['Set-Cookie'].push(cookieString);
                   }
                 }
-                head['Access-Control-Allow-Origin'] = '*';//允许跨域
+                if (this.enableCors) {
+                  head['Access-Control-Allow-Origin'] = '*'; //允许跨域
+                }
                 res.writeHead(session.status ?? 200, head);
               } else {
-                res.writeHead(200, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' });//允许跨域
+                const headers: http.OutgoingHttpHeaders = { 'Content-Type': 'text/plain' };
+                if (this.enableCors) {
+                  headers['Access-Control-Allow-Origin'] = '*'; //允许跨域
+                }
+                res.writeHead(200, headers);
               }
               if (session != null) {
                 res.end(session.body);
@@ -166,31 +278,81 @@ export class Server {
       });
 
       this.httpServer.listen(this.port, this.host, () => {
-        logger.info(`Yumeri Server listening on ${this.host}:${this.port}`);  // 假设 logger 已定义
+        this.status = 'running';
+        this.emit('started');
+        logger.info(`Yumeri Server listening on ${this.host}:${this.port}`);
         resolve();
       }).on('error', (err) => {
-        logger.error(`Failed to start Yumeri Server on ${this.host}:${this.port}:`, err);  // 假设 logger 已定义
+        this.status = 'error';
+        this.errorMessage = err.message;
+        this.emit('error', err);
+        logger.error(`Failed to start Yumeri Server on ${this.host}:${this.port}:`, err);
         reject(err);
       });
     });
   }
-  stop(): Promise<void> {
+
+  async stopPlatform(): Promise<void> {
+    if (this.status !== 'running' || !this.httpServer) {
+      return Promise.resolve();
+    }
+    
+    this.status = 'stopping';
+    this.emit('stopping');
+    
     return new Promise((resolve, reject) => {
       if (this.httpServer) {
         this.httpServer.close((err) => {
           if (err) {
+            this.status = 'error';
+            this.errorMessage = err.message;
+            this.emit('error', err);
             logger.error('Failed to stop Yumeri Server:', err);
             reject(err);
           } else {
+            this.status = 'idle';
+            this.emit('stopped');
             logger.info('Yumeri Server stopped.');
             resolve();
           }
         });
       } else {
-        resolve(); // 如果服务器没有启动，直接 resolve
+        this.status = 'idle';
+        resolve();
       }
     });
   }
+
+  sendMessage(session: Session, data: any) {
+    const res: http.ServerResponse<http.IncomingMessage> = session.properties?.res;
+    // 处理数据，确保它是可以发送的格式
+    const processedData = this.processSessionData(session, data);
+    res.write(processedData);
+  }
+
+  /**
+   * 处理会话数据
+   * @param session 会话对象
+   * @param data 会话数据
+   * @returns 处理后的数据
+   */
+  public processSessionData(session: Session, data: any): any {
+    // 如果数据是对象且不是Buffer或Stream，则转换为JSON字符串
+    if (typeof data === 'object' && data !== null && 
+        !(data instanceof Buffer) && 
+        !(data instanceof require('stream').Readable)) {
+      if (session.head['Content-Type'] === 'application/json') {
+        return JSON.stringify(data);
+      }
+    }
+    return data;
+  }
+
+  /**
+   * 获取客户端IP地址
+   * @param req HTTP请求对象
+   * @returns 客户端IP地址
+   */
   private getClientIP(req: http.IncomingMessage): string {
     const forwardedFor = req.headers['x-forwarded-for'] as string | undefined;
     if (forwardedFor) {
@@ -205,6 +367,12 @@ export class Server {
     }
     return '127.0.0.1';
   }
+
+  /**
+   * 解析请求体
+   * @param req HTTP请求对象
+   * @returns 解析后的参数
+   */
   private async parseRequestBody(req: IncomingMessage): Promise<ParsedParams> {
     return new Promise((resolve, reject) => {
       const contentType: string | undefined = req.headers['content-type'];
@@ -255,7 +423,6 @@ export class Server {
 
       // === 处理 multipart/form-data 使用 formidable ===
       } else if (lowerCaseContentType.includes('multipart/form-data')) {
-          // >>>>>> 使用导入的 Type 'IncomingForm' 进行类型注解 <<<<<<
           const form = formidable.formidable({
                // 可选配置，例如 uploadDir, keepExtensions, maxFileSize 等
                // uploadDir: './uploads',
@@ -263,10 +430,7 @@ export class Server {
                // maxFileSize: 10 * 1024 * 1024 // 示例：10MB
           });
 
-          // 调用 form.parse()
-          // >>>>>> 使用导入的 Types 'Fields' 和 'Files' 进行类型注解 <<<<<<
           form.parse(req, (err: Error | null, fields: Fields, files: Files) => {
-          // >>>>>> 修改结束 <<<<<<
               if (err) {
                   reject(new Error('Failed to parse multipart/form-data: ' + err.message));
                   return;
@@ -275,42 +439,38 @@ export class Server {
               const parsedFields: ParsedParams = {};
 
               // 遍历 fields，处理不同版本的 formidable 返回结构
-              // formidable v3+ 返回 Record<string, (string | formidable.File)[] | undefined>
-              // 我们只提取字符串值
               for (const key in fields) {
                   if (Object.prototype.hasOwnProperty.call(fields, key)) {
-                      const value = fields[key]; // value is (string | formidable.File)[] | undefined
+                      const value = fields[key];
 
                       if (Array.isArray(value) && value.length > 0) {
                            // 过滤数组，只保留字符串类型的元素
-                           // 使用类型谓词 item is string 帮助 TypeScript 识别过滤后的类型
                            const stringValues = value.filter((item): item is string => typeof item === 'string');
 
                            if (stringValues.length > 0) {
                               // 如果有字符串值（一个或多个），存入结果
                               parsedFields[key] = stringValues.length === 1 ? stringValues[0] : stringValues;
                            }
-                           // 如果 stringValues.length 是 0，表示这个字段的值都是 formidable.File 或其他非字符串类型，忽略。
                       }
-                      // 忽略那些值为 undefined 或非数组的字段 (尽管 formidable 通常返回数组)
                   }
               }
 
-              // files 对象中的文件信息被忽略，因为你只关心表单字段。
-              // 如果需要处理文件，可以在这里遍历 files 并处理。
-
-              resolve(parsedFields); // 返回解析好的文本字段参数
+              resolve(parsedFields);
           });
-          // formidable internal handling might cover this, but adding for completeness if needed
-          // req.on('error', (error: Error) => reject(error));
 
       // === 处理不支持的 Content-Type ===
       } else {
           // 请求头中的 Content-Type 不支持
           reject(new Error('Unsupported Content-Type: ' + contentType));
       }
-  });
-}
+    });
+  }
+
+  /**
+   * 解析Cookie
+   * @param req HTTP请求对象
+   * @returns Cookie对象
+   */
   private parseCookies(req: http.IncomingMessage): Record<string, string> {
     const cookieString = req.headers.cookie;
     if (!cookieString) {
@@ -329,35 +489,56 @@ export class Server {
 
     return cookies;
   }
+  
+  /**
+   * 获取平台配置模式
+   * @returns 配置模式对象
+   */
+  public static getConfigSchema(): Record<string, ConfigSchema> {
+    return config.schema;
+  }
 }
 
 export async function apply(core: Core, config: Config) {
-  const server = new Server(core, config.content.port, config.content.host);
-  await server.start();
+  // 创建服务器实例，使用配置内容
+  const serverConfig: Partial<ServerConfig> = {
+    port: config.get<number>('port', 14510),
+    host: config.get<string>('host', '0.0.0.0'),
+    enableCors: config.get<boolean>('enableCors', true),
+    staticDir: config.get<string>('staticDir', 'static')
+  };
+  
+  const server = new Server(core, serverConfig);
+  core.registerPlatform(server);
+  
+  // 注册静态文件处理命令
   core.command('static')
     .action(async (session: Session, param?: any) => {
       if (!param.path) {
-        session.body = `<html><head><title>404 Not Found</title></head><body><center><h1>404 Not Found</h1></center><hr><center>yumerijs</center></body>`;
+        await session.send(`<html><head><title>404 Not Found</title></head><body><center><h1>404 Not Found</h1></center><hr><center>yumerijs</center></body>`);
         session.setMime('html');
         return;
       }
       try {
-        const fullPath = path.join(process.cwd(), 'static', param.path);
+        const staticDir = server.getConfig<string>('staticDir', 'static');
+        const fullPath = path.join(process.cwd(), staticDir, param.path);
         session.body = fs.readFileSync(fullPath);
         session.setMime(mime.lookup(fullPath) || 'text/plain');
         return;
       } catch (e) {
-        session.body = `<html><head><title>404 Not Found</title></head><body><center><h1>404 Not Found</h1></center><hr><center>yumerijs</center></body></html>`;
+        await session.send(`<html><head><title>404 Not Found</title></head><body><center><h1>404 Not Found</h1></center><hr><center>yumerijs</center></body>`);
         session.setMime("text/html");
         return;
       }
     });
+    
+  // 注册服务器组件
   core.registerComponent('server', server);
 }
 
 export async function disable(core: Core) {
-  logger.info('Stopping server...')
-  let server = core.getComponent('server');
-  await server.stop();
+  logger.info('Stopping server...');
+  const server = core.getComponent('server') as Server;
+  await server.stopPlatform();
   core.unregisterComponent('server');
 }

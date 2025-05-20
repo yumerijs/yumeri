@@ -4,9 +4,22 @@
   "private": true,
   "packageManager": "yarn@4.9.1",
   "workspaces": [
-    "package/*"
+    "package/*",
+    "plugins/*"
   ],
+  "scripts": {
+    "start": "node package/yumeri/dist/run.js",
+    "dev": "cross-env NODE_ENV=development node package/yumeri/dist/run.js"
+  },
   "dependencies": {
-    "chokidar": "^4.0.3"
+    "chokidar": "^4.0.3",
+    "yumeri": "workspace:^",
+    "yumeri-plugin-console": "workspace:^",
+    "yumeri-plugin-server": "workspace:^"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.19",
+    "cross-env": "^7.0.3",
+    "typescript": "^5.8.3"
   }
 }

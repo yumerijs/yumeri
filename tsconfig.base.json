@@ -1,0 +1,10 @@
+{
+    "files": [],
+    "references": [
+      { "path": "./package/core" },
+      { "path": "./package/loader" },
+      { "path": "./package/yumeri" },
+      { "path": "./plugins/yumeri-plugin-server" },
+      { "path": "./plugins/yumeri-plugin-console" }
+    ]
+  }

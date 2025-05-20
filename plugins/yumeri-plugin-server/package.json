@@ -36,6 +36,6 @@
   "dependencies": {
     "formidable": "^3.5.4",
     "mime-types": "^3.0.1",
-    "yumeri": "^1.0.0"
+    "yumeri": "^1.1.0-alpha.1"
   }
 }
