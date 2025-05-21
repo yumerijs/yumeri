@@ -77,6 +77,15 @@ export interface PluginConfigSchema {
 class PluginConfigManager {
   private configCache: Record<string, any> = {};
   private schemaCache: Record<string, Record<string, PluginConfigSchema>> = {};
+  private core: Core | null = null;
+  
+  /**
+   * 设置Core实例
+   * @param core Core实例
+   */
+  setCore(core: Core): void {
+    this.core = core;
+  }
   
   /**
    * 获取插件配置
@@ -84,8 +93,11 @@ class PluginConfigManager {
    * @returns 插件配置对象
    */
   async getPluginConfig(pluginName: string): Promise<any> {
-    if (this.configCache[pluginName]) {
-      return this.configCache[pluginName];
+    // 如果插件名以~开头，去掉~前缀获取配置
+    const actualPluginName = pluginName.startsWith('~') ? pluginName.substring(1) : pluginName;
+    
+    if (this.configCache[actualPluginName]) {
+      return this.configCache[actualPluginName];
     }
     
     try {
@@ -93,14 +105,14 @@ class PluginConfigManager {
       const configFileContent = fs.readFileSync(configYmlPath, 'utf8');
       const configData: any = yaml.load(configFileContent);
       
-      if (configData?.plugins?.[pluginName]) {
-        this.configCache[pluginName] = configData.plugins[pluginName];
-        return this.configCache[pluginName];
+      if (configData?.plugins?.[actualPluginName]) {
+        this.configCache[actualPluginName] = configData.plugins[actualPluginName];
+        return this.configCache[actualPluginName];
       }
       
       return null;
     } catch (error) {
-      logger.error(`Failed to get config for plugin ${pluginName}:`, error);
+      logger.error(`Failed to get config for plugin ${actualPluginName}:`, error);
       return null;
     }
   }
@@ -111,13 +123,16 @@ class PluginConfigManager {
    * @returns 插件配置schema
    */
   async getPluginSchema(pluginName: string): Promise<Record<string, PluginConfigSchema> | null> {
-    if (this.schemaCache[pluginName]) {
-      return this.schemaCache[pluginName];
+    // 如果插件名以~开头，去掉~前缀获取schema
+    const actualPluginName = pluginName.startsWith('~') ? pluginName.substring(1) : pluginName;
+    
+    if (this.schemaCache[actualPluginName]) {
+      return this.schemaCache[actualPluginName];
     }
     
     try {
       // 尝试从插件模块中获取配置schema
-      const pluginPath = path.join(process.cwd(), 'plugins', pluginName);
+      const pluginPath = path.join(process.cwd(), 'plugins', actualPluginName);
       
       // 检查插件目录是否存在
       if (!fs.existsSync(pluginPath)) {
@@ -128,7 +143,7 @@ class PluginConfigManager {
       try {
         // 清除模块缓存以确保获取最新的配置
         Object.keys(require.cache).forEach(key => {
-          if (key.includes(pluginName)) {
+          if (key.includes(actualPluginName)) {
             delete require.cache[key];
           }
         });
@@ -138,16 +153,16 @@ class PluginConfigManager {
         
         // 检查是否有config.schema导出
         if (pluginModule.config?.schema) {
-          this.schemaCache[pluginName] = pluginModule.config.schema;
+          this.schemaCache[actualPluginName] = pluginModule.config.schema;
           return pluginModule.config.schema;
         }
       } catch (importError) {
-        logger.warn(`Failed to import plugin module ${pluginName}:`, importError);
+        logger.warn(`Failed to import plugin module ${actualPluginName}:`, importError);
       }
       
       return null;
     } catch (error) {
-      logger.error(`Failed to get schema for plugin ${pluginName}:`, error);
+      logger.error(`Failed to get schema for plugin ${actualPluginName}:`, error);
       return null;
     }
   }
@@ -156,9 +171,14 @@ class PluginConfigManager {
    * 保存插件配置
    * @param pluginName 插件名称
    * @param config 配置对象
+   * @param reload 是否自动重载插件
    * @returns 是否保存成功
    */
-  async savePluginConfig(pluginName: string, config: any): Promise<boolean> {
+  async savePluginConfig(pluginName: string, config: any, reload: boolean = true): Promise<boolean> {
+    // 如果插件名以~开头，去掉~前缀保存配置
+    const actualPluginName = pluginName.startsWith('~') ? pluginName.substring(1) : pluginName;
+    const isDisabled = pluginName.startsWith('~');
+    
     try {
       const configYmlPath = path.join(process.cwd(), 'config.yml');
       const configTmpYmlPath = configYmlPath + '.tmp';
@@ -169,8 +189,14 @@ class PluginConfigManager {
       // 确保plugins对象存在
       configData.plugins = configData.plugins || {};
       
-      // 更新插件配置
-      configData.plugins[pluginName] = config;
+      // 更新插件配置，保持禁用状态（如果有）
+      if (isDisabled) {
+        // 如果是禁用状态，保存到~开头的键
+        configData.plugins[pluginName] = config;
+      } else {
+        // 如果是启用状态，保存到正常键
+        configData.plugins[actualPluginName] = config;
+      }
       
       // 将配置写入临时文件
       const yamlStr = yaml.dump(configData, {
@@ -185,29 +211,224 @@ class PluginConfigManager {
       fs.renameSync(configTmpYmlPath, configYmlPath);
       
       // 更新缓存
-      this.configCache[pluginName] = config;
+      this.configCache[actualPluginName] = config;
+      
+      // 如果需要重载插件且Core实例存在
+      if (reload && this.core && !isDisabled) {
+        try {
+          await this.core.reloadPlugin(actualPluginName, this.core);
+          logger.info(`Plugin ${actualPluginName} reloaded after config change.`);
+        } catch (reloadError) {
+          logger.error(`Failed to reload plugin ${actualPluginName} after config change:`, reloadError);
+        }
+      }
       
       return true;
     } catch (error) {
-      logger.error(`Failed to save config for plugin ${pluginName}:`, error);
+      logger.error(`Failed to save config for plugin ${actualPluginName}:`, error);
       return false;
     }
   }
   
   /**
-   * 获取所有插件名称
+   * 获取所有插件名称（包括禁用的插件）
+   * @param includeDisabled 是否包含禁用的插件
    * @returns 插件名称数组
    */
-  async getAllPluginNames(): Promise<string[]> {
+  async getAllPluginNames(includeDisabled: boolean = true): Promise<string[]> {
     try {
       const configYmlPath = path.join(process.cwd(), 'config.yml');
       const configFileContent = fs.readFileSync(configYmlPath, 'utf8');
       const configData: any = yaml.load(configFileContent);
       
-      return configData.plugins ? Object.keys(configData.plugins) : [];
+      if (!configData.plugins) {
+        return [];
+      }
+      
+      if (includeDisabled) {
+        // 返回所有插件名称，包括禁用的
+        return Object.keys(configData.plugins);
+      } else {
+        // 只返回未禁用的插件名称
+        return Object.keys(configData.plugins).filter(name => !name.startsWith('~'));
+      }
     } catch (error) {
       logger.error('Failed to get all plugin names:', error);
       return [];
+    }
+  }
+  
+  /**
+   * 禁用插件
+   * @param pluginName 插件名称
+   * @returns 是否禁用成功
+   */
+  async disablePlugin(pluginName: string): Promise<boolean> {
+    // 如果插件名已经以~开头，则已经是禁用状态
+    if (pluginName.startsWith('~')) {
+      return true;
+    }
+    
+    try {
+      const configYmlPath = path.join(process.cwd(), 'config.yml');
+      const configTmpYmlPath = configYmlPath + '.tmp';
+      
+      const configFileContent = fs.readFileSync(configYmlPath, 'utf8');
+      let configData: any = yaml.load(configFileContent);
+      
+      // 确保plugins对象存在
+      configData.plugins = configData.plugins || {};
+      
+      // 检查插件是否存在
+      if (!configData.plugins[pluginName]) {
+        logger.error(`Plugin ${pluginName} not found in configuration.`);
+        return false;
+      }
+      
+      // 保存插件配置
+      const pluginConfig = configData.plugins[pluginName];
+      
+      // 删除原来的插件配置
+      delete configData.plugins[pluginName];
+      
+      // 添加禁用的插件配置
+      configData.plugins[`~${pluginName}`] = pluginConfig;
+      
+      // 将配置写入临时文件
+      const yamlStr = yaml.dump(configData, {
+        indent: 2,
+        lineWidth: 120,
+        noRefs: true,
+      });
+      
+      fs.writeFileSync(configTmpYmlPath, yamlStr, 'utf8');
+      
+      // 重命名覆盖原文件
+      fs.renameSync(configTmpYmlPath, configYmlPath);
+      
+      // 如果Core实例存在，卸载插件
+      if (this.core) {
+        try {
+          await this.core.unloadPluginAndEmit(pluginName, this.core);
+          logger.info(`Plugin ${pluginName} unloaded after being disabled.`);
+        } catch (unloadError) {
+          logger.error(`Failed to unload plugin ${pluginName} after being disabled:`, unloadError);
+        }
+      }
+      
+      // 清除缓存
+      this.clearCache();
+      
+      return true;
+    } catch (error) {
+      logger.error(`Failed to disable plugin ${pluginName}:`, error);
+      return false;
+    }
+  }
+  
+  /**
+   * 启用插件
+   * @param pluginName 插件名称
+   * @returns 是否启用成功
+   */
+  async enablePlugin(pluginName: string): Promise<boolean> {
+    // 如果插件名不以~开头，则已经是启用状态
+    if (!pluginName.startsWith('~')) {
+      return true;
+    }
+    
+    const actualPluginName = pluginName.substring(1);
+    
+    try {
+      const configYmlPath = path.join(process.cwd(), 'config.yml');
+      const configTmpYmlPath = configYmlPath + '.tmp';
+      
+      const configFileContent = fs.readFileSync(configYmlPath, 'utf8');
+      let configData: any = yaml.load(configFileContent);
+      
+      // 确保plugins对象存在
+      configData.plugins = configData.plugins || {};
+      
+      // 检查插件是否存在
+      if (!configData.plugins[pluginName]) {
+        logger.error(`Plugin ${pluginName} not found in configuration.`);
+        return false;
+      }
+      
+      // 保存插件配置
+      const pluginConfig = configData.plugins[pluginName];
+      
+      // 删除禁用的插件配置
+      delete configData.plugins[pluginName];
+      
+      // 添加启用的插件配置
+      configData.plugins[actualPluginName] = pluginConfig;
+      
+      // 将配置写入临时文件
+      const yamlStr = yaml.dump(configData, {
+        indent: 2,
+        lineWidth: 120,
+        noRefs: true,
+      });
+      
+      fs.writeFileSync(configTmpYmlPath, yamlStr, 'utf8');
+      
+      // 重命名覆盖原文件
+      fs.renameSync(configTmpYmlPath, configYmlPath);
+      
+      // 清除缓存
+      this.clearCache();
+      
+      // 如果Core实例存在，加载插件
+      if (this.core) {
+        try {
+          // 获取插件配置
+          const config = await this.core.getPluginConfig(actualPluginName);
+          
+          // 加载插件
+          const plugin = await this.core.pluginLoader.load(actualPluginName);
+          
+          // 应用插件
+          if (plugin && plugin.apply) {
+            await plugin.apply(this.core, config);
+            logger.info(`Plugin ${actualPluginName} loaded after being enabled.`);
+          }
+        } catch (loadError) {
+          logger.error(`Failed to load plugin ${actualPluginName} after being enabled:`, loadError);
+        }
+      }
+      
+      return true;
+    } catch (error) {
+      logger.error(`Failed to enable plugin ${pluginName}:`, error);
+      return false;
+    }
+  }
+  
+  /**
+   * 检查插件是否被禁用
+   * @param pluginName 插件名称
+   * @returns 是否被禁用
+   */
+  async isPluginDisabled(pluginName: string): Promise<boolean> {
+    // 如果插件名以~开头，则是禁用状态
+    if (pluginName.startsWith('~')) {
+      return true;
+    }
+    
+    try {
+      const configYmlPath = path.join(process.cwd(), 'config.yml');
+      const configFileContent = fs.readFileSync(configYmlPath, 'utf8');
+      const configData: any = yaml.load(configFileContent);
+      
+      // 确保plugins对象存在
+      configData.plugins = configData.plugins || {};
+      
+      // 检查是否存在禁用的插件配置
+      return configData.plugins[`~${pluginName}`] !== undefined;
+    } catch (error) {
+      logger.error(`Failed to check if plugin ${pluginName} is disabled:`, error);
+      return false;
     }
   }
   
@@ -226,7 +447,10 @@ class PluginConfigManager {
    * @returns 验证结果，如果通过返回true，否则返回错误信息
    */
   async validatePluginConfig(pluginName: string, config: any): Promise<true | string> {
-    const schema = await this.getPluginSchema(pluginName);
+    // 如果插件名以~开头，去掉~前缀获取schema
+    const actualPluginName = pluginName.startsWith('~') ? pluginName.substring(1) : pluginName;
+    
+    const schema = await this.getPluginSchema(actualPluginName);
     if (!schema) {
       return true; // 没有schema，视为验证通过
     }
@@ -286,6 +510,7 @@ class PluginConfigManager {
 export async function apply(core: Core, config: Config) {
   // 创建插件配置管理器
   const configManager = new PluginConfigManager();
+  configManager.setCore(core);
   
   // 注册控制台命令
   core.command(config.get<string>('path', 'console'))
@@ -367,7 +592,8 @@ export async function apply(core: Core, config: Config) {
         
         // 获取所有插件名称
         if (param.path === '/api/getplugins') {
-          const plugins = await configManager.getAllPluginNames();
+          const includeDisabled = param.includeDisabled === 'true';
+          const plugins = await configManager.getAllPluginNames(includeDisabled);
           session.body = JSON.stringify(plugins);
           session.setMime('json');
           return;
@@ -377,6 +603,7 @@ export async function apply(core: Core, config: Config) {
         if (param.path === '/api/setconfig') {
           const pluginName = param.name;
           const content = param.content;
+          const reload = param.reload !== 'false'; // 默认为true
           
           if (!pluginName || !content) {
             session.body = JSON.stringify({ error: 'Plugin name and content are required.' });
@@ -417,7 +644,7 @@ export async function apply(core: Core, config: Config) {
             }
             
             // 保存插件配置
-            const success = await configManager.savePluginConfig(pluginName, newConfigObject);
+            const success = await configManager.savePluginConfig(pluginName, newConfigObject, reload);
             
             if (success) {
               session.body = JSON.stringify({ success: `Configuration for plugin ${pluginName} updated.` });
@@ -430,6 +657,93 @@ export async function apply(core: Core, config: Config) {
           } catch (error: any) {
             session.body = JSON.stringify({ error: `Error processing config update: ${error.message}` });
             logger.error('Error processing config update:', error);
+            session.setMime('json');
+            return;
+          }
+        }
+        
+        // 禁用插件
+        if (param.path === '/api/disableplugin') {
+          const pluginName = param.name;
+          
+          if (!pluginName) {
+            session.body = JSON.stringify({ error: 'Plugin name is required.' });
+            session.setMime('json');
+            return;
+          }
+          
+          try {
+            const success = await configManager.disablePlugin(pluginName);
+            
+            if (success) {
+              session.body = JSON.stringify({ success: `Plugin ${pluginName} disabled.` });
+            } else {
+              session.body = JSON.stringify({ error: `Failed to disable plugin ${pluginName}.` });
+            }
+            
+            session.setMime('json');
+            return;
+          } catch (error: any) {
+            session.body = JSON.stringify({ error: `Error disabling plugin: ${error.message}` });
+            logger.error('Error disabling plugin:', error);
+            session.setMime('json');
+            return;
+          }
+        }
+        
+        // 启用插件
+        if (param.path === '/api/enableplugin') {
+          const pluginName = param.name;
+          
+          if (!pluginName) {
+            session.body = JSON.stringify({ error: 'Plugin name is required.' });
+            session.setMime('json');
+            return;
+          }
+          
+          try {
+            const success = await configManager.enablePlugin(pluginName);
+            
+            if (success) {
+              session.body = JSON.stringify({ success: `Plugin ${pluginName} enabled.` });
+            } else {
+              session.body = JSON.stringify({ error: `Failed to enable plugin ${pluginName}.` });
+            }
+            
+            session.setMime('json');
+            return;
+          } catch (error: any) {
+            session.body = JSON.stringify({ error: `Error enabling plugin: ${error.message}` });
+            logger.error('Error enabling plugin:', error);
+            session.setMime('json');
+            return;
+          }
+        }
+        
+        // 检查插件状态
+        if (param.path === '/api/pluginstatus') {
+          const pluginName = param.name;
+          
+          if (!pluginName) {
+            session.body = JSON.stringify({ error: 'Plugin name is required.' });
+            session.setMime('json');
+            return;
+          }
+          
+          try {
+            const isDisabled = await configManager.isPluginDisabled(pluginName);
+            
+            session.body = JSON.stringify({ 
+              name: pluginName,
+              disabled: isDisabled,
+              status: isDisabled ? 'disabled' : 'enabled'
+            });
+            
+            session.setMime('json');
+            return;
+          } catch (error: any) {
+            session.body = JSON.stringify({ error: `Error checking plugin status: ${error.message}` });
+            logger.error('Error checking plugin status:', error);
             session.setMime('json');
             return;
           }

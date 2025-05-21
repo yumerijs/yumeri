@@ -39,7 +39,7 @@ export class Core {
   private eventListeners: { [event: string]: ((...args: any[]) => Promise<void>)[] } = {};
   private components: { [name: string]: any } = {};
   public commands: Record<string, Command> = {};
-  private pluginLoader: PluginLoader;
+  public pluginLoader: PluginLoader;
   private logger = new Logger('core');
   private providedComponents: { [name: string]: string } = {};
   private pluginModules: { [name: string]: any } = {};
@@ -61,10 +61,13 @@ export class Core {
   }
 
   async getPluginConfig(pluginName: string): Promise<Config> {
-    if (!this.config.plugins[pluginName]) {
-      return new Config(pluginName);
+    // 如果插件名以~开头，则去掉~前缀获取配置
+    const actualPluginName = pluginName.startsWith('~') ? pluginName.substring(1) : pluginName;
+    
+    if (!this.config.plugins[actualPluginName]) {
+      return new Config(actualPluginName);
     }
-    const config = new Config(pluginName, this.config.plugins[pluginName]);
+    const config = new Config(actualPluginName, this.config.plugins[actualPluginName]);
     return config;
   }
 
@@ -76,12 +79,18 @@ export class Core {
       return;
     }
 
-    // 获取所有需要加载的插件名
-    const pluginNamesToLoad = Object.keys(this.config.plugins);
+    // 获取所有需要加载的插件名，过滤掉以~开头的插件（禁用的插件）
+    const pluginNamesToLoad = Object.keys(this.config.plugins).filter(name => !name.startsWith('~'));
 
     if (pluginNamesToLoad.length === 0) {
-      this.logger.info('Plugins configuration is empty. No plugins to load.');
+      this.logger.info('No enabled plugins found in configuration. All plugins might be disabled or configuration is empty.');
       return;
+    }
+
+    // 记录被禁用的插件
+    const disabledPlugins = Object.keys(this.config.plugins).filter(name => name.startsWith('~'));
+    if (disabledPlugins.length > 0) {
+      this.logger.info(`Skipping disabled plugins: ${disabledPlugins.join(', ')}`);
     }
 
     const loadedPluginNames: string[] = [];
@@ -238,7 +247,12 @@ export class Core {
     logger.info(`Watching for plugin changes in ${pluginsDir}`);
   }
 
-  private async reloadPlugin(pluginName: string, core: Core) {
+  /**
+   * 重新加载插件
+   * @param pluginName 插件名称
+   * @param core Core实例
+   */
+  public async reloadPlugin(pluginName: string, core: Core) {
     try {
       const config = await core.getPluginConfig(pluginName);
       const plugin = await core.pluginLoader.load(pluginName);
@@ -264,7 +278,12 @@ export class Core {
     }
   }
 
-  private async unloadPluginAndEmit(pluginName: string, core: Core) {
+  /**
+   * 卸载插件并触发事件
+   * @param pluginName 插件名称
+   * @param core Core实例
+   */
+  public async unloadPluginAndEmit(pluginName: string, core: Core) {
     try {
       const plugin = core.plugins[`${pluginName}`];
       if (plugin && plugin.disable) {

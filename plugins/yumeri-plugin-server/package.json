@@ -1,6 +1,6 @@
 {
   "name": "yumeri-plugin-server",
-  "version": "1.0.8",
+  "version": "1.1.0-alpha.2",
   "description": "Web server for yumeri",
   "main": "dist/index.js",
   "dev": "src/index.ts",
@@ -28,14 +28,16 @@
   },
   "homepage": "https://github.com/WindyPear-Team/yumeri#readme",
   "devDependencies": {
+    "@types/chalk": "^2.2.4",
     "@types/formidable": "^3",
     "@types/mime-types": "^2.1.4",
     "@types/node": "^22.13.10",
+    "@types/semver": "^7.7.0",
     "typescript": "^5.8.2"
   },
   "dependencies": {
     "formidable": "^3.5.4",
     "mime-types": "^3.0.1",
-    "yumeri": "^1.1.0-alpha.1"
+    "yumeri": "1.1.0-alpha.2"
   }
 }

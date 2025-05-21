@@ -33,7 +33,7 @@
   },
   "dependencies": {
     "js-yaml": "^4.1.0",
-    "yumeri": "workspace:^",
-    "yumeri-plugin-server": "workspace:^"
+    "yumeri": "1.1.0-alpha.2",
+    "yumeri-plugin-server": "1.1.0-alpha.2"
   }
 }

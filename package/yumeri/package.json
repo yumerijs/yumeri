@@ -12,7 +12,7 @@
   "scripts": {
     "start": "node dist/run.js",
     "build": "tsc",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "yarn build"
   },
   "repository": {
     "type": "git",
@@ -29,6 +29,7 @@
   },
   "homepage": "https://github.com/yumerijs/yumeri#readme",
   "devDependencies": {
+    "@types/formidable": "^3.4.5",
     "@types/node": "^22.13.10",
     "typescript": "^5.8.2"
   },

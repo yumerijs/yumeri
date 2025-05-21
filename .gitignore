@@ -13,3 +13,4 @@ tmp/
 temp/
 .yarn/
 static/
+*.tar.gz

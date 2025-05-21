@@ -53,7 +53,9 @@ const RAW_RUNTIME_STATE =
       [null, {\
         "packageLocation": "./",\
         "packageDependencies": [\
+          ["@types/chalk", "npm:2.2.4"],\
           ["@types/node", "npm:22.15.19"],\
+          ["@types/semver", "npm:7.7.0"],\
           ["chokidar", "npm:4.0.3"],\
           ["cross-env", "npm:7.0.3"],\
           ["typescript", "patch:typescript@npm%3A5.8.3#optional!builtin<compat/typescript>::version=5.8.3&hash=5786d5"],\
@@ -224,7 +226,9 @@ const RAW_RUNTIME_STATE =
           ["@types/js-yaml", "npm:4.0.9"],\
           ["@types/node", "npm:22.15.19"],\
           ["@yumerijs/core", "workspace:package/core"],\
+          ["@yumerijs/loader", "workspace:package/loader"],\
           ["ansi-colors", "npm:4.1.3"],\
+          ["chalk", "npm:5.4.1"],\
           ["chokidar", "npm:4.0.3"],\
           ["js-sha256", "npm:0.11.0"],\
           ["js-yaml", "npm:4.1.0"],\
@@ -602,6 +606,7 @@ const RAW_RUNTIME_STATE =
       ["workspace:package/yumeri", {\
         "packageLocation": "./package/yumeri/",\
         "packageDependencies": [\
+          ["@types/formidable", "npm:3.4.5"],\
           ["@types/node", "npm:22.15.19"],\
           ["@yumerijs/core", "workspace:package/core"],\
           ["@yumerijs/loader", "workspace:package/loader"],\
@@ -615,7 +620,9 @@ const RAW_RUNTIME_STATE =
       ["workspace:.", {\
         "packageLocation": "./",\
         "packageDependencies": [\
+          ["@types/chalk", "npm:2.2.4"],\
           ["@types/node", "npm:22.15.19"],\
+          ["@types/semver", "npm:7.7.0"],\
           ["chokidar", "npm:4.0.3"],\
           ["cross-env", "npm:7.0.3"],\
           ["typescript", "patch:typescript@npm%3A5.8.3#optional!builtin<compat/typescript>::version=5.8.3&hash=5786d5"],\
@@ -646,9 +653,11 @@ const RAW_RUNTIME_STATE =
       ["workspace:plugins/yumeri-plugin-server", {\
         "packageLocation": "./plugins/yumeri-plugin-server/",\
         "packageDependencies": [\
+          ["@types/chalk", "npm:2.2.4"],\
           ["@types/formidable", "npm:3.4.5"],\
           ["@types/mime-types", "npm:2.1.4"],\
           ["@types/node", "npm:22.15.19"],\
+          ["@types/semver", "npm:7.7.0"],\
           ["formidable", "npm:3.5.4"],\
           ["mime-types", "npm:3.0.1"],\
           ["typescript", "patch:typescript@npm%3A5.8.3#optional!builtin<compat/typescript>::version=5.8.3&hash=5786d5"],\

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>插件配置</title>
+    <title>插件管理</title>
     <style>
         body {
             font-family: sans-serif;
@@ -35,10 +35,29 @@
             padding: 10px;
             cursor: pointer;
             border-bottom: 1px solid #ccc;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .sidebar nav ul li:hover {
             background-color: #ddd;
+        }
+
+        .plugin-status {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+
+        .plugin-status.enabled {
+            background-color: #4CAF50;
+        }
+
+        .plugin-status.disabled {
+            background-color: #f44336;
         }
 
         .main-content {
@@ -56,12 +75,25 @@
             margin-bottom: 10px;
         }
 
-        .save-button {
-            background-color: #007BFF;
+        .save-button, .enable-button, .disable-button {
             color: white;
             padding: 10px 20px;
             border: none;
             cursor: pointer;
+            margin-right: 10px;
+            margin-top: 20px;
+        }
+
+        .save-button {
+            background-color: #007BFF;
+        }
+
+        .enable-button {
+            background-color: #4CAF50;
+        }
+
+        .disable-button {
+            background-color: #f44336;
         }
 
         @media (max-width: 768px) {
@@ -137,11 +169,16 @@
         </aside>
         <main class="main-content">
             <h2 id="plugin-title">请选择插件</h2>
+            <div id="plugin-status"></div>
             <div id="configuration-area">
                 <!-- Plugin configuration -->
                 <p>请从左侧选择一个插件进行配置。</p>
             </div>
-            <button class="save-button">保存</button>
+            <div id="button-area">
+                <button class="save-button">保存配置</button>
+                <button class="enable-button">启用插件</button>
+                <button class="disable-button">禁用插件</button>
+            </div>
         </main>
     </div>
 
@@ -156,10 +193,18 @@
         const pluginList = document.getElementById('plugin-list');
         const configurationArea = document.getElementById('configuration-area');
         const pluginTitle = document.getElementById('plugin-title');
+        const pluginStatus = document.getElementById('plugin-status');
         const saveButton = document.querySelector('.save-button');
+        const enableButton = document.querySelector('.enable-button');
+        const disableButton = document.querySelector('.disable-button');
         const notification = document.getElementById('notification');
 
         let currentPluginName = null; // 用于存储当前选中的插件名称
+        let isPluginDisabled = false; // 用于存储当前插件是否被禁用
+
+        // 初始隐藏启用/禁用按钮
+        enableButton.style.display = 'none';
+        disableButton.style.display = 'none';
 
         // Toggle sidebar
         toggleSidebarButton.addEventListener('click', function () {
@@ -169,7 +214,7 @@
         // Function to fetch and populate the plugin list
         async function fetchPluginList() {
             try {
-                const response = await fetch('/console/api/getplugins');
+                const response = await fetch('/console/api/getplugins?includeDisabled=true');
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
@@ -178,10 +223,32 @@
                 pluginList.innerHTML = ''; // 清空现有列表
                 plugins.forEach(pluginName => {
                     const listItem = document.createElement('li');
-                    listItem.textContent = pluginName;
-                    listItem.dataset.plugin = pluginName;
+                    
+                    // 创建状态指示器
+                    const statusIndicator = document.createElement('span');
+                    statusIndicator.className = 'plugin-status';
+                    
+                    // 创建插件名称元素
+                    const nameSpan = document.createElement('span');
+                    
+                    // 判断插件是否被禁用
+                    if (pluginName.startsWith('~')) {
+                        statusIndicator.classList.add('disabled');
+                        nameSpan.textContent = pluginName.substring(1); // 去掉~显示名称
+                        listItem.dataset.plugin = pluginName; // 保留~作为数据属性
+                        listItem.dataset.disabled = 'true';
+                    } else {
+                        statusIndicator.classList.add('enabled');
+                        nameSpan.textContent = pluginName;
+                        listItem.dataset.plugin = pluginName;
+                        listItem.dataset.disabled = 'false';
+                    }
+                    
+                    listItem.appendChild(statusIndicator);
+                    listItem.appendChild(nameSpan);
+                    
                     listItem.addEventListener('click', function () {
-                        loadPluginConfiguration(pluginName);
+                        loadPluginConfiguration(listItem.dataset.plugin);
                         if (window.innerWidth <= 768) {
                             sidebar.classList.remove('open');
                         }
@@ -199,35 +266,43 @@
             try {
                 // 存储当前选中的插件名称
                 currentPluginName = pluginName;
+                
+                // 判断插件是否被禁用
+                isPluginDisabled = pluginName.startsWith('~');
+                
+                // 更新UI状态
+                updatePluginStatus();
+                
                 const response = await fetch(`/console/api/config?name=${pluginName}`);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
 
-                const config = await response.json(); // 后端需要返回 [[key, value], [key, value]] 这样的结构来兼容这里
+                const config = await response.json();
 
                 let configContent = '';
-                 // 我假设这里的 config 仍然是 [{"key":"value"}, {"key2":"value2"}] 这样的数组，因为你的后端需要适配它
+                // 我假设这里的 config 仍然是 [{"key":"value"}, {"key2":"value2"}] 这样的数组，因为你的后端需要适配它
                 if (Array.isArray(config)) {
-                     config.forEach(item => {
+                    config.forEach(item => {
                         const key = Object.keys(item)[0]; // 假设每个对象只有一个 key
                         if (key) {
-                           const value = item[key];
-                           configContent += `<label for="${key}">${key}:</label>
-                                              <input type="text" id="${key}" value="${value}" data-key="${key}"><br>`;
+                            const value = item[key];
+                            configContent += `<label for="${key}">${key}:</label>
+                                            <input type="text" id="${key}" value="${value}" data-key="${key}"><br>`;
                         }
                     });
+                } else if (config.error) {
+                    // 如果后端返回错误信息
+                    configContent = `<p>${config.error}</p>`;
                 } else {
                     // 如果后端返回的不是数组，显示错误信息
-                     configContent = '<p>Invalid configuration format received from server.</p>';
+                    configContent = '<p>Invalid configuration format received from server.</p>';
                 }
 
-
-                pluginTitle.textContent = `${pluginName} 配置`;
+                // 显示插件名称（去掉~前缀）
+                const displayName = isPluginDisabled ? pluginName.substring(1) : pluginName;
+                pluginTitle.textContent = `${displayName} 配置`;
                 configurationArea.innerHTML = configContent;
-
-                // **** 重要改动 ****
-                // 不再在这里添加事件监听器，只在 DOMContentLoaded 时添加一次
 
             } catch (error) {
                 console.error('Failed to load plugin configuration:', error);
@@ -235,27 +310,39 @@
             }
         }
 
-        // **** 重要改动 ****
-        // 在 DOMContentLoaded 时只给 saveButton 添加一个永久的事件监听器
+        // 更新插件状态UI
+        function updatePluginStatus() {
+            if (isPluginDisabled) {
+                pluginStatus.innerHTML = '<p style="color: #f44336;">当前状态: 已禁用</p>';
+                enableButton.style.display = 'inline-block';
+                disableButton.style.display = 'none';
+            } else {
+                pluginStatus.innerHTML = '<p style="color: #4CAF50;">当前状态: 已启用</p>';
+                enableButton.style.display = 'none';
+                disableButton.style.display = 'inline-block';
+            }
+        }
+
+        // 保存配置按钮事件
         saveButton.addEventListener('click', async function() {
             // 只有当 currentPluginName 有值时才尝试保存
             if (!currentPluginName) {
-                showNotification('Please select a plugin first.', 'error');
+                showNotification('请先选择一个插件', 'error');
                 return;
             }
 
             let configData = []; // 构建要发送的数组
             document.querySelectorAll('#configuration-area input[type="text"]').forEach(input => {
-                 // 确保 input.dataset.key 存在
-                 if (input.dataset.key) {
-                     let item = {};
-                     item[input.dataset.key] = input.value;  // create an object for each key-value pair
-                     configData.push(item); // push the object to the array
-                 }
+                // 确保 input.dataset.key 存在
+                if (input.dataset.key) {
+                    let item = {};
+                    item[input.dataset.key] = input.value;  // create an object for each key-value pair
+                    configData.push(item); // push the object to the array
+                }
             });
 
             try {
-                 console.log('Frontend sending JSON:', configData); // 打印发送的数据
+                console.log('Frontend sending JSON:', configData); // 打印发送的数据
                 const jsonContent = JSON.stringify(configData);
                 // 使用存储的 currentPluginName 发送请求
                 const url = `/console/api/setconfig?name=${currentPluginName}&content=${encodeURIComponent(jsonContent)}`;
@@ -268,16 +355,95 @@
                 }
 
                 const result = await response.json();
-                 // 根据后端返回的 success 或 error 字段显示通知
+                // 根据后端返回的 success 或 error 字段显示通知
                 showNotification(result.success || result.error, result.success ? 'success' : 'error');
+
+                // 如果保存成功且插件未被禁用，刷新插件列表
+                if (result.success && !isPluginDisabled) {
+                    setTimeout(fetchPluginList, 1000); // 延迟1秒刷新列表
+                }
 
             } catch (error) {
                 console.error('Failed to save configuration:', error);
-                 // 确保显示的是错误消息
+                // 确保显示的是错误消息
                 showNotification(`${error.message}`, 'error');
             }
         });
 
+        // 启用插件按钮事件
+        enableButton.addEventListener('click', async function() {
+            if (!currentPluginName || !isPluginDisabled) {
+                showNotification('当前插件不需要启用', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/console/api/enableplugin?name=${currentPluginName}`);
+                
+                if (!response.ok) {
+                    const errorResult = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
+                    throw new Error(errorResult.error || `HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification(result.success, 'success');
+                    
+                    // 更新当前插件名称（去掉~前缀）
+                    currentPluginName = currentPluginName.substring(1);
+                    isPluginDisabled = false;
+                    updatePluginStatus();
+                    
+                    // 刷新插件列表
+                    setTimeout(fetchPluginList, 1000);
+                    
+                    // 重新加载插件配置
+                    setTimeout(() => loadPluginConfiguration(currentPluginName), 1500);
+                } else {
+                    showNotification(result.error, 'error');
+                }
+            } catch (error) {
+                console.error('Failed to enable plugin:', error);
+                showNotification(`启用插件失败: ${error.message}`, 'error');
+            }
+        });
+
+        // 禁用插件按钮事件
+        disableButton.addEventListener('click', async function() {
+            if (!currentPluginName || isPluginDisabled) {
+                showNotification('当前插件不需要禁用', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/console/api/disableplugin?name=${currentPluginName}`);
+                
+                if (!response.ok) {
+                    const errorResult = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
+                    throw new Error(errorResult.error || `HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification(result.success, 'success');
+                    
+                    // 更新当前插件名称（添加~前缀）
+                    currentPluginName = `~${currentPluginName}`;
+                    isPluginDisabled = true;
+                    updatePluginStatus();
+                    
+                    // 刷新插件列表
+                    setTimeout(fetchPluginList, 1000);
+                } else {
+                    showNotification(result.error, 'error');
+                }
+            } catch (error) {
+                console.error('Failed to disable plugin:', error);
+                showNotification(`禁用插件失败: ${error.message}`, 'error');
+            }
+        });
 
         // Function to show notification
         function showNotification(message, type = 'success') {
@@ -285,7 +451,7 @@
             notification.className = `notification show ${type === 'error' ? 'error' : ''}`;
             setTimeout(() => {
                 notification.classList.remove('show');
-                 notification.className = 'notification'; // 移除 show 和 error 类
+                notification.className = 'notification'; // 移除 show 和 error 类
             }, 3000); // Hide after 3 seconds
         }
 
