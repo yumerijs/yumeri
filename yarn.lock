@@ -503,15 +503,25 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"yumeri-plugin-echo@workspace:plugins/yumeri-plugin-echo":
+  version: 0.0.0-use.local
+  resolution: "yumeri-plugin-echo@workspace:plugins/yumeri-plugin-echo"
+  dependencies:
+    "@types/node": "npm:^22.14.1"
+    typescript: "npm:^5.8.2"
+    yumeri: "npm:1.1.0-alpha.2"
+  languageName: unknown
+  linkType: soft
+
 "yumeri-plugin-server@npm:1.1.0-alpha.2, yumeri-plugin-server@workspace:^, yumeri-plugin-server@workspace:plugins/yumeri-plugin-server":
   version: 0.0.0-use.local
   resolution: "yumeri-plugin-server@workspace:plugins/yumeri-plugin-server"
   dependencies:
-    "@types/chalk": "npm:^2.2.4"
     "@types/formidable": "npm:^3"
     "@types/mime-types": "npm:^2.1.4"
     "@types/node": "npm:^22.13.10"
     "@types/semver": "npm:^7.7.0"
+    chalk: "npm:^5.4.1"
     formidable: "npm:^3.5.4"
     mime-types: "npm:^3.0.1"
     typescript: "npm:^5.8.2"

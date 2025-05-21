@@ -31,6 +31,10 @@ const RAW_RUNTIME_STATE =
       "reference": "workspace:plugins/yumeri-plugin-console"\
     },\
     {\
+      "name": "yumeri-plugin-echo",\
+      "reference": "workspace:plugins/yumeri-plugin-echo"\
+    },\
+    {\
       "name": "yumeri-plugin-server",\
       "reference": "workspace:plugins/yumeri-plugin-server"\
     }\
@@ -44,6 +48,7 @@ const RAW_RUNTIME_STATE =
     ["yumeri", ["workspace:package/yumeri"]],\
     ["yumeri-dev", ["workspace:."]],\
     ["yumeri-plugin-console", ["workspace:plugins/yumeri-plugin-console"]],\
+    ["yumeri-plugin-echo", ["workspace:plugins/yumeri-plugin-echo"]],\
     ["yumeri-plugin-server", ["workspace:plugins/yumeri-plugin-server"]]\
   ],\
   "fallbackPool": [\
@@ -649,15 +654,27 @@ const RAW_RUNTIME_STATE =
         "linkType": "SOFT"\
       }]\
     ]],\
+    ["yumeri-plugin-echo", [\
+      ["workspace:plugins/yumeri-plugin-echo", {\
+        "packageLocation": "./plugins/yumeri-plugin-echo/",\
+        "packageDependencies": [\
+          ["@types/node", "npm:22.15.19"],\
+          ["typescript", "patch:typescript@npm%3A5.8.3#optional!builtin<compat/typescript>::version=5.8.3&hash=5786d5"],\
+          ["yumeri", "workspace:package/yumeri"],\
+          ["yumeri-plugin-echo", "workspace:plugins/yumeri-plugin-echo"]\
+        ],\
+        "linkType": "SOFT"\
+      }]\
+    ]],\
     ["yumeri-plugin-server", [\
       ["workspace:plugins/yumeri-plugin-server", {\
         "packageLocation": "./plugins/yumeri-plugin-server/",\
         "packageDependencies": [\
-          ["@types/chalk", "npm:2.2.4"],\
           ["@types/formidable", "npm:3.4.5"],\
           ["@types/mime-types", "npm:2.1.4"],\
           ["@types/node", "npm:22.15.19"],\
           ["@types/semver", "npm:7.7.0"],\
+          ["chalk", "npm:5.4.1"],\
           ["formidable", "npm:3.5.4"],\
           ["mime-types", "npm:3.0.1"],\
           ["typescript", "patch:typescript@npm%3A5.8.3#optional!builtin<compat/typescript>::version=5.8.3&hash=5786d5"],\
