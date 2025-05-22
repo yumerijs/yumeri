@@ -40,7 +40,7 @@ export class Core {
   private eventListeners: { [event: string]: ((...args: any[]) => Promise<void>)[] } = {};
   private components: { [name: string]: any } = {};
   public commands: Record<string, Command> = {};
-  private pluginLoader: PluginLoader;
+  public pluginLoader: PluginLoader;
   private logger = new Logger('core');
   private providedComponents: { [name: string]: string } = {};
   private pluginModules: { [name: string]: any } = {};
