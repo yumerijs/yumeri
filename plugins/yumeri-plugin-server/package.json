@@ -1,6 +1,6 @@
 {
   "name": "yumeri-plugin-server",
-  "version": "1.1.0-alpha.2",
+  "version": "1.1.0-alpha.3",
   "description": "Web server for yumeri",
   "main": "dist/index.js",
   "dev": "src/index.ts",
@@ -38,6 +38,6 @@
     "chalk": "^5.4.1",
     "formidable": "^3.5.4",
     "mime-types": "^3.0.1",
-    "yumeri": "1.1.0-alpha.2"
+    "yumeri": "1.1.0-alpha.3"
   }
 }

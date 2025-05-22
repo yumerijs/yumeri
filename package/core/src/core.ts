@@ -12,6 +12,7 @@ import { Command } from './command';
 import { Session } from './session';
 import { Platform } from './platform';
 import chokidar from 'chokidar';
+import { Middleware } from './middleware';
 
 interface Plugin {
   apply: (core: Core, config: Config) => Promise<void>;
@@ -39,10 +40,12 @@ export class Core {
   private eventListeners: { [event: string]: ((...args: any[]) => Promise<void>)[] } = {};
   private components: { [name: string]: any } = {};
   public commands: Record<string, Command> = {};
-  public pluginLoader: PluginLoader;
+  private pluginLoader: PluginLoader;
   private logger = new Logger('core');
   private providedComponents: { [name: string]: string } = {};
   private pluginModules: { [name: string]: any } = {};
+  private configPath: string = ''; // 存储配置文件路径
+  private globalMiddlewares: Middleware[] = []; // 全局中间件数组
 
   constructor(pluginLoader: PluginLoader) {
     this.pluginLoader = pluginLoader;
@@ -51,18 +54,68 @@ export class Core {
   // 加载配置文件
   async loadConfig(configPath: string): Promise<void> {
     try {
+      this.configPath = configPath; // 保存配置文件路径
       const doc = yaml.load(fs.readFileSync(configPath, 'utf8'));
       this.config = doc;
       this.logger.info('Config loaded.');
+      
+      // 开发环境下监听配置文件变化
+      if (process.env.NODE_ENV === 'development') {
+        this.watchConfig(configPath);
+      }
     } catch (e) {
       this.logger.error('Failed to load config:', e);
       throw e; // 抛出异常，让上层处理
     }
   }
 
+  /**
+   * 监听配置文件变化
+   * @param configPath 配置文件路径
+   */
+  private watchConfig(configPath: string): void {
+    const watcher = chokidar.watch(configPath, {
+      persistent: true,
+      ignoreInitial: true,
+      awaitWriteFinish: {
+        stabilityThreshold: 300,
+        pollInterval: 100,
+      },
+    });
+
+    watcher.on('change', async () => {
+      this.logger.info('Config file changed, reloading...');
+      try {
+        // 重新加载配置文件
+        const doc = yaml.load(fs.readFileSync(configPath, 'utf8'));
+        this.config = doc;
+        this.logger.info('Config reloaded successfully.');
+        
+        // 触发配置变更事件
+        await this.emit('config-changed', this.config);
+      } catch (error) {
+        this.logger.error('Failed to reload config:', error);
+      }
+    });
+
+    this.logger.info(`Watching for config changes at ${configPath}`);
+  }
+
   async getPluginConfig(pluginName: string): Promise<Config> {
     // 如果插件名以~开头，则去掉~前缀获取配置
     const actualPluginName = pluginName.startsWith('~') ? pluginName.substring(1) : pluginName;
+    
+    // 如果配置文件路径存在且处于开发模式，每次都重新读取配置文件
+    if (this.configPath && process.env.NODE_ENV === 'development') {
+      try {
+        const doc = yaml.load(fs.readFileSync(this.configPath, 'utf8')) as any;
+        if (doc && doc.plugins) {
+          this.config.plugins = doc.plugins;
+        }
+      } catch (error) {
+        this.logger.warn('Failed to refresh config for hot reload:', error);
+      }
+    }
     
     if (!this.config.plugins[actualPluginName]) {
       return new Config(actualPluginName);
@@ -254,11 +307,30 @@ export class Core {
    */
   public async reloadPlugin(pluginName: string, core: Core) {
     try {
+      // 强制重新读取配置文件，确保获取最新配置
+      if (this.configPath && process.env.NODE_ENV === 'development') {
+        try {
+          const doc = yaml.load(fs.readFileSync(this.configPath, 'utf8')) as any;
+          if (doc && doc.plugins) {
+            this.config.plugins = doc.plugins;
+          }
+        } catch (error) {
+          this.logger.warn('Failed to refresh config for plugin reload:', error);
+        }
+      }
+      
+      // 获取最新的插件配置
       const config = await core.getPluginConfig(pluginName);
+      
+      // 加载插件实例
       const plugin = await core.pluginLoader.load(pluginName);
+      
+      // 如果插件存在，先禁用旧实例
       if (plugin && plugin.disable) {
         await plugin.disable(core);
       }
+      
+      // 清理插件提供的组件
       if (plugin.provide) {
         for (let providedmodules of plugin.provide) {
           if (this.components[`${providedmodules}`]) {
@@ -266,12 +338,18 @@ export class Core {
           }
         }
       }
+      
+      // 卸载插件
       await core.pluginLoader.unloadPlugin(pluginName);
+      
+      // 应用新的插件实例
       if (plugin && plugin.apply) {
         await plugin.apply(core, config);
       }
+      
       this.pluginLoader.logger.info(`apply plugin ${pluginName}`);
 
+      // 触发插件重载事件
       core.emit('plugin-reloaded', pluginName);
     } catch (error) {
       this.logger.error(`Failed to reload plugin ${pluginName}:`, error);
@@ -351,6 +429,12 @@ export class Core {
     }
   }
 
+  // 注册全局中间件
+  use(middleware: Middleware): Core {
+    this.globalMiddlewares.push(middleware);
+    return this;
+  }
+
   // 定义指令
   command(name: string): Command {
     const command = new Command(this, name); // 传递 Core 实例
@@ -362,10 +446,38 @@ export class Core {
   async executeCommand(name: string, session: any, ...args: any[]): Promise<Session | null> {
     const command = this.commands[`${name}`];
     if (command) {
-      return await command.execute(session, ...args);
+      // 如果有全局中间件，先执行中间件链
+      if (this.globalMiddlewares.length > 0 || command.middlewares.length > 0) {
+        // 合并全局中间件和命令特定中间件
+        const middlewares = [...this.globalMiddlewares, ...command.middlewares];
+        
+        // 创建中间件执行链
+        let index = 0;
+        const runner = async (): Promise<void> => {
+          // 如果所有中间件都已执行，则执行命令处理函数
+          if (index >= middlewares.length) {
+            await command.executeHandler(session, ...args);
+            return;
+          }
+          
+          // 获取当前中间件
+          const middleware = middlewares[index++];
+          
+          // 执行当前中间件，传入session和next函数
+          await middleware(session, runner);
+        };
+        
+        // 开始执行中间件链
+        await runner();
+        return session;
+      } else {
+        // 没有中间件，直接执行命令处理函数
+        return await command.execute(session, ...args);
+      }
     }
     return null;
   }
+
   registerPlatform(platform: Platform): any {
     this.platforms.push(platform);
     return platform.startPlatform(this);
