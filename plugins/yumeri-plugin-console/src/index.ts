@@ -103,10 +103,8 @@ class PluginConfigManager {
    * @returns 插件配置对象
    */
   async getPluginConfig(pluginName: string): Promise<any> {
-    // 如果插件名以~开头，去掉~前缀获取配置
     const actualPluginName = pluginName.startsWith('~') ? pluginName.substring(1) : pluginName;
 
-    // 开发模式下或强制刷新时，不使用缓存
     if (process.env.NODE_ENV === 'development' || !this.configCache[actualPluginName]) {
       try {
         const configFileContent = fs.readFileSync(this.configPath, 'utf8');
@@ -115,7 +113,6 @@ class PluginConfigManager {
         if (configData?.plugins?.[actualPluginName]) {
           this.configCache[actualPluginName] = configData.plugins[actualPluginName];
         } else if (configData?.plugins?.[pluginName]) {
-          // 检查是否有禁用版本的配置
           this.configCache[actualPluginName] = configData.plugins[pluginName];
         } else {
           this.configCache[actualPluginName] = null;
@@ -125,21 +122,34 @@ class PluginConfigManager {
         return null;
       }
     }
-    const schema = await this.getPluginSchema(actualPluginName)
-    const config = this.configCache[actualPluginName] || {}
-    
-    const mergedConfig: { key: string, value: any, description?: string }[] = []
-    
+
+    const schema = await this.getPluginSchema(actualPluginName);
+    const config = this.configCache[actualPluginName] || {};
+
+    const mergedConfig: {
+      key: string;
+      value: any;
+      description?: string;
+      type?: string;
+      options?: string[];
+    }[] = [];
+
     for (const key in schema) {
-      const value = config.hasOwnProperty(key) ? config[key] : (schema[key].default ?? '')
-      const description = schema[key].description || ''
-      mergedConfig.push({
-        key,
-        value,
-        description
-      })
+      const value = config.hasOwnProperty(key) ? config[key] : (schema[key].default ?? '');
+      const description = schema[key].description || '';
+      const type = schema[key].enum ? 'select' : 'text';
+      const options = schema[key].enum;
+
+      const item: any = { key, value, description };
+      if (type === 'select') {
+        item.type = 'select';
+        item.options = options;
+      }
+
+      mergedConfig.push(item);
     }
-    return mergedConfig
+
+    return mergedConfig;
   }
 
   /**
@@ -622,23 +632,23 @@ export async function apply(ctx: Context, config: Config) {
           const pluginName = param.name;
           const content = param.content;
           const reload = param.reload !== 'false'; // 默认为true
-          
+
           if (!pluginName || !content) {
             session.body = JSON.stringify({ error: 'Plugin name and content are required.' });
             session.setMime('json');
             return;
           }
-          
+
           try {
             const newConfigArray = JSON.parse(content);
-            
+
             // 验证newConfigArray是否是数组
             if (!Array.isArray(newConfigArray)) {
               session.body = JSON.stringify({ error: 'Content must be a valid JSON array.' });
               session.setMime('json');
               return;
             }
-            
+
             // 将前端发送的数组格式转换为后端期望的对象格式
             const newConfigObject: { [key: string]: any } = {};
             for (const item of newConfigArray) {
@@ -652,7 +662,7 @@ export async function apply(ctx: Context, config: Config) {
               const key = keys[0];
               newConfigObject[key] = item[key];
             }
-            
+
             // 验证配置是否符合schema
             const validationResult = await configManager.validatePluginConfig(pluginName, newConfigObject);
             if (validationResult !== true) {
@@ -660,16 +670,16 @@ export async function apply(ctx: Context, config: Config) {
               session.setMime('json');
               return;
             }
-            
+
             // 保存插件配置
             const success = await configManager.savePluginConfig(pluginName, newConfigObject, reload);
-            
+
             if (success) {
               session.body = JSON.stringify({ success: `Configuration for plugin ${pluginName} updated.` });
             } else {
               session.body = JSON.stringify({ error: `Failed to update configuration for plugin ${pluginName}.` });
             }
-            
+
             session.setMime('json');
             return;
           } catch (error: any) {

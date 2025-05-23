@@ -1,127 +1,193 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="zh-CN">
 <head>
-    <title>登录 | Yumeri Console</title>
-    <style>
-        /* 弹窗样式同上例 */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgb(0, 0, 0);
-            background-color: rgba(0, 0, 0, 0.4);
-        }
+  <meta charset="UTF-8">
+  <title>登录 | Yumeri Console</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    :root {
+      --primary: #4CAF50;
+      --danger: #f44336;
+      --gray-light: #f1f1f1;
+      --border-color: #ccc;
+    }
 
-        .modal-content {
-            background-color: #fefefe;
-            margin: 15% auto;
-            padding: 20px;
-            border: 1px solid #888;
-            width: 80%;
-            max-width: 500px;
-            text-align: center;
-        }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: "Segoe UI", sans-serif;
+      background-color: #f7f9fb;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
 
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-        }
+    .login-container {
+      background-color: white;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 400px;
+    }
 
-        .close:hover,
-        .close:focus {
-            color: black;
-            text-decoration: none;
-            cursor: pointer;
-        }
-    </style>
-    <meta charset="UTF-8">
+    .login-container h2 {
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 24px;
+      color: #333;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      color: #333;
+    }
+
+    input[type="text"],
+    input[type="password"] {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    input[type="submit"] {
+      width: 100%;
+      background-color: var(--primary);
+      color: white;
+      padding: 12px;
+      font-size: 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+
+    input[type="submit"]:hover {
+      background-color: #45a049;
+    }
+
+    /* 弹窗样式 */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 100;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.4);
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-content {
+      background-color: #fff;
+      padding: 24px 30px;
+      border-radius: 10px;
+      max-width: 400px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+      position: relative;
+    }
+
+    .modal-content p {
+      font-size: 16px;
+      color: #333;
+      margin: 0;
+    }
+
+    .close {
+      position: absolute;
+      top: 10px;
+      right: 14px;
+      color: #aaa;
+      font-size: 24px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: color 0.2s ease;
+    }
+
+    .close:hover {
+      color: #000;
+    }
+  </style>
 </head>
-
 <body>
 
-    <h2><center>用户登录</center></h2>
-
+  <div class="login-container">
+    <h2>用户登录</h2>
     <form id="loginForm" action="/console/api/loginpass" method="post">
-        <div>
-            <label for="username"><center>账号:</center></label><br>
-            <center><input type="text" id="username" name="username"><br><br></center>
-        </div>
-        <div>
-            <label for="password"><center>密码:</center></label><br>
-            <center><input type="password" id="password" name="password"><br><br></center>
-        </div>
-        <div>
-            <center><input type="submit" value="登录"></center>
-        </div>
+      <div class="form-group">
+        <label for="username">账号</label>
+        <input type="text" id="username" name="username" required>
+      </div>
+      <div class="form-group">
+        <label for="password">密码</label>
+        <input type="password" id="password" name="password" required>
+      </div>
+      <input type="submit" value="登录">
     </form>
+  </div>
 
-    <!-- 弹窗结构 -->
-    <div id="myModal" class="modal">
-        <div class="modal-content">
-            <span class="close">&times;</span>
-            <p id="modalMessage"></p>
-        </div>
+  <!-- 弹窗 -->
+  <div id="myModal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <p id="modalMessage"></p>
     </div>
+  </div>
 
-    <script>
-        // 获取表单和弹窗元素
-        var loginForm = document.getElementById("loginForm");
-        var modal = document.getElementById("myModal");
-        var span = document.getElementsByClassName("close")[0];
-        var modalMessage = document.getElementById("modalMessage");
+  <script>
+    var loginForm = document.getElementById("loginForm");
+    var modal = document.getElementById("myModal");
+    var span = document.getElementsByClassName("close")[0];
+    var modalMessage = document.getElementById("modalMessage");
 
-        // 阻止表单默认提交，改用 AJAX
-        loginForm.addEventListener("submit", function (event) {
-            event.preventDefault(); // 阻止默认的表单提交行为
+    loginForm.addEventListener("submit", function (event) {
+      event.preventDefault();
 
-            var formData = new FormData(loginForm); // 获取表单数据
+      var formData = new FormData(loginForm);
 
-            // 使用 fetch API 发送 AJAX 请求
-            fetch(loginForm.action, {
-                method: loginForm.method,
-                body: formData
-            })
-                .then(response => response.json()) // 假设后台返回 JSON
-                .then(data => {
-                    // 根据后台返回的数据处理结果
-                    if (data.success) { // 假设后台返回 { success: true, message: "登录成功" }
-                        modalMessage.textContent = data.message || "登录成功";
-                        modal.style.display = "block"; // 显示弹窗
-                        // TODO: 登录成功后可以跳转页面
-                        window.location.href = "/console/config";
-                    } else { // 假设后台返回 { success: false, message: "用户名或密码错误" }
-                        modalMessage.textContent = data.message || "登录失败";
-                        modal.style.display = "block"; // 显示弹窗
-                    }
-                })
-                .catch(error => {
-                    modalMessage.textContent = "请求发送失败，请稍后再试。";
-                    modal.style.display = "block"; // 显示弹窗
-                    console.error('Error:', error);
-                });
+      fetch(loginForm.action, {
+        method: loginForm.method,
+        body: formData
+      })
+        .then(response => response.json())
+        .then(data => {
+          modalMessage.textContent = data.message || (data.success ? "登录成功" : "登录失败");
+          modal.style.display = "flex";
+          if (data.success) {
+            setTimeout(() => {
+              window.location.href = "/console/config";
+            }, 1000);
+          }
+        })
+        .catch(error => {
+          modalMessage.textContent = "请求发送失败，请稍后再试。";
+          modal.style.display = "flex";
+          console.error('Error:', error);
         });
+    });
 
-        // 点击 × 关闭弹窗
-        span.onclick = function () {
-            modal.style.display = "none";
-        }
+    span.onclick = function () {
+      modal.style.display = "none";
+    }
 
-        // 点击弹窗外部关闭弹窗
-        window.onclick = function (event) {
-            if (event.target == modal) {
-                modal.style.display = "none";
-            }
-        }
-    </script>
+    window.onclick = function (event) {
+      if (event.target == modal) {
+        modal.style.display = "none";
+      }
+    }
+  </script>
 
 </body>
-
 </html>

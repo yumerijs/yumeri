@@ -6,6 +6,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>插件管理</title>
     <style>
+        select {
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            background-color: #fff;
+            font-size: 14px;
+            color: #333;
+            outline: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%23666' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            background-size: 12px 8px;
+        }
+
+        select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
+        }
+
         :root {
             --primary: #4CAF50;
             --danger: #f44336;
@@ -25,8 +45,7 @@
             background-color: #ffffff;
             color: #333;
             min-height: 100vh;
-            display: grid;
-            grid-template-columns: 250px 1fr;
+            display: flex;
             transition: all 0.3s ease-in-out;
         }
 
@@ -35,8 +54,10 @@
             border-right: 1px solid #ddd;
             padding: 20px;
             height: 100vh;
+            width: 250px;
             overflow-y: auto;
             transition: transform 0.3s ease-in-out;
+            flex-shrink: 0;
         }
 
         .sidebar ul {
@@ -77,6 +98,8 @@
             padding: 30px;
             display: flex;
             flex-direction: column;
+            flex: 1;
+            min-width: 0;
         }
 
         h2 {
@@ -134,6 +157,7 @@
 
         .notification {
             position: fixed;
+            display: none;
             top: 30px;
             left: 50%;
             transform: translateX(-50%);
@@ -156,10 +180,15 @@
             background-color: var(--danger);
         }
 
-        /* Mobile */
+        @media (min-width: 768px) {
+            .toggle-sidebar {
+                display: none;
+            }
+        }
+
         @media (max-width: 768px) {
             body {
-                grid-template-columns: 1fr;
+                flex-direction: column;
             }
 
             .sidebar {
@@ -191,21 +220,6 @@
                 cursor: pointer;
             }
 
-            .close-sidebar {
-                position: absolute;
-                top: 10px;
-                right: 10px;
-                background: var(--danger);
-                border: none;
-                color: white;
-                width: 30px;
-                height: 30px;
-                border-radius: 20%;
-                font-size: 18px;
-                cursor: pointer;
-                display: block;
-            }
-
             .overlay {
                 display: none;
                 position: fixed;
@@ -222,13 +236,13 @@
             }
         }
     </style>
+    </style>
 </head>
 
 <body>
     <div class="overlay" id="overlay"></div>
     <button class="toggle-sidebar" id="toggle-sidebar">☰</button>
     <aside class="sidebar" id="sidebar">
-        <button class="close-sidebar" id="close-sidebar">×</button>
         <nav>
             <ul id="plugin-list"></ul>
         </nav>
@@ -252,7 +266,6 @@
         document.addEventListener('DOMContentLoaded', function () {
             const sidebar = document.getElementById('sidebar');
             const toggleSidebarButton = document.getElementById('toggle-sidebar');
-            const closeSidebarButton = document.getElementById('close-sidebar');
             const overlay = document.getElementById('overlay');
             const pluginList = document.getElementById('plugin-list');
             const configurationArea = document.getElementById('configuration-area');
@@ -274,18 +287,14 @@
             toggleSidebarButton.addEventListener('click', function () {
                 sidebar.classList.add('open');
                 overlay.style.display = 'block';
-            });
-
-            // 关闭侧边栏（通过关闭按钮）
-            closeSidebarButton.addEventListener('click', function () {
-                sidebar.classList.remove('open');
-                overlay.style.display = 'none';
+                toggleSidebarButton.style.display = 'none';
             });
 
             // 点击遮罩层关闭侧边栏
             overlay.addEventListener('click', function () {
                 sidebar.classList.remove('open');
                 overlay.style.display = 'none';
+                toggleSidebarButton.style.display = 'block';
             });
 
             // Function to fetch and populate the plugin list
@@ -329,6 +338,7 @@
                             if (window.innerWidth <= 768) {
                                 sidebar.classList.remove('open');
                                 overlay.style.display = 'none';
+                                toggleSidebarButton.style.display = 'block';
                             }
                         });
                         pluginList.appendChild(listItem);
@@ -342,13 +352,8 @@
             // Function to load plugin configuration
             async function loadPluginConfiguration(pluginName) {
                 try {
-                    // 存储当前选中的插件名称
                     currentPluginName = pluginName;
-
-                    // 判断插件是否被禁用
                     isPluginDisabled = pluginName.startsWith('~');
-
-                    // 更新UI状态
                     updatePluginStatus();
 
                     const response = await fetch(`/console/api/config?name=${pluginName}`);
@@ -364,14 +369,25 @@
                             const key = item.key;
                             const value = item.value;
                             const description = item.description || '';
+                            const type = item.type || 'text'; // 默认是 text
+                            const options = item.options || [];
 
-                            if (key) {
-                                configContent += `
-        <label for="${key}">${description}</label><br>
-        <input type="text" id="${key}" value="${value}" data-key="${key}">
-        <small style="color: #888;">(${key})</small><br><br>
-      `;
+                            if (!key) return;
+
+                            configContent += `<label for="${key}">${description}</label><br>`;
+
+                            if (type === 'select' && Array.isArray(options)) {
+                                configContent += `<select id="${key}" data-key="${key}">`;
+                                options.forEach(option => {
+                                    const selected = option === value ? 'selected' : '';
+                                    configContent += `<option value="${option}" ${selected}>${option}</option>`;
+                                });
+                                configContent += `</select>`;
+                            } else {
+                                configContent += `<input type="text" id="${key}" value="${value}" data-key="${key}">`;
                             }
+
+                            configContent += `<small style="color: #888;">(${key})</small><br><br>`;
                         });
                     } else if (config.error) {
                         configContent = `<p>${config.error}</p>`;
@@ -379,7 +395,6 @@
                         configContent = '<p>Invalid configuration format received from server.</p>';
                     }
 
-                    // 显示插件名称（去掉~前缀）
                     const displayName = isPluginDisabled ? pluginName.substring(1) : pluginName;
                     pluginTitle.textContent = `${displayName} 配置`;
                     configurationArea.innerHTML = configContent;
@@ -405,47 +420,40 @@
 
             // 保存配置按钮事件
             saveButton.addEventListener('click', async function () {
-                // 只有当 currentPluginName 有值时才尝试保存
                 if (!currentPluginName) {
                     showNotification('请先选择一个插件', 'error');
                     return;
                 }
 
-                let configData = []; // 构建要发送的数组
-                document.querySelectorAll('#configuration-area input[type="text"]').forEach(input => {
-                    // 确保 input.dataset.key 存在
-                    if (input.dataset.key) {
+                let configData = [];
+                // 选择所有 input[type="text"] 和 select 元素
+                document.querySelectorAll('#configuration-area input[type="text"], #configuration-area select').forEach(el => {
+                    if (el.dataset.key) {
                         let item = {};
-                        item[input.dataset.key] = input.value;  // create an object for each key-value pair
-                        configData.push(item); // push the object to the array
+                        item[el.dataset.key] = el.value;
+                        configData.push(item);
                     }
                 });
 
                 try {
-                    console.log('Frontend sending JSON:', configData); // 打印发送的数据
+                    console.log('Frontend sending JSON:', configData);
                     const jsonContent = JSON.stringify(configData);
-                    // 使用存储的 currentPluginName 发送请求
                     const url = `/console/api/saveconfig?name=${currentPluginName}&content=${encodeURIComponent(jsonContent)}`;
                     const response = await fetch(url);
 
                     if (!response.ok) {
-                        // 尝试解析错误信息
                         const errorResult = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
                         throw new Error(errorResult.error || `HTTP error! status: ${response.status}`);
                     }
 
                     const result = await response.json();
-                    // 根据后端返回的 success 或 error 字段显示通知
                     showNotification(result.success || result.error, result.success ? 'success' : 'error');
 
-                    // 如果保存成功且插件未被禁用，刷新插件列表
                     if (result.success && !isPluginDisabled) {
-                        setTimeout(fetchPluginList, 1000); // 延迟1秒刷新列表
+                        setTimeout(fetchPluginList, 1000);
                     }
-
                 } catch (error) {
                     console.error('Failed to save configuration:', error);
-                    // 确保显示的是错误消息
                     showNotification(`${error.message}`, 'error');
                 }
             });
@@ -527,12 +535,20 @@
 
             // Function to show notification
             function showNotification(message, type = 'success') {
+                const notification = document.querySelector('.notification');
                 notification.textContent = message;
-                notification.className = `notification show ${type === 'error' ? 'error' : ''}`;
+                notification.classList.remove('error'); // 先清除之前可能的错误类
+                notification.style.display = 'block';
+                notification.classList.add('show');
+                if (type === 'error') {
+                    notification.classList.add('error');
+                }
+
                 setTimeout(() => {
                     notification.classList.remove('show');
-                    notification.className = 'notification'; // 移除 show 和 error 类
-                }, 3000); // Hide after 3 seconds
+                    notification.classList.remove('error');
+                    notification.style.display = 'none';
+                }, 3000);
             }
 
             // Fetch the plugin list when the page loads

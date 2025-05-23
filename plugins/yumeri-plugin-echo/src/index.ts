@@ -19,6 +19,7 @@ export interface EchoConfig {
    * @default "Hello World"
    */
   content: string;
+  type: string;
 }
 
 /**
@@ -35,6 +36,12 @@ export const config = {
       type: 'string',
       default: 'Hello World',
       description: '输出内容'
+    },
+    type: {
+      type: 'string',
+      default: 'html',
+      description: '输出类型',
+      enum: ['html', 'json', 'text']
     }
   } as Record<string, ConfigSchema>
 };
@@ -42,7 +49,7 @@ export async function apply(ctx: Context, config: Config) {
   // 注册Echo命令
   ctx.command(config.get<string>('path', 'echo'))
     .action(async (session: Session, param?: any) => {
-      session.setMime('html'); // 默认设置为 HTML 类型
+      session.setMime(config.get<string>('type', 'html')); // 默认设置为 HTML 类型
       session.body = config.get<string>('content', 'Hello World');
     });
   logger.info('Echo plugin loaded');
