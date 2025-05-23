@@ -1,4 +1,4 @@
-import { Core, Config, Session, Logger, ConfigSchema } from 'yumeri';
+import { Context, Config, Session, Logger, ConfigSchema } from 'yumeri';
 
 const logger = new Logger("echo");
 
@@ -38,16 +38,12 @@ export const config = {
     }
   } as Record<string, ConfigSchema>
 };
-export async function apply(core: Core, config: Config) {
+export async function apply(ctx: Context, config: Config) {
   // 注册Echo命令
-  core.command(config.get<string>('path', 'echo'))
+  ctx.command(config.get<string>('path', 'echo'))
     .action(async (session: Session, param?: any) => {
       session.setMime('html'); // 默认设置为 HTML 类型
       session.body = config.get<string>('content', 'Hello World');
     });
   logger.info('Echo plugin loaded');
-}
-
-export async function disable(core: Core) {
-  logger.info('Echo plugin disabled');
 }

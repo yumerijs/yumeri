@@ -1,4 +1,4 @@
-import { Core, Config, Session, Logger, Platform, ConfigSchema } from 'yumeri';
+import { Context, Core, Config, Session, Logger, Platform, ConfigSchema } from 'yumeri';
 import * as fs from 'fs';
 import * as mime from 'mime-types';
 import http from 'http';
@@ -499,7 +499,7 @@ export class Server extends Platform {
   }
 }
 
-export async function apply(core: Core, config: Config) {
+export async function apply(ctx: Context, config: Config) {
   // 创建服务器实例，使用配置内容
   const serverConfig: Partial<ServerConfig> = {
     port: config.get<number>('port', 14510),
@@ -507,12 +507,13 @@ export async function apply(core: Core, config: Config) {
     enableCors: config.get<boolean>('enableCors', true),
     staticDir: config.get<string>('staticDir', 'static')
   };
+  const core = ctx.getCore();
   
   const server = new Server(core, serverConfig);
   core.registerPlatform(server);
   
   // 注册静态文件处理命令
-  core.command('static')
+  ctx.command('static')
     .action(async (session: Session, param?: any) => {
       if (!param.path) {
         await session.send(`<html><head><title>404 Not Found</title></head><body><center><h1>404 Not Found</h1></center><hr><center>yumerijs</center></body>`);
@@ -533,12 +534,11 @@ export async function apply(core: Core, config: Config) {
     });
     
   // 注册服务器组件
-  core.registerComponent('server', server);
+  ctx.registerComponent('server', server);
 }
 
-export async function disable(core: Core) {
+export async function disable(ctx: Context) {
   logger.info('Stopping server...');
-  const server = core.getComponent('server') as Server;
+  const server = ctx.getComponent('server') as Server;
   await server.stopPlatform();
-  core.unregisterComponent('server');
 }

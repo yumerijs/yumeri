@@ -1,18 +1,14 @@
 import * as path from 'path';
-import { Core, Config, Logger } from '@yumerijs/core';
+import { Core, Config, Logger, Context } from '@yumerijs/core';
 import * as fs from 'fs';
 import { promisify } from 'util';
 import { exec } from 'child_process';
-import { satisfies } from 'semver';
 import * as tsNode from 'ts-node';
-import chokidar from 'chokidar';
-import { pathToFileURL } from 'url';
-
 const execAsync = promisify(exec);
 
 interface Plugin {
-    apply: (core: Core, config: Config) => Promise<void>;
-    disable: (core: Core) => Promise<void>;
+    apply: (ctx: Context, config: Config) => Promise<void>;
+    disable: (ctx: Context) => Promise<void>;
     depend: Array<string>;
     provide: Array<string>;
     // Note: depend and provide are handled after plugin load due to loader constraints
@@ -186,7 +182,8 @@ class PluginLoader {
                 }
             });
 
-            this.logger.info(`Plugin unloaded: ${pluginName}`);
+            // this.logger.info(`Plugin unloaded: ${pluginName}`);
+            this.core?.unregall(pluginName);
         } catch (error) {
             this.logger.error(`Error unloading plugin ${pluginName}:`, error);
         }

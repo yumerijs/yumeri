@@ -10,3 +10,4 @@ export * from './command';
 export * from './config';
 export * from './logger';
 export * from './platform';
+export * from './context';

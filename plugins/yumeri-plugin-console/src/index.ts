@@ -1,4 +1,4 @@
-import { Core, Config, Session, Logger, ConfigSchema } from 'yumeri';
+import { Core, Context, Config, Session, Logger, ConfigSchema } from 'yumeri';
 import * as fs from 'fs'; // 引入同步 fs 模块
 import * as path from 'path';
 import { fileURLToPath } from 'url';
@@ -418,7 +418,7 @@ class PluginConfigManager {
 
           // 应用插件
           if (plugin && plugin.apply) {
-            await plugin.apply(this.core, config);
+            await plugin.apply(new Context(this.core, pluginName), config);
             logger.info(`Plugin ${actualPluginName} loaded after being enabled.`);
           }
         } catch (loadError) {
@@ -534,13 +534,14 @@ class PluginConfigManager {
   }
 }
 
-export async function apply(core: Core, config: Config) {
+export async function apply(ctx: Context, config: Config) {
   // 创建插件配置管理器
   const configManager = new PluginConfigManager();
+  const core = ctx.getCore();
   configManager.setCore(core);
 
   // 注册控制台命令
-  core.command(config.get<string>('path', 'console'))
+  ctx.command(config.get<string>('path', 'console'))
     .action(async (session: Session, param?: any) => {
       session.setMime('html'); // 默认设置为 HTML 类型
 
@@ -829,16 +830,9 @@ export async function apply(core: Core, config: Config) {
     });
 
   // 注册控制台组件
-  core.registerComponent('console', {
+  ctx.registerComponent('console', {
     configManager
   });
 
   logger.info('Console plugin initialized');
-}
-
-export async function disable(core: Core) {
-  // 取消注册控制台组件
-  core.unregisterComponent('console');
-
-  logger.info('Console plugin disabled');
 }

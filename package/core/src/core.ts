@@ -13,10 +13,11 @@ import { Session } from './session';
 import { Platform } from './platform';
 import chokidar from 'chokidar';
 import { Middleware } from './middleware';
+import { Context } from './context';
 
 interface Plugin {
-  apply: (core: Core, config: Config) => Promise<void>;
-  disable: (core: Core) => Promise<void>;
+  apply: (ctx: Context, config: Config) => Promise<void>;
+  disable: (ctx: Context) => Promise<void>;
   depend: Array<string>;
   provide: Array<string>;
   // Note: depend and provide are handled after plugin load due to loader constraints
@@ -38,14 +39,19 @@ export class Core {
   public config: any = null;
   public platforms: Platform[] = [];
   private eventListeners: { [event: string]: ((...args: any[]) => Promise<void>)[] } = {};
-  private components: { [name: string]: any } = {};
+  public components: { [name: string]: any } = {};
   public commands: Record<string, Command> = {};
   public pluginLoader: PluginLoader;
-  private logger = new Logger('core');
-  private providedComponents: { [name: string]: string } = {};
+  public logger = new Logger('core');
+  public providedComponents: { [name: string]: string } = {};
   private pluginModules: { [name: string]: any } = {};
   private configPath: string = ''; // 存储配置文件路径
-  private globalMiddlewares: Middleware[] = []; // 全局中间件数组
+  private globalMiddlewares: Record<string, Middleware> = {}; // 全局中间件数组
+  public cmdtoplu: Record<string, string> = {}; // 存储命令与插件名的映射关系
+  public comtoplu: Record<string, string> = {}; // 存储组件与插件名的映射关系
+  public evttoplu: Record<string, string> = {}; // 存储事件与插件名的映射关系
+  public mdwtoplu: Record<string, string> = {}; // 存储中间件与插件名的映射关系
+  public plftoplu: Record<string, string> = {}; // 存储平台与插件名的映射关系
 
   constructor(pluginLoader: PluginLoader) {
     this.pluginLoader = pluginLoader;
@@ -84,17 +90,17 @@ export class Core {
     });
 
     watcher.on('change', async () => {
-      this.logger.info('Config file changed, reloading...');
+      //this.logger.info('Config file changed, reloading...');
       try {
         // 重新加载配置文件
         const doc = yaml.load(fs.readFileSync(configPath, 'utf8'));
         this.config = doc;
-        this.logger.info('Config reloaded successfully.');
+        // this.logger.info('Config reloaded successfully.');
         
         // 触发配置变更事件
         await this.emit('config-changed', this.config);
       } catch (error) {
-        this.logger.error('Failed to reload config:', error);
+        // this.logger.error('Failed to reload config:', error);
       }
     });
 
@@ -188,7 +194,7 @@ export class Core {
               loadedPluginNames.push(pluginName);
               loadedInThisPass = true; // 标记本轮有插件加载成功
               if (loadedInThisPass && pluginInstance && pluginInstance.apply) {
-                await pluginInstance.apply(this, await this.getPluginConfig(pluginName));
+                await pluginInstance.apply(new Context(this, pluginName), await this.getPluginConfig(pluginName));
                 // 使用 pluginName
                 this.pluginLoader.logger.info(`apply plugin ${pluginName}`);
               }
@@ -327,24 +333,24 @@ export class Core {
       
       // 如果插件存在，先禁用旧实例
       if (plugin && plugin.disable) {
-        await plugin.disable(core);
+        await plugin.disable(new Context(this, pluginName));
       }
       
       // 清理插件提供的组件
-      if (plugin.provide) {
-        for (let providedmodules of plugin.provide) {
-          if (this.components[`${providedmodules}`]) {
-            this.unregisterComponent(providedmodules);
-          }
-        }
-      }
+      // if (plugin.provide) {
+      //   for (let providedmodules of plugin.provide) {
+      //     if (this.components[`${providedmodules}`]) {
+      //       this.unregisterComponent(providedmodules);
+      //     }
+      //   }
+      // }
       
       // 卸载插件
-      await core.pluginLoader.unloadPlugin(pluginName);
+      await core.unloadPluginAndEmit(pluginName, core);
       
       // 应用新的插件实例
       if (plugin && plugin.apply) {
-        await plugin.apply(core, config);
+        await plugin.apply(new Context(this, pluginName), config);
       }
       
       this.pluginLoader.logger.info(`apply plugin ${pluginName}`);
@@ -365,18 +371,19 @@ export class Core {
     try {
       const plugin = core.plugins[`${pluginName}`];
       if (plugin && plugin.disable) {
-        await plugin.disable(core);
+        await plugin.disable(new Context(this, pluginName));
       }
       await core.pluginLoader.unloadPlugin(pluginName);
       delete core.plugins[`${pluginName}`];
       delete this.pluginModules[`${pluginName}`];
       // Remove provided components from this plugin
-      for (const componentName in this.providedComponents) {
-        if (this.providedComponents[`${componentName}`] === pluginName) {
-          delete this.components[`${componentName}`];
-          delete this.providedComponents[`${componentName}`];
-        }
-      }
+      // for (const componentName in this.providedComponents) {
+      //   if (this.providedComponents[`${componentName}`] === pluginName) {
+      //     delete this.components[`${componentName}`];
+      //     delete this.providedComponents[`${componentName}`];
+      //   }
+      // }
+      this.unregall(pluginName);
       core.emit('plugin-unloaded', pluginName);
     } catch (error) {
       this.logger.error(`Failed to unload plugin ${pluginName}:`, error);
@@ -402,6 +409,7 @@ export class Core {
   unregisterComponent(name: string): void {
     delete this.components[`${name}`];
     delete this.providedComponents[`${name}`];
+    delete this.comtoplu[`${name}`]
   }
 
   // 事件系统：监听事件
@@ -416,7 +424,7 @@ export class Core {
   // 事件系统：触发事件
   async emit(event: string, ...args: any[]): Promise<void> {
     if (this.eventListeners[`${event}`]) {
-      this.logger.info(`Emitting event "${event}" with args:`, args);
+      // this.logger.info(`Emitting event "${event}" with args:`, args);
       for (const listener of this.eventListeners[`${event}`]) {
         try {
           await listener(...args);
@@ -430,8 +438,8 @@ export class Core {
   }
 
   // 注册全局中间件
-  use(middleware: Middleware): Core {
-    this.globalMiddlewares.push(middleware);
+  use(name: string, middleware: Middleware): Core {
+    this.globalMiddlewares[name] = middleware;
     return this;
   }
 
@@ -446,40 +454,81 @@ export class Core {
   async executeCommand(name: string, session: any, ...args: any[]): Promise<Session | null> {
     const command = this.commands[`${name}`];
     if (command) {
-      // 如果有全局中间件，先执行中间件链
-      if (this.globalMiddlewares.length > 0 || command.middlewares.length > 0) {
-        // 合并全局中间件和命令特定中间件
-        const middlewares = [...this.globalMiddlewares, ...command.middlewares];
-        
-        // 创建中间件执行链
+      // 将 globalMiddlewares 从对象转为数组
+      const globalMiddlewareList = Object.values(this.globalMiddlewares || {});
+      const commandMiddlewareList = command.middlewares || [];
+  
+      // 如果有中间件，执行中间件链
+      if (globalMiddlewareList.length > 0 || commandMiddlewareList.length > 0) {
+        const middlewares = [...globalMiddlewareList, ...commandMiddlewareList];
+  
         let index = 0;
         const runner = async (): Promise<void> => {
-          // 如果所有中间件都已执行，则执行命令处理函数
           if (index >= middlewares.length) {
             await command.executeHandler(session, ...args);
             return;
           }
-          
-          // 获取当前中间件
+  
           const middleware = middlewares[index++];
-          
-          // 执行当前中间件，传入session和next函数
           await middleware(session, runner);
         };
-        
-        // 开始执行中间件链
+  
         await runner();
         return session;
       } else {
-        // 没有中间件，直接执行命令处理函数
         return await command.execute(session, ...args);
       }
     }
     return null;
   }
+  
 
   registerPlatform(platform: Platform): any {
     this.platforms.push(platform);
     return platform.startPlatform(this);
+  }
+
+  unregall(pluginname: string): void{
+    let cmdtodel = [];
+    for(const cmd in this.cmdtoplu){
+      if(this.cmdtoplu[cmd] === pluginname){
+        cmdtodel.push(cmd);
+      }
+    }
+    for(const cmd of cmdtodel){
+      delete this.cmdtoplu[cmd];
+      delete this.commands[cmd];
+    }
+    let comptodel = [];
+    for(const comp in this.comtoplu){
+      if(this.comtoplu[comp] === pluginname){
+        comptodel.push(comp);
+      }
+    }
+    for(const comp of comptodel){
+      delete this.comtoplu[comp];
+      delete this.components[comp];
+      delete this.providedComponents[comp];
+    }
+    let evttodel = [];
+    for(const evt in this.evttoplu){
+      if(this.evttoplu[evt] === pluginname){
+        evttodel.push(evt);
+      }
+    }
+    for(const evt of evttodel){
+      delete this.evttoplu[evt];
+      delete this.eventListeners[evt];
+    }
+    let mdwtodel = [];
+    for(const mdw in this.mdwtoplu){
+      if(this.mdwtoplu[mdw] === pluginname){
+        mdwtodel.push(mdw);
+      }
+    }
+    for(const mdw of mdwtodel){
+      delete this.mdwtoplu[mdw];
+      delete this.globalMiddlewares[mdw];
+    }
   }
 }
