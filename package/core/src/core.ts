@@ -49,7 +49,7 @@ export class Core {
   private globalMiddlewares: Record<string, Middleware> = {}; // 全局中间件数组
   public cmdtoplu: Record<string, string> = {}; // 存储命令与插件名的映射关系
   public comtoplu: Record<string, string> = {}; // 存储组件与插件名的映射关系
-  public evttoplu: Record<string, string> = {}; // 存储事件与插件名的映射关系
+  public evttoplu: Record<string, Record<string, ((...args: any[]) => Promise<void>)[]>> = {}; // 存储事件与插件名的映射关系
   public mdwtoplu: Record<string, string> = {}; // 存储中间件与插件名的映射关系
   public plftoplu: Record<string, string> = {}; // 存储平台与插件名的映射关系
 
@@ -64,7 +64,7 @@ export class Core {
       const doc = yaml.load(fs.readFileSync(configPath, 'utf8'));
       this.config = doc;
       this.logger.info('Config loaded.');
-      
+
       // 开发环境下监听配置文件变化
       if (process.env.NODE_ENV === 'development') {
         this.watchConfig(configPath);
@@ -96,7 +96,7 @@ export class Core {
         const doc = yaml.load(fs.readFileSync(configPath, 'utf8'));
         this.config = doc;
         // this.logger.info('Config reloaded successfully.');
-        
+
         // 触发配置变更事件
         await this.emit('config-changed', this.config);
       } catch (error) {
@@ -110,7 +110,7 @@ export class Core {
   async getPluginConfig(pluginName: string): Promise<Config> {
     // 如果插件名以~开头，则去掉~前缀获取配置
     const actualPluginName = pluginName.startsWith('~') ? pluginName.substring(1) : pluginName;
-    
+
     // 如果配置文件路径存在且处于开发模式，每次都重新读取配置文件
     if (this.configPath && process.env.NODE_ENV === 'development') {
       try {
@@ -122,7 +122,7 @@ export class Core {
         this.logger.warn('Failed to refresh config for hot reload:', error);
       }
     }
-    
+
     if (!this.config.plugins[actualPluginName]) {
       return new Config(actualPluginName);
     }
@@ -324,18 +324,18 @@ export class Core {
           this.logger.warn('Failed to refresh config for plugin reload:', error);
         }
       }
-      
+
       // 获取最新的插件配置
       const config = await core.getPluginConfig(pluginName);
-      
+
       // 加载插件实例
       const plugin = await core.pluginLoader.load(pluginName);
-      
+
       // 如果插件存在，先禁用旧实例
       if (plugin && plugin.disable) {
         await plugin.disable(new Context(this, pluginName));
       }
-      
+
       // 清理插件提供的组件
       // if (plugin.provide) {
       //   for (let providedmodules of plugin.provide) {
@@ -344,15 +344,15 @@ export class Core {
       //     }
       //   }
       // }
-      
+
       // 卸载插件
       await core.unloadPluginAndEmit(pluginName, core);
-      
+
       // 应用新的插件实例
       if (plugin && plugin.apply) {
         await plugin.apply(new Context(this, pluginName), config);
       }
-      
+
       this.pluginLoader.logger.info(`apply plugin ${pluginName}`);
 
       // 触发插件重载事件
@@ -457,22 +457,22 @@ export class Core {
       // 将 globalMiddlewares 从对象转为数组
       const globalMiddlewareList = Object.values(this.globalMiddlewares || {});
       const commandMiddlewareList = command.middlewares || [];
-  
+
       // 如果有中间件，执行中间件链
       if (globalMiddlewareList.length > 0 || commandMiddlewareList.length > 0) {
         const middlewares = [...globalMiddlewareList, ...commandMiddlewareList];
-  
+
         let index = 0;
         const runner = async (): Promise<void> => {
           if (index >= middlewares.length) {
             await command.executeHandler(session, ...args);
             return;
           }
-  
+
           const middleware = middlewares[index++];
           await middleware(session, runner);
         };
-  
+
         await runner();
         return session;
       } else {
@@ -481,52 +481,59 @@ export class Core {
     }
     return null;
   }
-  
+
 
   registerPlatform(platform: Platform): any {
     this.platforms.push(platform);
     return platform.startPlatform(this);
   }
 
-  unregall(pluginname: string): void{
+  unregall(pluginname: string): void {
     let cmdtodel = [];
-    for(const cmd in this.cmdtoplu){
-      if(this.cmdtoplu[cmd] === pluginname){
+    for (const cmd in this.cmdtoplu) {
+      if (this.cmdtoplu[cmd] === pluginname) {
         cmdtodel.push(cmd);
       }
     }
-    for(const cmd of cmdtodel){
+    for (const cmd of cmdtodel) {
       delete this.cmdtoplu[cmd];
       delete this.commands[cmd];
     }
     let comptodel = [];
-    for(const comp in this.comtoplu){
-      if(this.comtoplu[comp] === pluginname){
+    for (const comp in this.comtoplu) {
+      if (this.comtoplu[comp] === pluginname) {
         comptodel.push(comp);
       }
     }
-    for(const comp of comptodel){
+    for (const comp of comptodel) {
       delete this.comtoplu[comp];
       delete this.components[comp];
       delete this.providedComponents[comp];
     }
-    let evttodel = [];
-    for(const evt in this.evttoplu){
-      if(this.evttoplu[evt] === pluginname){
-        evttodel.push(evt);
+    let evttodel: string[] = [];
+
+    for (const evt in this.evttoplu) {
+      if (this.evttoplu[evt][pluginname]) {
+        // 清除插件在 evttoplu 中的记录
+        delete this.evttoplu[evt][pluginname];
+
+        // 如果该事件的插件已经全部清除了，也可以选择删掉整个事件
+        if (Object.keys(this.evttoplu[evt]).length === 0) {
+          evttodel.push(evt);
+        }
+
+        // 同时在 this.eventListeners 中删掉对应 listener
+        const pluginListeners = this.evttoplu[evt][pluginname] || [];
+        this.eventListeners[evt] = this.eventListeners[evt]?.filter(l => !pluginListeners.includes(l)) || [];
       }
     }
-    for(const evt of evttodel){
-      delete this.evttoplu[evt];
-      delete this.eventListeners[evt];
-    }
     let mdwtodel = [];
-    for(const mdw in this.mdwtoplu){
-      if(this.mdwtoplu[mdw] === pluginname){
+    for (const mdw in this.mdwtoplu) {
+      if (this.mdwtoplu[mdw] === pluginname) {
         mdwtodel.push(mdw);
       }
     }
-    for(const mdw of mdwtodel){
+    for (const mdw of mdwtodel) {
       delete this.mdwtoplu[mdw];
       delete this.globalMiddlewares[mdw];
     }

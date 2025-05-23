@@ -18,11 +18,10 @@ export class Context {
             return this.core.command(name);
         }
     }
-    on(name: string, callback: Function) {
-        this.core.evttoplu[name] = this.pluginname;
-        this.core.on(name, async (...args: any[]) => {
-            return callback(...args);
-        });        
+    on(name: string, listener: (...args: any[]) => Promise<void>) {
+        // 存储该插件监听的事件，需要注意的是一个事件可由多个插件监听
+        this.core.evttoplu[name][this.pluginname].push(listener);
+        this.core.on(name, listener);        
     }
     use(name: string, callback: Function) {
         this.core.mdwtoplu[name] = this.pluginname;
@@ -30,8 +29,8 @@ export class Context {
             return callback(...args);
         });
     }
-    /*
-     *Unless nessesary, do not use core directly
+    /*@
+     *@ Unless nessesary, do not use core directly
      */
     getCore() {
         return this.core;
