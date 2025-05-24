@@ -21,6 +21,10 @@ export interface EchoConfig {
   content: string;
   type: string;
 }
+interface contentobject {
+  content: string[];
+  join: string;
+}
 
 /**
  * 控制台插件配置schema
@@ -33,9 +37,21 @@ export const config = {
       description: '监听路径（命令）'
     },
     content: {
-      type: 'string',
-      default: 'Hello World',
-      description: '输出内容'
+      type: 'object',
+      default: { content: ['Hello World'], join: '\n'},
+      properties: {
+        content: {
+          type: 'array',
+          default: [],
+          description: '输出内容'
+      },
+      join: {
+        type: 'string',
+        default: '\n',
+        description: '输出内容连接符'
+      }
+    },
+      description: '输出内容定义'
     },
     type: {
       type: 'string',
@@ -50,7 +66,7 @@ export async function apply(ctx: Context, config: Config) {
   ctx.command(config.get<string>('path', 'echo'))
     .action(async (session: Session, param?: any) => {
       session.setMime(config.get<string>('type', 'html')); // 默认设置为 HTML 类型
-      session.body = config.get<string>('content', 'Hello World');
+      session.body = config.get<contentobject>('content').content?.join(config.get<contentobject>('content').join);
     });
   logger.info('Echo plugin loaded');
 }

@@ -126,31 +126,36 @@ class PluginConfigManager {
     const schema = await this.getPluginSchema(actualPluginName);
     const config = this.configCache[actualPluginName] || {};
 
-    const mergedConfig: {
-      key: string;
-      value: any;
-      description?: string;
-      type?: string;
-      options?: string[];
-    }[] = [];
+    const mergedConfig: any[] = [];
+
+    function parseSchema(key: string, value: any, node: any): void {
+      const description = node.description || '';
+
+      if (node.enum) {
+        mergedConfig.push({ key, value, description, type: 'select', options: node.enum });
+      } else if (node.type === 'boolean') {
+        mergedConfig.push({ key, value: !!value, description, type: 'boolean' });
+      } else if (node.type === 'array') {
+        mergedConfig.push({ key, value: Array.isArray(value) ? value.join(',') : '', description, type: 'array' });
+      } else if (node.type === 'object' && node.properties) {
+        for (const subKey in node.properties) {
+          const fullKey = `${key}.${subKey}`;
+          const subValue = value?.[subKey] ?? node.properties[subKey].default ?? '';
+          parseSchema(fullKey, subValue, node.properties[subKey]);
+        }
+      } else {
+        mergedConfig.push({ key, value, description, type: 'text' });
+      }
+    }
 
     for (const key in schema) {
       const value = config.hasOwnProperty(key) ? config[key] : (schema[key].default ?? '');
-      const description = schema[key].description || '';
-      const type = schema[key].enum ? 'select' : 'text';
-      const options = schema[key].enum;
-
-      const item: any = { key, value, description };
-      if (type === 'select') {
-        item.type = 'select';
-        item.options = options;
-      }
-
-      mergedConfig.push(item);
+      parseSchema(key, value, schema[key]);
     }
 
     return mergedConfig;
   }
+
 
   /**
    * 获取插件配置schema
@@ -640,30 +645,16 @@ export async function apply(ctx: Context, config: Config) {
           }
 
           try {
-            const newConfigArray = JSON.parse(content);
+            const newConfigObject = JSON.parse(content);
 
-            // 验证newConfigArray是否是数组
-            if (!Array.isArray(newConfigArray)) {
-              session.body = JSON.stringify({ error: 'Content must be a valid JSON array.' });
+            // 验证 newConfigObject 是个对象
+            if (typeof newConfigObject !== 'object' || newConfigObject === null || Array.isArray(newConfigObject)) {
+              session.body = JSON.stringify({ error: 'Content must be a valid JSON object.' });
               session.setMime('json');
               return;
             }
 
-            // 将前端发送的数组格式转换为后端期望的对象格式
-            const newConfigObject: { [key: string]: any } = {};
-            for (const item of newConfigArray) {
-              // 验证数组里的每个元素是否是object且只有一个key-value对
-              const keys = Object.keys(item);
-              if (typeof item !== 'object' || item === null || keys.length !== 1) {
-                session.body = JSON.stringify({ error: 'Each item in the array must be a valid JSON object with a single key-value pair.' });
-                session.setMime('json');
-                return;
-              }
-              const key = keys[0];
-              newConfigObject[key] = item[key];
-            }
-
-            // 验证配置是否符合schema
+            // 验证配置是否符合 schema
             const validationResult = await configManager.validatePluginConfig(pluginName, newConfigObject);
             if (validationResult !== true) {
               session.body = JSON.stringify({ error: `Configuration validation failed: ${validationResult}` });
@@ -671,23 +662,22 @@ export async function apply(ctx: Context, config: Config) {
               return;
             }
 
-            // 保存插件配置
+            // 保存配置
             const success = await configManager.savePluginConfig(pluginName, newConfigObject, reload);
+            session.body = JSON.stringify(
+              success
+                ? { success: `Configuration for plugin ${pluginName} updated.` }
+                : { error: `Failed to update configuration for plugin ${pluginName}.` }
+            );
 
-            if (success) {
-              session.body = JSON.stringify({ success: `Configuration for plugin ${pluginName} updated.` });
-            } else {
-              session.body = JSON.stringify({ error: `Failed to update configuration for plugin ${pluginName}.` });
-            }
-
-            session.setMime('json');
-            return;
           } catch (error: any) {
             session.body = JSON.stringify({ error: `Error processing config update: ${error.message}` });
             logger.error('Error processing config update:', error);
-            session.setMime('json');
-            return;
           }
+
+          session.setMime('json');
+          return;
+
         }
 
         // 获取所有插件名称
