@@ -376,6 +376,7 @@
     <div class="overlay" id="overlay"></div>
     <button class="toggle-sidebar" id="toggle-sidebar">☰</button>
     <aside class="sidebar" id="sidebar">
+        <button class="return-home" id="return-home">返回主页</button>
         <nav>
             <ul id="plugin-list"></ul>
         </nav>
@@ -407,7 +408,12 @@
             const enableButton = document.querySelector('.enable-button');
             const disableButton = document.querySelector('.disable-button');
             const notification = document.getElementById('notification');
+            const returnHomeButton = document.getElementById('return-home');
 
+            // 返回主页
+            returnHomeButton.addEventListener('click', function () {
+                window.location.href = './home';
+            });
             let currentPluginName = null; // 用于存储当前选中的插件名称
             let isPluginDisabled = false; // 用于存储当前插件是否被禁用
 
@@ -452,7 +458,7 @@
             // 获取并显示插件列表
             async function fetchPluginList() {
                 try {
-                    const response = await fetch('/console/api/plugins?includeDisabled=true');
+                    const response = await fetch('./api/plugins?includeDisabled=true');
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
@@ -528,7 +534,7 @@
                     isPluginDisabled = pluginName.startsWith('~');
                     updatePluginStatus();
 
-                    const response = await fetch(`/console/api/config?name=${pluginName}`);
+                    const response = await fetch(`./api/config?name=${pluginName}`);
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
@@ -1133,7 +1139,7 @@
                     console.log('Saving configuration:', jsonContent);
 
                     // 构建保存配置的URL，并确保内容被URIComponent编码
-                    const url = `/console/api/saveconfig?name=${currentPluginName}&config=${encodeURIComponent(jsonContent)}`;
+                    const url = `./api/saveconfig?name=${currentPluginName}&config=${encodeURIComponent(jsonContent)}`;
                     const response = await fetch(url);
 
                     if (!response.ok) {
@@ -1164,7 +1170,7 @@
                 }
 
                 try {
-                    const response = await fetch(`/console/api/enableplugin?name=${currentPluginName}`);
+                    const response = await fetch(`./api/enableplugin?name=${currentPluginName}`);
 
                     if (!response.ok) {
                         const errorResult = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
@@ -1203,7 +1209,7 @@
                 }
 
                 try {
-                    const response = await fetch(`/console/api/disableplugin?name=${currentPluginName}`);
+                    const response = await fetch(`./api/disableplugin?name=${currentPluginName}`);
 
                     if (!response.ok) {
                         const errorResult = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));

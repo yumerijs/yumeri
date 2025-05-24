@@ -141,12 +141,12 @@ class PluginConfigManager {
 
       // 处理枚举类型
       if (node.enum) {
-        mergedConfig.push({ 
-          key: fullPath, 
-          value, 
-          description, 
-          type: 'select', 
-          options: node.enum 
+        mergedConfig.push({
+          key: fullPath,
+          value,
+          description,
+          type: 'select',
+          options: node.enum
         });
         return;
       }
@@ -154,20 +154,20 @@ class PluginConfigManager {
       // 根据类型处理
       switch (node.type) {
         case 'boolean':
-          mergedConfig.push({ 
-            key: fullPath, 
-            value: !!value, 
-            description, 
-            type: 'boolean' 
+          mergedConfig.push({
+            key: fullPath,
+            value: !!value,
+            description,
+            type: 'boolean'
           });
           break;
 
         case 'array':
           // 处理数组类型
-          const arrayValue = Array.isArray(value) ? value : 
-                            (typeof value === 'string' && value.trim() !== '' ? 
-                              value.split(',').map(s => s.trim()) : []);
-          
+          const arrayValue = Array.isArray(value) ? value :
+            (typeof value === 'string' && value.trim() !== '' ?
+              value.split(',').map(s => s.trim()) : []);
+
           // 如果数组项是对象或数组类型，需要特殊处理
           if (node.items && (node.items.type === 'object' || node.items.type === 'array')) {
             mergedConfig.push({
@@ -205,46 +205,46 @@ class PluginConfigManager {
             for (const subKey in node.properties) {
               const subNode = node.properties[subKey];
               const subValue = value && typeof value === 'object' ? value[subKey] : undefined;
-              
+
               // 使用默认值，如果值不存在
-              const finalSubValue = subValue !== undefined ? subValue : 
-                                   (subNode.default !== undefined ? subNode.default : 
-                                    (subNode.type === 'object' ? {} : 
-                                     (subNode.type === 'array' ? [] : '')));
-              
+              const finalSubValue = subValue !== undefined ? subValue :
+                (subNode.default !== undefined ? subNode.default :
+                  (subNode.type === 'object' ? {} :
+                    (subNode.type === 'array' ? [] : '')));
+
               parseSchema(subKey, finalSubValue, subNode, fullPath);
             }
           } else {
             // 没有属性定义的对象，作为普通文本处理
-            mergedConfig.push({ 
-              key: fullPath, 
-              value: typeof value === 'object' ? JSON.stringify(value) : value, 
-              description, 
-              type: 'text' 
+            mergedConfig.push({
+              key: fullPath,
+              value: typeof value === 'object' ? JSON.stringify(value) : value,
+              description,
+              type: 'text'
             });
           }
           break;
 
         case 'number':
           // 数字类型
-          mergedConfig.push({ 
-            key: fullPath, 
-            value: typeof value === 'number' ? value : 
-                  (value !== undefined && value !== null && value !== '' ? Number(value) : 
-                   (node.default !== undefined ? node.default : 0)), 
-            description, 
-            type: 'number' 
+          mergedConfig.push({
+            key: fullPath,
+            value: typeof value === 'number' ? value :
+              (value !== undefined && value !== null && value !== '' ? Number(value) :
+                (node.default !== undefined ? node.default : 0)),
+            description,
+            type: 'number'
           });
           break;
 
         default:
           // 默认作为文本处理（包括string类型）
-          mergedConfig.push({ 
-            key: fullPath, 
-            value: value !== undefined && value !== null ? String(value) : 
-                  (node.default !== undefined ? node.default : ''), 
-            description, 
-            type: 'text' 
+          mergedConfig.push({
+            key: fullPath,
+            value: value !== undefined && value !== null ? String(value) :
+              (node.default !== undefined ? node.default : ''),
+            description,
+            type: 'text'
           });
           break;
       }
@@ -253,11 +253,11 @@ class PluginConfigManager {
     // 处理顶层配置项
     for (const key in schema) {
       const node = schema[key];
-      const value = config.hasOwnProperty(key) ? config[key] : 
-                   (node.default !== undefined ? node.default : 
-                    (node.type === 'object' ? {} : 
-                     (node.type === 'array' ? [] : '')));
-      
+      const value = config.hasOwnProperty(key) ? config[key] :
+        (node.default !== undefined ? node.default :
+          (node.type === 'object' ? {} :
+            (node.type === 'array' ? [] : '')));
+
       parseSchema(key, value, node);
     }
 
@@ -656,12 +656,27 @@ class PluginConfigManager {
   }
 }
 
+class ConsoleItem {
+  public icon: string;
+  public name: string;
+  public htmlpath: string;
+  public staticpath: string;
+  constructor(icon: string, name: string, htmlpath: string, staticpath: string) {
+    this.icon = icon;
+    this.name = name;
+    this.htmlpath = htmlpath;
+    this.staticpath = staticpath;
+  }
+}
+
 export async function apply(ctx: Context, config: Config) {
   // 创建插件配置管理器
   const configManager = new PluginConfigManager();
   const core = ctx.getCore();
   configManager.setCore(core);
-
+  let consoleitem: Record<string, ConsoleItem> = {};
+  const staticDir = path.join(__dirname, '..', 'static');
+  consoleitem['config'] = new ConsoleItem('fa-cog', '配置', path.join(staticDir, 'config.html'), path.join(staticDir, 'files'));
   // 注册控制台命令
   ctx.command(config.get<string>('path', 'console'))
     .action(async (session: Session, param?: any) => {
@@ -677,7 +692,7 @@ export async function apply(ctx: Context, config: Config) {
       if (param && param.path && param.path.startsWith('/api/')) {
         // 设置MIME类型为JSON
         session.setMime('json');
-        
+
         // 处理登录请求
         if (param.path === '/api/loginpass') {
           if (param.username === config.get<string>('adminname', 'admin') && param.password === config.get<string>('adminpassword', 'admin')) {
@@ -729,10 +744,10 @@ export async function apply(ctx: Context, config: Config) {
           try {
             // 解析配置数据
             const parsedConfig = typeof configData === 'string' ? JSON.parse(configData) : configData;
-            
+
             // 保存配置
             const success = await configManager.savePluginConfig(pluginName, parsedConfig, reload);
-            
+
             if (success) {
               session.body = JSON.stringify({ success: true, message: '配置保存成功' });
             } else {
@@ -747,14 +762,14 @@ export async function apply(ctx: Context, config: Config) {
         // 处理禁用插件请求
         if (param.path === '/api/disableplugin') {
           const pluginName = param.name;
-          
+
           if (!pluginName) {
             session.body = JSON.stringify({ success: false, message: '缺少插件名称参数' });
             return;
           }
 
           const success = await configManager.disablePlugin(pluginName);
-          
+
           if (success) {
             session.body = JSON.stringify({ success: true, message: '插件禁用成功' });
           } else {
@@ -766,19 +781,40 @@ export async function apply(ctx: Context, config: Config) {
         // 处理启用插件请求
         if (param.path === '/api/enableplugin') {
           const pluginName = param.name;
-          
+
           if (!pluginName) {
             session.body = JSON.stringify({ success: false, message: '缺少插件名称参数' });
             return;
           }
 
           const success = await configManager.enablePlugin(pluginName);
-          
+
           if (success) {
             session.body = JSON.stringify({ success: true, message: '插件启用成功' });
           } else {
             session.body = JSON.stringify({ success: false, message: '插件启用失败' });
           }
+          return;
+        }
+        if (param.path === '/api/consoleitem') {
+          session.setMime('json');
+          // 使用 Object.entries 来同时获取键 (key) 和值 (item)
+          const resultArray = Object.entries(consoleitem)
+            .map(([key, item]) => { // 解构赋值，key 是 record 的键名（例如 "settings"），item 是 ConsoleItem 实例
+              const itemIcon = item.icon;
+              const itemName = item.name; // 这里仍然使用 ConsoleItem 内部的 name 属性作为显示名称
+              
+              // 路径拼接：使用 record 的键名 (key)
+              const itemPath = `/${config.get<string>('path', 'console')}/${key}`; 
+        
+              return {
+                item: itemIcon,
+                name: itemName,
+                path: itemPath
+              };
+            });
+          const jsonOutput = JSON.stringify(resultArray, null, 2);
+          session.body = jsonOutput;
           return;
         }
 
@@ -789,74 +825,88 @@ export async function apply(ctx: Context, config: Config) {
 
       // 处理静态文件请求
       if (param && param.path) {
-        // 静态文件目录
-        const staticDir = path.join(__dirname, '..', 'static');
-        
         // 处理登录页面请求
         if (param.path === '/login') {
           const loginHtmlPath = path.join(staticDir, 'login.html');
-          
+
           if (fs.existsSync(loginHtmlPath)) {
             session.body = fs.readFileSync(loginHtmlPath, 'utf8');
             return;
           }
         }
-        
-        // 处理配置页面请求
-        if (param.path === '/config') {
-          const configHtmlPath = path.join(staticDir, 'config.html');
-          
-          if (fs.existsSync(configHtmlPath)) {
-            session.body = fs.readFileSync(configHtmlPath, 'utf8');
+        // 处理控制台主页请求
+        if (param.path === '/home') {
+          const consoleHtmlPath = path.join(staticDir, 'home.html');
+
+          if (fs.existsSync(consoleHtmlPath)) {
+            session.body = fs.readFileSync(consoleHtmlPath, 'utf8');
             return;
           }
         }
-        
-        // 处理其他静态文件请求
-        const filePath = path.join(staticDir, param.path);
-        
-        // 安全检查：确保请求的文件在静态目录内
-        if (filePath.startsWith(staticDir) && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-          const ext = path.extname(filePath).toLowerCase();
-          
-          // 根据文件扩展名设置MIME类型
-          switch (ext) {
-            case '.html':
-              session.setMime('html');
-              break;
-            case '.css':
-              session.setMime('css');
-              break;
-            case '.js':
-              session.setMime('javascript');
-              break;
-            case '.json':
-              session.setMime('json');
-              break;
-            case '.png':
-              session.setMime('png');
-              break;
-            case '.jpg':
-            case '.jpeg':
-              session.setMime('jpeg');
-              break;
-            case '.gif':
-              session.setMime('gif');
-              break;
-            case '.svg':
-              session.setMime('svg');
-              break;
-            default:
-              session.setMime('text');
-              break;
+
+        // 处理其他consoleitem页面请求
+        if (consoleitem[param.path.split('/')[1]]) {
+          if (param.path.split('/').length === 2) {
+            if (fs.existsSync(consoleitem[param.path.split('/')[1]].htmlpath)) {
+              session.body = fs.readFileSync(consoleitem[param.path.split('/')[1]].htmlpath, 'utf8');
+              return;
+            }
+          } else {
+            if (fs.existsSync(consoleitem[param.path.split('/')[1]].staticpath + '/' + param.path.split('/').slice(2).join('/'))) {
+              const filePath = consoleitem[param.path.split('/')[1]].staticpath + '/' + param.path.split('/').slice(2).join('/');
+              if (filePath.startsWith(staticDir) && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+                const ext = path.extname(filePath).toLowerCase();
+
+                // 根据文件扩展名设置MIME类型
+                switch (ext) {
+                  case '.html':
+                    session.setMime('html');
+                    break;
+                  case '.css':
+                    session.setMime('css');
+                    break;
+                  case '.js':
+                    session.setMime('javascript');
+                    break;
+                  case '.json':
+                    session.setMime('json');
+                    break;
+                  case '.png':
+                    session.setMime('png');
+                    break;
+                  case '.jpg':
+                  case '.jpeg':
+                    session.setMime('jpeg');
+                    break;
+                  case '.gif':
+                    session.setMime('gif');
+                    break;
+                  case '.svg':
+                    session.setMime('svg');
+                    break;
+                  default:
+                    session.setMime('text');
+                    break;
+                }
+                session.body = fs.readFileSync(filePath, ext.match(/\.(png|jpg|jpeg|gif|svg)$/) ? null : 'utf8');
+                return;
+              }
+            }
           }
-          
-          session.body = fs.readFileSync(filePath, ext.match(/\.(png|jpg|jpeg|gif|svg)$/) ? null : 'utf8');
-          return;
         }
       }
 
-      // 默认重定向到配置页面
-      session.body = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>重定向</title></head><body><script>window.location.href = "/${config.get<string>('path', 'console')}/config";</script><p>正在重定向</p></body></html>`;
+      // 默认重定向到主页面
+      session.body = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>重定向</title></head><body><script>window.location.href = "/${config.get<string>('path', 'console')}/home";</script><p>正在重定向</p></body></html>`;
     });
+
+  const operateconsole = {
+    addconsoleitem: (icon: string, name: string, htmlpath: string, staticpath: string) => {
+      consoleitem[name] = new ConsoleItem(icon, name, htmlpath, staticpath);
+    },
+    removeconsoleitem: (name: string) => {
+      delete consoleitem[name];
+    }
+  }
+  ctx.registerComponent('console', operateconsole);
 }

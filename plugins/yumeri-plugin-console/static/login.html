@@ -125,7 +125,7 @@
 
   <div class="login-container">
     <h2>用户登录</h2>
-    <form id="loginForm" action="/console/api/loginpass" method="post">
+    <form id="loginForm" action="./api/loginpass" method="post">
       <div class="form-group">
         <label for="username">账号</label>
         <input type="text" id="username" name="username" required>
@@ -167,7 +167,7 @@
           modal.style.display = "flex";
           if (data.success) {
             setTimeout(() => {
-              window.location.href = "/console/config";
+              window.location.href = "./home";
             }, 1000);
           }
         })
