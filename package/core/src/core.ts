@@ -274,10 +274,8 @@ export class Core {
       if (!changePath.endsWith('.ts') && !changePath.endsWith('.js')) return;
       const parts = changePath.split(path.sep);
       if (parts.length < 2) return;
-      const pluginName = parts.slice(0, 2).join(path.sep);
-      const simplePluginName = parts.length >= 2 ? parts.slice(0, 2).join('/') : path.basename(changePath, path.extname(changePath));
-
-      this.logger.info(`Plugin file changed: ${simplePluginName}`);
+      const pluginName = parts[1];
+      this.logger.info(`Plugin file changed: ${changePath}`);
       this.reloadPlugin(pluginName, core);
     });
 
@@ -285,10 +283,8 @@ export class Core {
       if (!changePath.endsWith('.ts') && !changePath.endsWith('.js')) return;
       const parts = changePath.split(path.sep);
       if (parts.length < 2) return;
-      const pluginName = parts.slice(0, 2).join(path.sep);
-      const simplePluginName = parts.length >= 2 ? parts.slice(0, 2).join('/') : path.basename(changePath, path.extname(changePath));
-
-      this.logger.info(`New plugin file added: ${simplePluginName}`);
+      const pluginName = parts[1];
+      this.logger.info(`New plugin file added: ${changePath}`);
       this.reloadPlugin(pluginName, core);
     });
 
@@ -296,10 +292,8 @@ export class Core {
       if (!changePath.endsWith('.ts') && !changePath.endsWith('.js')) return;
       const parts = changePath.split(path.sep);
       if (parts.length < 2) return;
-      const pluginName = parts.slice(0, 2).join(path.sep);
-      const simplePluginName = parts.length >= 2 ? parts.slice(0, 2).join('/') : path.basename(changePath, path.extname(changePath));
-
-      this.logger.info(`Plugin file removed: ${simplePluginName}`);
+      const pluginName = parts[1];
+      this.logger.info(`Plugin file removed: ${changePath}`);
       await this.unloadPluginAndEmit(pluginName, core);
     });
 

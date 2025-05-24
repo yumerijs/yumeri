@@ -92,7 +92,7 @@ class PluginConfigManager {
       this.core.on('config-changed', async () => {
         // 配置文件变更时清除缓存
         this.clearCache();
-        logger.info('Config cache cleared due to config file change');
+        // logger.info('Config cache cleared due to config file change');
       });
     }
   }
@@ -128,34 +128,141 @@ class PluginConfigManager {
 
     const mergedConfig: any[] = [];
 
-    function parseSchema(key: string, value: any, node: any): void {
+    /**
+     * 递归解析配置模式和值
+     * @param key 配置键
+     * @param value 配置值
+     * @param node 配置模式节点
+     * @param parentPath 父路径
+     */
+    function parseSchema(key: string, value: any, node: any, parentPath: string = ''): void {
+      const fullPath = parentPath ? `${parentPath}.${key}` : key;
       const description = node.description || '';
 
+      // 处理枚举类型
       if (node.enum) {
-        mergedConfig.push({ key, value, description, type: 'select', options: node.enum });
-      } else if (node.type === 'boolean') {
-        mergedConfig.push({ key, value: !!value, description, type: 'boolean' });
-      } else if (node.type === 'array') {
-        mergedConfig.push({ key, value: Array.isArray(value) ? value.join(',') : '', description, type: 'array' });
-      } else if (node.type === 'object' && node.properties) {
-        for (const subKey in node.properties) {
-          const fullKey = `${key}.${subKey}`;
-          const subValue = value?.[subKey] ?? node.properties[subKey].default ?? '';
-          parseSchema(fullKey, subValue, node.properties[subKey]);
-        }
-      } else {
-        mergedConfig.push({ key, value, description, type: 'text' });
+        mergedConfig.push({ 
+          key: fullPath, 
+          value, 
+          description, 
+          type: 'select', 
+          options: node.enum 
+        });
+        return;
+      }
+
+      // 根据类型处理
+      switch (node.type) {
+        case 'boolean':
+          mergedConfig.push({ 
+            key: fullPath, 
+            value: !!value, 
+            description, 
+            type: 'boolean' 
+          });
+          break;
+
+        case 'array':
+          // 处理数组类型
+          const arrayValue = Array.isArray(value) ? value : 
+                            (typeof value === 'string' && value.trim() !== '' ? 
+                              value.split(',').map(s => s.trim()) : []);
+          
+          // 如果数组项是对象或数组类型，需要特殊处理
+          if (node.items && (node.items.type === 'object' || node.items.type === 'array')) {
+            mergedConfig.push({
+              key: fullPath,
+              value: arrayValue,
+              description,
+              type: 'complex-array',
+              itemType: node.items.type,
+              itemSchema: node.items
+            });
+          } else {
+            // 基本类型数组
+            mergedConfig.push({
+              key: fullPath,
+              value: arrayValue,
+              description,
+              type: 'array',
+              itemType: node.items ? node.items.type : 'string'
+            });
+          }
+          break;
+
+        case 'object':
+          // 处理对象类型
+          if (node.properties) {
+            // 添加对象本身的信息
+            mergedConfig.push({
+              key: fullPath,
+              value: value || {},
+              description,
+              type: 'object-header'
+            });
+
+            // 递归处理对象的每个属性
+            for (const subKey in node.properties) {
+              const subNode = node.properties[subKey];
+              const subValue = value && typeof value === 'object' ? value[subKey] : undefined;
+              
+              // 使用默认值，如果值不存在
+              const finalSubValue = subValue !== undefined ? subValue : 
+                                   (subNode.default !== undefined ? subNode.default : 
+                                    (subNode.type === 'object' ? {} : 
+                                     (subNode.type === 'array' ? [] : '')));
+              
+              parseSchema(subKey, finalSubValue, subNode, fullPath);
+            }
+          } else {
+            // 没有属性定义的对象，作为普通文本处理
+            mergedConfig.push({ 
+              key: fullPath, 
+              value: typeof value === 'object' ? JSON.stringify(value) : value, 
+              description, 
+              type: 'text' 
+            });
+          }
+          break;
+
+        case 'number':
+          // 数字类型
+          mergedConfig.push({ 
+            key: fullPath, 
+            value: typeof value === 'number' ? value : 
+                  (value !== undefined && value !== null && value !== '' ? Number(value) : 
+                   (node.default !== undefined ? node.default : 0)), 
+            description, 
+            type: 'number' 
+          });
+          break;
+
+        default:
+          // 默认作为文本处理（包括string类型）
+          mergedConfig.push({ 
+            key: fullPath, 
+            value: value !== undefined && value !== null ? String(value) : 
+                  (node.default !== undefined ? node.default : ''), 
+            description, 
+            type: 'text' 
+          });
+          break;
       }
     }
 
+    // 处理顶层配置项
     for (const key in schema) {
-      const value = config.hasOwnProperty(key) ? config[key] : (schema[key].default ?? '');
-      parseSchema(key, value, schema[key]);
+      const node = schema[key];
+      const value = config.hasOwnProperty(key) ? config[key] : 
+                   (node.default !== undefined ? node.default : 
+                    (node.type === 'object' ? {} : 
+                     (node.type === 'array' ? [] : '')));
+      
+      parseSchema(key, value, node);
     }
 
     return mergedConfig;
   }
-
 
   /**
    * 获取插件配置schema
@@ -257,7 +364,7 @@ class PluginConfigManager {
 
           // 重新加载插件
           await this.core.reloadPlugin(actualPluginName, this.core);
-          logger.info(`Plugin ${actualPluginName} reloaded after config change.`);
+          // logger.info(`Plugin ${actualPluginName} reloaded after config change.`);
         } catch (reloadError) {
           logger.error(`Failed to reload plugin ${actualPluginName} after config change:`, reloadError);
         }
@@ -354,7 +461,7 @@ class PluginConfigManager {
         // 卸载插件
         try {
           await this.core.unloadPluginAndEmit(pluginName, this.core);
-          logger.info(`Plugin ${pluginName} unloaded after being disabled.`);
+          // logger.info(`Plugin ${pluginName} unloaded after being disabled.`);
         } catch (unloadError) {
           logger.error(`Failed to unload plugin ${pluginName} after being disabled:`, unloadError);
         }
@@ -433,8 +540,8 @@ class PluginConfigManager {
 
           // 应用插件
           if (plugin && plugin.apply) {
-            await plugin.apply(new Context(this.core, pluginName), config);
-            logger.info(`Plugin ${actualPluginName} loaded after being enabled.`);
+            await plugin.apply(new Context(this.core, actualPluginName), config);
+            // logger.info(`Plugin ${actualPluginName} loaded after being enabled.`);
           }
         } catch (loadError) {
           logger.error(`Failed to load plugin ${actualPluginName} after being enabled:`, loadError);
@@ -568,227 +675,151 @@ export async function apply(ctx: Context, config: Config) {
 
       // 处理API请求
       if (param && param.path && param.path.startsWith('/api/')) {
+        // 设置MIME类型为JSON
+        session.setMime('json');
+        
         // 处理登录请求
         if (param.path === '/api/loginpass') {
           if (param.username === config.get<string>('adminname', 'admin') && param.password === config.get<string>('adminpassword', 'admin')) {
-            // 登录成功
-            loginstatus[session.sessionid] = config.get<string>('adminname', 'admin');
-            session.body = JSON.stringify({ success: '登录成功' });
-            session.setMime('json');
+            loginstatus[session.sessionid] = param.username;
+            session.body = JSON.stringify({ success: true });
           } else {
-            // 登录失败
-            session.body = JSON.stringify({ error: `账号或密码错误` });
-            session.setMime('json');
-            logger.info(param.username + '尝试登录');
+            session.body = JSON.stringify({ success: false, message: '用户名或密码错误' });
           }
           return;
         }
 
-        // 获取插件配置
+        // 处理获取插件列表请求
+        if (param.path === '/api/plugins') {
+          const includeDisabled = param.includeDisabled === 'true';
+          const plugins = await configManager.getAllPluginNames(includeDisabled);
+          session.body = JSON.stringify(plugins);
+          return;
+        }
+
+        // 处理获取插件配置请求
         if (param.path === '/api/config') {
           const pluginName = param.name;
           if (!pluginName) {
-            session.body = JSON.stringify({ error: 'Plugin name is required.' });
-            session.setMime('json');
+            session.body = JSON.stringify({ success: false, message: '缺少插件名称参数' });
             return;
           }
 
-          // 获取插件配置
-          const pluginConfig = await configManager.getPluginConfig(pluginName);
-
-          if (pluginConfig !== null && typeof pluginConfig === 'object' && !Array.isArray(pluginConfig)) {
-            // 将对象格式转换为数组格式以适应前端
-            const pluginConfigArray = Object.keys(pluginConfig).map(key => ({ [key]: pluginConfig[key] }));
-            session.body = JSON.stringify(pluginConfigArray);
-          } else if (pluginConfig === null) {
-            session.body = JSON.stringify({ error: `No configuration found for plugin ${pluginName}.` });
-          } else {
-            session.body = JSON.stringify(pluginConfig);
-          }
-          logger.info(session.body);
-
-          session.setMime('json');
+          const config = await configManager.getPluginConfig(pluginName);
+          session.body = JSON.stringify(config);
           return;
         }
 
-        // 获取插件配置schema
-        if (param.path === '/api/schema') {
-          const pluginName = param.name;
-          if (!pluginName) {
-            session.body = JSON.stringify({ error: 'Plugin name is required.' });
-            session.setMime('json');
-            return;
-          }
-
-          // 获取插件配置schema
-          const pluginSchema = await configManager.getPluginSchema(pluginName);
-
-          if (pluginSchema) {
-            session.body = JSON.stringify(pluginSchema);
-          } else {
-            session.body = JSON.stringify({ error: `No schema found for plugin ${pluginName}.` });
-          }
-
-          session.setMime('json');
-          return;
-        }
-
-        // 保存插件配置
+        // 处理保存插件配置请求
         if (param.path === '/api/saveconfig') {
           const pluginName = param.name;
-          const content = param.content;
-          const reload = param.reload !== 'false'; // 默认为true
+          const configData = param.config;
+          const reload = param.reload !== 'false';
 
-          if (!pluginName || !content) {
-            session.body = JSON.stringify({ error: 'Plugin name and content are required.' });
-            session.setMime('json');
+          if (!pluginName) {
+            session.body = JSON.stringify({ success: false, message: '缺少插件名称参数' });
+            return;
+          }
+
+          if (!configData) {
+            session.body = JSON.stringify({ success: false, message: '缺少配置数据' });
             return;
           }
 
           try {
-            const newConfigObject = JSON.parse(content);
-
-            // 验证 newConfigObject 是个对象
-            if (typeof newConfigObject !== 'object' || newConfigObject === null || Array.isArray(newConfigObject)) {
-              session.body = JSON.stringify({ error: 'Content must be a valid JSON object.' });
-              session.setMime('json');
-              return;
-            }
-
-            // 验证配置是否符合 schema
-            const validationResult = await configManager.validatePluginConfig(pluginName, newConfigObject);
-            if (validationResult !== true) {
-              session.body = JSON.stringify({ error: `Configuration validation failed: ${validationResult}` });
-              session.setMime('json');
-              return;
-            }
-
+            // 解析配置数据
+            const parsedConfig = typeof configData === 'string' ? JSON.parse(configData) : configData;
+            
             // 保存配置
-            const success = await configManager.savePluginConfig(pluginName, newConfigObject, reload);
-            session.body = JSON.stringify(
-              success
-                ? { success: `Configuration for plugin ${pluginName} updated.` }
-                : { error: `Failed to update configuration for plugin ${pluginName}.` }
-            );
-
-          } catch (error: any) {
-            session.body = JSON.stringify({ error: `Error processing config update: ${error.message}` });
-            logger.error('Error processing config update:', error);
+            const success = await configManager.savePluginConfig(pluginName, parsedConfig, reload);
+            
+            if (success) {
+              session.body = JSON.stringify({ success: true, message: '配置保存成功' });
+            } else {
+              session.body = JSON.stringify({ success: false, message: '配置保存失败' });
+            }
+          } catch (error) {
+            session.body = JSON.stringify({ success: false, message: `配置保存失败: ${error}` });
           }
-
-          session.setMime('json');
-          return;
-
-        }
-
-        // 获取所有插件名称
-        if (param.path === '/api/plugins') {
-          const includeDisabled = param.includeDisabled === 'true';
-
-          // 获取所有插件名称
-          const pluginNames = await configManager.getAllPluginNames(includeDisabled);
-
-          session.body = JSON.stringify(pluginNames);
-          session.setMime('json');
           return;
         }
 
-        // 禁用插件
+        // 处理禁用插件请求
         if (param.path === '/api/disableplugin') {
           const pluginName = param.name;
-
+          
           if (!pluginName) {
-            session.body = JSON.stringify({ error: 'Plugin name is required.' });
-            session.setMime('json');
+            session.body = JSON.stringify({ success: false, message: '缺少插件名称参数' });
             return;
           }
 
-          // 禁用插件
-          const disableResult = await configManager.disablePlugin(pluginName);
-
-          if (disableResult) {
-            session.body = JSON.stringify({ success: `Plugin ${pluginName} disabled successfully.` });
+          const success = await configManager.disablePlugin(pluginName);
+          
+          if (success) {
+            session.body = JSON.stringify({ success: true, message: '插件禁用成功' });
           } else {
-            session.body = JSON.stringify({ error: `Failed to disable plugin ${pluginName}.` });
+            session.body = JSON.stringify({ success: false, message: '插件禁用失败' });
           }
-
-          session.setMime('json');
           return;
         }
 
-        // 启用插件
+        // 处理启用插件请求
         if (param.path === '/api/enableplugin') {
           const pluginName = param.name;
-
+          
           if (!pluginName) {
-            session.body = JSON.stringify({ error: 'Plugin name is required.' });
-            session.setMime('json');
+            session.body = JSON.stringify({ success: false, message: '缺少插件名称参数' });
             return;
           }
 
-          // 启用插件
-          const enableResult = await configManager.enablePlugin(pluginName);
-
-          if (enableResult) {
-            session.body = JSON.stringify({ success: `Plugin ${pluginName.startsWith('~') ? pluginName.substring(1) : pluginName} enabled successfully.` });
+          const success = await configManager.enablePlugin(pluginName);
+          
+          if (success) {
+            session.body = JSON.stringify({ success: true, message: '插件启用成功' });
           } else {
-            session.body = JSON.stringify({ error: `Failed to enable plugin ${pluginName}.` });
+            session.body = JSON.stringify({ success: false, message: '插件启用失败' });
           }
-
-          session.setMime('json');
-          return;
-        }
-
-        // 检查插件状态
-        if (param.path === '/api/pluginstatus') {
-          const pluginName = param.name;
-
-          if (!pluginName) {
-            session.body = JSON.stringify({ error: 'Plugin name is required.' });
-            session.setMime('json');
-            return;
-          }
-
-          // 检查插件是否被禁用
-          const isDisabled = await configManager.isPluginDisabled(pluginName);
-
-          session.body = JSON.stringify({ disabled: isDisabled });
-          session.setMime('json');
           return;
         }
 
         // 未知API请求
-        session.body = JSON.stringify({ error: 'Unknown API endpoint.' });
-        session.setMime('json');
+        session.body = JSON.stringify({ success: false, message: '未知API请求' });
         return;
       }
 
       // 处理静态文件请求
       if (param && param.path) {
-        // 获取当前文件的目录
-        const __dirname = path.dirname(__filename);
-
         // 静态文件目录
         const staticDir = path.join(__dirname, '..', 'static');
-
-        // 默认页面
-        if (param.path === '/') {
-          param.path = '/index.html';
+        
+        // 处理登录页面请求
+        if (param.path === '/login') {
+          const loginHtmlPath = path.join(staticDir, 'login.html');
+          
+          if (fs.existsSync(loginHtmlPath)) {
+            session.body = fs.readFileSync(loginHtmlPath, 'utf8');
+            return;
+          }
         }
-        if (!param.path.includes('.')) {
-          param.path += '.html';
+        
+        // 处理配置页面请求
+        if (param.path === '/config') {
+          const configHtmlPath = path.join(staticDir, 'config.html');
+          
+          if (fs.existsSync(configHtmlPath)) {
+            session.body = fs.readFileSync(configHtmlPath, 'utf8');
+            return;
+          }
         }
-
-        // 构建文件路径
+        
+        // 处理其他静态文件请求
         const filePath = path.join(staticDir, param.path);
-
-        // 检查文件是否存在
-        if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-          // 读取文件内容
-          const content = fs.readFileSync(filePath, 'utf8');
-
-          // 设置MIME类型
+        
+        // 安全检查：确保请求的文件在静态目录内
+        if (filePath.startsWith(staticDir) && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
           const ext = path.extname(filePath).toLowerCase();
+          
+          // 根据文件扩展名设置MIME类型
           switch (ext) {
             case '.html':
               session.setMime('html');
@@ -817,23 +848,15 @@ export async function apply(ctx: Context, config: Config) {
               break;
             default:
               session.setMime('text');
+              break;
           }
-
-          // 返回文件内容
-          session.body = content;
+          
+          session.body = fs.readFileSync(filePath, ext.match(/\.(png|jpg|jpeg|gif|svg)$/) ? null : 'utf8');
           return;
         }
       }
 
-      // 默认返回404
-      session.body = '<h1>404 Not Found</h1>';
-      session.setMime('html');
+      // 默认重定向到配置页面
+      session.body = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>重定向</title></head><body><script>window.location.href = "/${config.get<string>('path', 'console')}/config";</script><p>正在重定向</p></body></html>`;
     });
-
-  // 注册控制台组件
-  ctx.registerComponent('console', {
-    configManager
-  });
-
-  logger.info('Console plugin initialized');
 }

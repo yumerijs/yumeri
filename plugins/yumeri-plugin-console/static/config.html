@@ -227,6 +227,93 @@
             background-color: var(--danger);
         }
 
+        /* 新增样式 - 配置项容器 */
+        .config-item {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        /* 新增样式 - 对象容器 */
+        .object-container {
+            margin-left: 20px;
+            padding: 10px 0 10px 15px;
+            border-left: 2px solid #ddd;
+            margin-bottom: 15px;
+        }
+
+        .object-header {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        /* 新增样式 - 数组容器 */
+        .array-container {
+            margin-bottom: 15px;
+        }
+
+        .array-header {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .array-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 8px;
+            padding: 8px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+
+        .array-item-content {
+            flex-grow: 1;
+        }
+
+        .array-controls {
+            margin-top: 10px;
+        }
+
+        .add-array-item, .remove-array-item {
+            padding: 5px 10px;
+            font-size: 12px;
+            margin-right: 5px;
+        }
+
+        .add-array-item {
+            background-color: var(--accent);
+            color: white;
+        }
+
+        .remove-array-item {
+            background-color: var(--danger);
+            color: white;
+        }
+
+        /* 复杂数组项的样式 */
+        .complex-array-item {
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #f9f9f9;
+        }
+
+        .complex-array-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .complex-array-item-title {
+            font-weight: bold;
+            color: #333;
+        }
+
         @media (min-width: 768px) {
             .toggle-sidebar {
                 display: none;
@@ -283,7 +370,6 @@
             }
         }
     </style>
-    </style>
 </head>
 
 <body>
@@ -308,7 +394,6 @@
     </main>
     <div id="notification" class="notification"></div>
 
-    <!-- 原始的 script 标签直接保留不动 -->
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const sidebar = document.getElementById('sidebar');
@@ -344,7 +429,27 @@
                 toggleSidebarButton.style.display = 'block';
             });
 
-            // Function to fetch and populate the plugin list
+            // 显示通知
+            function showNotification(message, type = 'success') {
+                notification.textContent = message;
+                notification.className = 'notification';
+                if (type === 'error') {
+                    notification.classList.add('error');
+                }
+                notification.style.display = 'block';
+                setTimeout(() => {
+                    notification.classList.add('show');
+                }, 10);
+
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                    setTimeout(() => {
+                        notification.style.display = 'none';
+                    }, 300);
+                }, 3000);
+            }
+
+            // 获取并显示插件列表
             async function fetchPluginList() {
                 try {
                     const response = await fetch('/console/api/plugins?includeDisabled=true');
@@ -395,6 +500,8 @@
                     pluginList.innerHTML = '<li>Failed to load plugins.</li>';
                 }
             }
+
+            // 深度合并对象
             function deepMergeObject(target, path, value) {
                 const keys = path.split('.');
                 let current = target;
@@ -414,7 +521,7 @@
                 return target;
             }
 
-            // --- loadPluginConfiguration 函数开始 ---
+            // 加载插件配置
             async function loadPluginConfiguration(pluginName) {
                 try {
                     currentPluginName = pluginName;
@@ -427,126 +534,578 @@
                     }
 
                     const config = await response.json();
-                    let configContent = '';
+                    configurationArea.innerHTML = '';
 
-                    // 辅助函数：渲染单个配置字段
-                    function renderField(key, value, description, type, options, prefix = '') {
-                        const fullKey = prefix ? `${prefix}.${key}` : key;
-
-                        // 为非数组类型的字段添加标签
-                        if (type !== 'array') {
-                            configContent += `<label for="${fullKey}">${description || key}</label><br>`;
-                        }
-
-                        if (type === 'select' && Array.isArray(options)) {
-                            configContent += `<select id="${fullKey}" data-key="${fullKey}">`;
-                            options.forEach(option => {
-                                const selected = option === value ? 'selected' : '';
-                                configContent += `<option value="${option}" ${selected}>${option}</option>`;
-                            });
-                            configContent += `</select><br>`;
-                        } else if (type === 'boolean') {
-                            const checked = value ? 'checked' : '';
-                            configContent += `
-                    <label class="switch">
-                        <input type="checkbox" id="${fullKey}" data-key="${fullKey}" ${checked}>
-                        <span class="slider round"></span>
-                    </label><br>
-                `;
-                        } else if (type === 'array') {
-                            // --- 数组类型：支持添加/删除项 ---
-                            configContent += `<div class="plugin-config-array-container" data-key="${fullKey}">`;
-                            configContent += `<label class="array-label">${description || key}</label><br>`;
-
-                            let itemsToRender = [];
-                            // 如果值是数组，直接使用
-                            if (Array.isArray(value)) {
-                                itemsToRender = value;
-                            }
-                            // 如果值是字符串，且非空，则尝试按逗号分隔
-                            else if (typeof value === 'string' && value.trim() !== '') {
-                                itemsToRender = value.split(',').map(s => s.trim());
-                            }
-                            // 其他情况（null, undefined, 空字符串），视为初始空数组
-                            else {
-                                itemsToRender = [];
-                            }
-
-                            itemsToRender.forEach((item) => {
-                                const itemValue = (item === null || item === undefined) ? '' : String(item).replace(/"/g, '&quot;');
-                                configContent += `
-                        <div class="plugin-config-array-item">
-                            <input type="text" class="plugin-config-array-input" value="${itemValue}" placeholder="请输入项的值">
-                            <button type="button" class="remove-plugin-config-array-item">删除</button>
-                        </div>
-                    `;
-                            });
-                            configContent += `
-                    <button type="button" class="add-plugin-config-array-item">添加项</button>
-                `;
-                            configContent += `</div>`;
-                        } else if (type === 'object' && value && value.properties) {
-                            // --- 对象类型：递归渲染其属性 ---
-                            if (description) {
-                                configContent += `<strong>${description || key}:</strong><br>`;
-                            }
-                            Object.entries(value.properties).forEach(([subKey, subItem]) => {
-                                renderField(subKey, subItem.value, subItem.description, subItem.type, subItem.options, fullKey);
-                            });
-                        } else {
-                            // --- 普通文本输入框 ---
-                            const inputValue = (value === null || value === undefined) ? '' : String(value).replace(/"/g, '&quot;');
-                            configContent += `<input type="text" id="${fullKey}" value="${inputValue}" data-key="${fullKey}">`;
-                        }
-
-                        configContent += `<small style="color: #888;">(${fullKey})</small><br><br>`;
-                    }
-
+                    // 渲染配置项
                     if (Array.isArray(config)) {
-                        config.forEach(item => {
-                            renderField(item.key, item.value, item.description, item.type, item.options, '');
-                        });
+                        renderConfigItems(config);
                     } else if (config.error) {
-                        configContent = `<p>${config.error}</p>`;
+                        configurationArea.innerHTML = `<p>${config.error}</p>`;
                     } else {
                         console.warn('Invalid configuration format received:', config);
-                        configContent = '<p>Received invalid configuration format from server.</p>';
+                        configurationArea.innerHTML = '<p>Received invalid configuration format from server.</p>';
                     }
 
                     const displayName = isPluginDisabled ? pluginName.substring(1) : pluginName;
                     pluginTitle.textContent = `${displayName} 配置`;
-                    configurationArea.innerHTML = configContent;
 
-                    // --- 为动态生成的数组操作按钮绑定事件监听器 ---
-                    document.querySelectorAll('.add-plugin-config-array-item').forEach(button => {
-                        button.addEventListener('click', function () {
-                            const container = this.closest('.plugin-config-array-container');
-                            const newItemDiv = document.createElement('div');
-                            newItemDiv.classList.add('plugin-config-array-item');
-                            newItemDiv.innerHTML = `
-                    <input type="text" class="plugin-config-array-input" placeholder="请输入项的值">
-                    <button type="button" class="remove-plugin-config-array-item">删除</button>
-                `;
-                            container.insertBefore(newItemDiv, this);
-
-                            newItemDiv.querySelector('.remove-plugin-config-array-item').addEventListener('click', function () {
-                                this.closest('.plugin-config-array-item').remove();
-                            });
-                        });
-                    });
-
-                    document.querySelectorAll('.remove-plugin-config-array-item').forEach(button => {
-                        button.addEventListener('click', function () {
-                            this.closest('.plugin-config-array-item').remove();
-                        });
-                    });
-
+                    // 绑定事件监听器
+                    bindEventListeners();
                 } catch (error) {
                     console.error('Failed to load plugin configuration:', error);
                     configurationArea.innerHTML = `<p>Failed to load configuration: ${error.message}</p>`;
                 }
             }
 
+            // 渲染配置项
+            function renderConfigItems(configItems) {
+                configItems.forEach(item => {
+                    const configItemDiv = document.createElement('div');
+                    configItemDiv.className = 'config-item';
+                    configItemDiv.dataset.key = item.key;
+
+                    switch (item.type) {
+                        case 'text':
+                            renderTextInput(configItemDiv, item);
+                            break;
+                        case 'number':
+                            renderNumberInput(configItemDiv, item);
+                            break;
+                        case 'boolean':
+                            renderBooleanInput(configItemDiv, item);
+                            break;
+                        case 'select':
+                            renderSelectInput(configItemDiv, item);
+                            break;
+                        case 'array':
+                            renderArrayInput(configItemDiv, item);
+                            break;
+                        case 'complex-array':
+                            renderComplexArrayInput(configItemDiv, item);
+                            break;
+                        case 'object-header':
+                            renderObjectHeader(configItemDiv, item);
+                            break;
+                        default:
+                            renderTextInput(configItemDiv, item);
+                    }
+
+                    configurationArea.appendChild(configItemDiv);
+                });
+            }
+
+            // 渲染文本输入框
+            function renderTextInput(container, item) {
+                const label = document.createElement('label');
+                label.textContent = item.description || item.key;
+                label.htmlFor = item.key;
+
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.id = item.key;
+                input.value = item.value !== null && item.value !== undefined ? item.value : '';
+                input.dataset.key = item.key;
+
+                container.appendChild(label);
+                container.appendChild(input);
+            }
+
+            // 渲染数字输入框
+            function renderNumberInput(container, item) {
+                const label = document.createElement('label');
+                label.textContent = item.description || item.key;
+                label.htmlFor = item.key;
+
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.id = item.key;
+                input.value = item.value !== null && item.value !== undefined ? item.value : 0;
+                input.dataset.key = item.key;
+
+                container.appendChild(label);
+                container.appendChild(input);
+            }
+
+            // 渲染布尔输入框
+            function renderBooleanInput(container, item) {
+                const label = document.createElement('label');
+                label.textContent = item.description || item.key;
+                label.htmlFor = item.key;
+                container.appendChild(label);
+
+                const switchLabel = document.createElement('label');
+                switchLabel.className = 'switch';
+
+                const input = document.createElement('input');
+                input.type = 'checkbox';
+                input.id = item.key;
+                input.checked = !!item.value;
+                input.dataset.key = item.key;
+
+                const slider = document.createElement('span');
+                slider.className = 'slider round';
+
+                switchLabel.appendChild(input);
+                switchLabel.appendChild(slider);
+                container.appendChild(switchLabel);
+            }
+
+            // 渲染选择框
+            function renderSelectInput(container, item) {
+                const label = document.createElement('label');
+                label.textContent = item.description || item.key;
+                label.htmlFor = item.key;
+
+                const select = document.createElement('select');
+                select.id = item.key;
+                select.dataset.key = item.key;
+
+                if (Array.isArray(item.options)) {
+                    item.options.forEach(option => {
+                        const optionEl = document.createElement('option');
+                        optionEl.value = option;
+                        optionEl.textContent = option;
+                        if (option === item.value) {
+                            optionEl.selected = true;
+                        }
+                        select.appendChild(optionEl);
+                    });
+                }
+
+                container.appendChild(label);
+                container.appendChild(select);
+            }
+
+            // 渲染基本数组输入
+            function renderArrayInput(container, item) {
+                const header = document.createElement('div');
+                header.className = 'array-header';
+                header.textContent = item.description || item.key;
+                container.appendChild(header);
+
+                const arrayContainer = document.createElement('div');
+                arrayContainer.className = 'array-container';
+                arrayContainer.dataset.key = item.key;
+                arrayContainer.dataset.type = 'array';
+                arrayContainer.dataset.itemType = item.itemType || 'string';
+
+                // 渲染现有数组项
+                if (Array.isArray(item.value)) {
+                    item.value.forEach(value => {
+                        const arrayItem = createArrayItem(value, item.itemType || 'string');
+                        arrayContainer.appendChild(arrayItem);
+                    });
+                }
+
+                // 添加新项按钮
+                const addButton = document.createElement('button');
+                addButton.className = 'add-array-item';
+                addButton.textContent = '添加项';
+                addButton.dataset.action = 'add-array-item';
+                addButton.dataset.target = item.key;
+
+                const controls = document.createElement('div');
+                controls.className = 'array-controls';
+                controls.appendChild(addButton);
+
+                container.appendChild(arrayContainer);
+                container.appendChild(controls);
+            }
+
+            // 创建数组项
+            function createArrayItem(value, itemType) {
+                const arrayItem = document.createElement('div');
+                arrayItem.className = 'array-item';
+
+                const itemContent = document.createElement('div');
+                itemContent.className = 'array-item-content';
+
+                let input;
+                if (itemType === 'number') {
+                    input = document.createElement('input');
+                    input.type = 'number';
+                    input.value = value !== null && value !== undefined ? value : 0;
+                    input.className = 'array-item-input';
+                } else if (itemType === 'boolean') {
+                    const switchLabel = document.createElement('label');
+                    switchLabel.className = 'switch';
+
+                    input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.checked = !!value;
+                    input.className = 'array-item-input';
+
+                    const slider = document.createElement('span');
+                    slider.className = 'slider round';
+
+                    switchLabel.appendChild(input);
+                    switchLabel.appendChild(slider);
+                    itemContent.appendChild(switchLabel);
+                } else {
+                    input = document.createElement('input');
+                    input.type = 'text';
+                    input.value = value !== null && value !== undefined ? value : '';
+                    input.className = 'array-item-input';
+                    itemContent.appendChild(input);
+                }
+
+                if (itemType !== 'boolean') {
+                    itemContent.appendChild(input);
+                }
+
+                const removeButton = document.createElement('button');
+                removeButton.className = 'remove-array-item';
+                removeButton.textContent = '删除';
+                removeButton.dataset.action = 'remove-array-item';
+
+                arrayItem.appendChild(itemContent);
+                arrayItem.appendChild(removeButton);
+
+                return arrayItem;
+            }
+
+            // 渲染复杂数组输入（数组项为对象或嵌套数组）
+            function renderComplexArrayInput(container, item) {
+                const header = document.createElement('div');
+                header.className = 'array-header';
+                header.textContent = item.description || item.key;
+                container.appendChild(header);
+
+                const arrayContainer = document.createElement('div');
+                arrayContainer.className = 'array-container';
+                arrayContainer.dataset.key = item.key;
+                arrayContainer.dataset.type = 'complex-array';
+                arrayContainer.dataset.itemType = item.itemType;
+                arrayContainer.dataset.itemSchema = JSON.stringify(item.itemSchema);
+
+                // 渲染现有数组项
+                if (Array.isArray(item.value)) {
+                    item.value.forEach((value, index) => {
+                        const complexItem = createComplexArrayItem(item.key, index, value, item.itemSchema);
+                        arrayContainer.appendChild(complexItem);
+                    });
+                }
+
+                // 添加新项按钮
+                const addButton = document.createElement('button');
+                addButton.className = 'add-array-item';
+                addButton.textContent = '添加项';
+                addButton.dataset.action = 'add-complex-array-item';
+                addButton.dataset.target = item.key;
+
+                const controls = document.createElement('div');
+                controls.className = 'array-controls';
+                controls.appendChild(addButton);
+
+                container.appendChild(arrayContainer);
+                container.appendChild(controls);
+            }
+
+            // 创建复杂数组项
+            function createComplexArrayItem(arrayKey, index, value, itemSchema) {
+                const complexItem = document.createElement('div');
+                complexItem.className = 'complex-array-item';
+                complexItem.dataset.index = index;
+
+                const header = document.createElement('div');
+                header.className = 'complex-array-item-header';
+
+                const title = document.createElement('div');
+                title.className = 'complex-array-item-title';
+                title.textContent = `项 ${index + 1}`;
+
+                const removeButton = document.createElement('button');
+                removeButton.className = 'remove-array-item';
+                removeButton.textContent = '删除';
+                removeButton.dataset.action = 'remove-complex-array-item';
+
+                header.appendChild(title);
+                header.appendChild(removeButton);
+                complexItem.appendChild(header);
+
+                const content = document.createElement('div');
+                content.className = 'complex-array-item-content';
+
+                // 根据itemSchema类型渲染内容
+                if (itemSchema.type === 'object' && itemSchema.properties) {
+                    // 对象类型，渲染其属性
+                    Object.entries(itemSchema.properties).forEach(([propKey, propSchema]) => {
+                        const propValue = value && typeof value === 'object' ? value[propKey] : undefined;
+                        const finalValue = propValue !== undefined ? propValue : 
+                                          (propSchema.default !== undefined ? propSchema.default : 
+                                           (propSchema.type === 'object' ? {} : 
+                                            (propSchema.type === 'array' ? [] : '')));
+                        
+                        const propItem = {
+                            key: `${arrayKey}[${index}].${propKey}`,
+                            value: finalValue,
+                            description: propSchema.description || propKey,
+                            type: propSchema.enum ? 'select' : propSchema.type,
+                            options: propSchema.enum
+                        };
+
+                        const propDiv = document.createElement('div');
+                        propDiv.className = 'config-item';
+                        propDiv.dataset.key = propItem.key;
+
+                        switch (propItem.type) {
+                            case 'text':
+                            case 'string':
+                                renderTextInput(propDiv, propItem);
+                                break;
+                            case 'number':
+                                renderNumberInput(propDiv, propItem);
+                                break;
+                            case 'boolean':
+                                renderBooleanInput(propDiv, propItem);
+                                break;
+                            case 'select':
+                                renderSelectInput(propDiv, propItem);
+                                break;
+                            default:
+                                renderTextInput(propDiv, propItem);
+                        }
+
+                        content.appendChild(propDiv);
+                    });
+                } else if (itemSchema.type === 'array' && itemSchema.items) {
+                    // 数组类型，递归渲染
+                    const arrayItem = {
+                        key: `${arrayKey}[${index}]`,
+                        value: Array.isArray(value) ? value : [],
+                        description: itemSchema.description || `项 ${index + 1}`,
+                        type: 'array',
+                        itemType: itemSchema.items.type
+                    };
+                    
+                    renderArrayInput(content, arrayItem);
+                } else {
+                    // 基本类型，渲染单个输入框
+                    const basicItem = {
+                        key: `${arrayKey}[${index}]`,
+                        value: value,
+                        description: itemSchema.description || `项 ${index + 1}`,
+                        type: itemSchema.type === 'boolean' ? 'boolean' : 
+                              (itemSchema.type === 'number' ? 'number' : 'text')
+                    };
+                    
+                    switch (basicItem.type) {
+                        case 'boolean':
+                            renderBooleanInput(content, basicItem);
+                            break;
+                        case 'number':
+                            renderNumberInput(content, basicItem);
+                            break;
+                        default:
+                            renderTextInput(content, basicItem);
+                    }
+                }
+
+                complexItem.appendChild(content);
+                return complexItem;
+            }
+
+            // 渲染对象头部
+            function renderObjectHeader(container, item) {
+                const header = document.createElement('div');
+                header.className = 'object-header';
+                header.textContent = item.description || item.key;
+                
+                const objectContainer = document.createElement('div');
+                objectContainer.className = 'object-container';
+                objectContainer.dataset.key = item.key;
+                objectContainer.dataset.type = 'object';
+                
+                container.appendChild(header);
+                container.appendChild(objectContainer);
+            }
+
+            // 绑定事件监听器
+            function bindEventListeners() {
+                // 添加数组项按钮
+                document.querySelectorAll('[data-action="add-array-item"]').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const targetKey = this.dataset.target;
+                        const arrayContainer = document.querySelector(`.array-container[data-key="${targetKey}"]`);
+                        const itemType = arrayContainer.dataset.itemType || 'string';
+                        
+                        const newItem = createArrayItem('', itemType);
+                        arrayContainer.appendChild(newItem);
+                    });
+                });
+
+                // 添加复杂数组项按钮
+                document.querySelectorAll('[data-action="add-complex-array-item"]').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const targetKey = this.dataset.target;
+                        const arrayContainer = document.querySelector(`.array-container[data-key="${targetKey}"]`);
+                        const itemSchema = JSON.parse(arrayContainer.dataset.itemSchema);
+                        const currentItems = arrayContainer.querySelectorAll('.complex-array-item');
+                        const newIndex = currentItems.length;
+                        
+                        // 创建默认值
+                        let defaultValue;
+                        if (itemSchema.type === 'object') {
+                            defaultValue = {};
+                            if (itemSchema.properties) {
+                                Object.entries(itemSchema.properties).forEach(([key, prop]) => {
+                                    defaultValue[key] = prop.default !== undefined ? prop.default : 
+                                                      (prop.type === 'object' ? {} : 
+                                                       (prop.type === 'array' ? [] : ''));
+                                });
+                            }
+                        } else if (itemSchema.type === 'array') {
+                            defaultValue = [];
+                        } else {
+                            defaultValue = itemSchema.default !== undefined ? itemSchema.default : '';
+                        }
+                        
+                        const newItem = createComplexArrayItem(targetKey, newIndex, defaultValue, itemSchema);
+                        arrayContainer.appendChild(newItem);
+                        
+                        // 重新绑定事件
+                        bindEventListeners();
+                    });
+                });
+
+                // 使用事件委托处理删除按钮
+                document.addEventListener('click', function(e) {
+                    if (e.target.dataset.action === 'remove-array-item') {
+                        e.target.closest('.array-item').remove();
+                    } else if (e.target.dataset.action === 'remove-complex-array-item') {
+                        e.target.closest('.complex-array-item').remove();
+                    }
+                });
+            }
+
+            // 收集配置数据
+            function collectConfigData() {
+                const configData = {};
+
+                // 处理基本输入字段
+                document.querySelectorAll('#configuration-area input[data-key], #configuration-area select[data-key]').forEach(el => {
+                    if (!el.closest('.array-container') && !el.closest('.complex-array-item')) {
+                        const key = el.dataset.key;
+                        let value;
+
+                        if (el.type === 'checkbox') {
+                            value = el.checked;
+                        } else if (el.type === 'number') {
+                            value = Number(el.value);
+                        } else if (el.tagName === 'SELECT') {
+                            value = el.value;
+                        } else {
+                            value = el.value;
+                        }
+
+                        deepMergeObject(configData, key, value);
+                    }
+                });
+
+                // 处理基本数组
+                document.querySelectorAll('.array-container[data-type="array"]').forEach(container => {
+                    const key = container.dataset.key;
+                    const itemType = container.dataset.itemType;
+                    const items = [];
+
+                    container.querySelectorAll('.array-item').forEach(item => {
+                        const input = item.querySelector('.array-item-input');
+                        if (input) {
+                            let value;
+                            if (itemType === 'number') {
+                                value = Number(input.value);
+                            } else if (itemType === 'boolean') {
+                                value = input.checked;
+                            } else {
+                                value = input.value;
+                            }
+                            items.push(value);
+                        }
+                    });
+
+                    deepMergeObject(configData, key, items);
+                });
+
+                // 处理复杂数组
+                document.querySelectorAll('.array-container[data-type="complex-array"]').forEach(container => {
+                    const key = container.dataset.key;
+                    const items = [];
+
+                    container.querySelectorAll('.complex-array-item').forEach(complexItem => {
+                        const index = complexItem.dataset.index;
+                        let itemData = {};
+
+                        // 收集复杂项中的所有输入
+                        complexItem.querySelectorAll('input[data-key], select[data-key]').forEach(input => {
+                            const inputKey = input.dataset.key;
+                            // 从inputKey中提取属性名
+                            const match = inputKey.match(new RegExp(`${key}\\[(\\d+)\\]\\.(.+)`));
+                            
+                            if (match) {
+                                const propKey = match[2];
+                                let value;
+
+                                if (input.type === 'checkbox') {
+                                    value = input.checked;
+                                } else if (input.type === 'number') {
+                                    value = Number(input.value);
+                                } else if (input.tagName === 'SELECT') {
+                                    value = input.value;
+                                } else {
+                                    value = input.value;
+                                }
+
+                                // 处理嵌套属性
+                                if (propKey.includes('.')) {
+                                    deepMergeObject(itemData, propKey, value);
+                                } else {
+                                    itemData[propKey] = value;
+                                }
+                            }
+                        });
+
+                        // 处理嵌套数组
+                        complexItem.querySelectorAll('.array-container').forEach(nestedArray => {
+                            const nestedKey = nestedArray.dataset.key;
+                            // 从nestedKey中提取属性名
+                            const match = nestedKey.match(new RegExp(`${key}\\[(\\d+)\\](.+)`));
+                            
+                            if (match) {
+                                const propPath = match[2];
+                                const nestedItems = [];
+
+                                nestedArray.querySelectorAll('.array-item').forEach(item => {
+                                    const input = item.querySelector('.array-item-input');
+                                    if (input) {
+                                        let value;
+                                        if (nestedArray.dataset.itemType === 'number') {
+                                            value = Number(input.value);
+                                        } else if (nestedArray.dataset.itemType === 'boolean') {
+                                            value = input.checked;
+                                        } else {
+                                            value = input.value;
+                                        }
+                                        nestedItems.push(value);
+                                    }
+                                });
+
+                                // 处理嵌套路径
+                                if (propPath.startsWith('.')) {
+                                    deepMergeObject(itemData, propPath.substring(1), nestedItems);
+                                } else {
+                                    itemData[propPath] = nestedItems;
+                                }
+                            }
+                        });
+
+                        items.push(itemData);
+                    });
+
+                    deepMergeObject(configData, key, items);
+                });
+
+                return configData;
+            }
 
             // 更新插件状态UI
             function updatePluginStatus() {
@@ -561,55 +1120,20 @@
                 }
             }
 
+            // 保存配置按钮事件
             saveButton.addEventListener('click', async function () {
                 if (!currentPluginName) {
                     showNotification('请先选择一个插件', 'error');
                     return;
                 }
 
-                let configData = {}; // 用于存储要保存的配置数据
-
-                // 遍历所有带有 data-key 属性的元素，收集其值
-                document.querySelectorAll('#configuration-area [data-key]').forEach(el => {
-                    const key = el.dataset.key; // 配置项的键（可能是点分路径）
-                    let value;
-
-                    // --- 修改部分：处理数组容器 ---
-                    if (el.classList.contains('plugin-config-array-container')) {
-                        const items = [];
-                        // 遍历该数组容器内的所有数组项输入框
-                        el.querySelectorAll('.plugin-config-array-input').forEach(input => {
-                            // 仅收集非空字符串的项
-                            if (input.value.trim() !== '') {
-                                items.push(input.value.trim());
-                            }
-                        });
-                        value = items; // 将收集到的数组作为值
-                    }
-                    // --- 修改部分结束 ---
-                    else if (el.type === 'checkbox') {
-                        // 复选框的值为 checked 状态
-                        value = el.checked;
-                    } else if (el.tagName === 'SELECT') {
-                        // 下拉选择框的值
-                        value = el.value;
-                    }
-                    // elif (el.tagName === 'TEXTAREA') 已被移除，因为数组现在用动态输入框处理
-                    else {
-                        // 普通文本输入框或处理 "true"/"false" 字符串的逻辑
-                        value = el.value === 'true' ? true : (el.value === 'false' ? false : el.value);
-                    }
-
-                    // 使用 deepMergeObject 将值合并到 configData 中
-                    deepMergeObject(configData, key, value);
-                });
-
                 try {
+                    const configData = collectConfigData();
                     const jsonContent = JSON.stringify(configData);
                     console.log('Saving configuration:', jsonContent);
 
                     // 构建保存配置的URL，并确保内容被URIComponent编码
-                    const url = `/console/api/saveconfig?name=${currentPluginName}&content=${encodeURIComponent(jsonContent)}`;
+                    const url = `/console/api/saveconfig?name=${currentPluginName}&config=${encodeURIComponent(jsonContent)}`;
                     const response = await fetch(url);
 
                     if (!response.ok) {
@@ -619,7 +1143,7 @@
                     }
 
                     const result = await response.json();
-                    showNotification(result.success || result.error, result.success ? 'success' : 'error');
+                    showNotification(result.success ? '配置保存成功' : result.message, result.success ? 'success' : 'error');
 
                     // 如果保存成功且插件未被禁用，延迟刷新插件列表
                     if (result.success && !isPluginDisabled) {
@@ -628,10 +1152,9 @@
 
                 } catch (error) {
                     console.error('Failed to save configuration:', error);
-                    showNotification(`${error.message}`, 'error');
+                    showNotification(`保存配置失败: ${error.message}`, 'error');
                 }
             });
-
 
             // 启用插件按钮事件
             enableButton.addEventListener('click', async function () {
@@ -651,7 +1174,7 @@
                     const result = await response.json();
 
                     if (result.success) {
-                        showNotification(result.success, 'success');
+                        showNotification('插件启用成功', 'success');
 
                         // 更新当前插件名称（去掉~前缀）
                         currentPluginName = currentPluginName.substring(1);
@@ -664,7 +1187,7 @@
                         // 重新加载插件配置
                         setTimeout(() => loadPluginConfiguration(currentPluginName), 1500);
                     } else {
-                        showNotification(result.error, 'error');
+                        showNotification(result.message || '插件启用失败', 'error');
                     }
                 } catch (error) {
                     console.error('Failed to enable plugin:', error);
@@ -690,7 +1213,7 @@
                     const result = await response.json();
 
                     if (result.success) {
-                        showNotification(result.success, 'success');
+                        showNotification('插件禁用成功', 'success');
 
                         // 更新当前插件名称（添加~前缀）
                         currentPluginName = `~${currentPluginName}`;
@@ -700,7 +1223,7 @@
                         // 刷新插件列表
                         setTimeout(fetchPluginList, 1000);
                     } else {
-                        showNotification(result.error, 'error');
+                        showNotification(result.message || '插件禁用失败', 'error');
                     }
                 } catch (error) {
                     console.error('Failed to disable plugin:', error);
@@ -708,25 +1231,7 @@
                 }
             });
 
-            // Function to show notification
-            function showNotification(message, type = 'success') {
-                const notification = document.querySelector('.notification');
-                notification.textContent = message;
-                notification.classList.remove('error'); // 先清除之前可能的错误类
-                notification.style.display = 'block';
-                notification.classList.add('show');
-                if (type === 'error') {
-                    notification.classList.add('error');
-                }
-
-                setTimeout(() => {
-                    notification.classList.remove('show');
-                    notification.classList.remove('error');
-                    notification.style.display = 'none';
-                }, 3000);
-            }
-
-            // Fetch the plugin list when the page loads
+            // 初始化
             fetchPluginList();
         });
     </script>
