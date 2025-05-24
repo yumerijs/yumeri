@@ -605,6 +605,7 @@ export async function apply(ctx: Context, config: Config) {
           } else {
             session.body = JSON.stringify(pluginConfig);
           }
+          logger.info(session.body);
 
           session.setMime('json');
           return;

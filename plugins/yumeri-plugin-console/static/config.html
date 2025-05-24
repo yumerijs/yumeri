@@ -395,8 +395,26 @@
                     pluginList.innerHTML = '<li>Failed to load plugins.</li>';
                 }
             }
+            function deepMergeObject(target, path, value) {
+                const keys = path.split('.');
+                let current = target;
 
-            // Function to load plugin configuration
+                keys.forEach((key, index) => {
+                    if (index === keys.length - 1) {
+                        current[key] = value;
+                    } else {
+                        // 如果路径中的某个部分不存在或不是对象，则初始化为新的空对象
+                        if (!current[key] || typeof current[key] !== 'object' || Array.isArray(current[key])) {
+                            current[key] = {};
+                        }
+                        current = current[key];
+                    }
+                });
+
+                return target;
+            }
+
+            // --- loadPluginConfiguration 函数开始 ---
             async function loadPluginConfiguration(pluginName) {
                 try {
                     currentPluginName = pluginName;
@@ -411,9 +429,14 @@
                     const config = await response.json();
                     let configContent = '';
 
+                    // 辅助函数：渲染单个配置字段
                     function renderField(key, value, description, type, options, prefix = '') {
                         const fullKey = prefix ? `${prefix}.${key}` : key;
-                        configContent += `<label for="${fullKey}">${description || key}</label><br>`;
+
+                        // 为非数组类型的字段添加标签
+                        if (type !== 'array') {
+                            configContent += `<label for="${fullKey}">${description || key}</label><br>`;
+                        }
 
                         if (type === 'select' && Array.isArray(options)) {
                             configContent += `<select id="${fullKey}" data-key="${fullKey}">`;
@@ -425,19 +448,55 @@
                         } else if (type === 'boolean') {
                             const checked = value ? 'checked' : '';
                             configContent += `
-    <label class="switch">
-      <input type="checkbox" id="${key}" data-key="${key}" ${checked}>
-      <span class="slider round"></span>
-    </label><br>
-  `;
+                    <label class="switch">
+                        <input type="checkbox" id="${fullKey}" data-key="${fullKey}" ${checked}>
+                        <span class="slider round"></span>
+                    </label><br>
+                `;
                         } else if (type === 'array') {
-                            configContent += `<textarea id="${fullKey}" data-key="${fullKey}" rows="3" placeholder="逗号分隔">${Array.isArray(value) ? value.join(',') : value}</textarea>`;
+                            // --- 数组类型：支持添加/删除项 ---
+                            configContent += `<div class="plugin-config-array-container" data-key="${fullKey}">`;
+                            configContent += `<label class="array-label">${description || key}</label><br>`;
+
+                            let itemsToRender = [];
+                            // 如果值是数组，直接使用
+                            if (Array.isArray(value)) {
+                                itemsToRender = value;
+                            }
+                            // 如果值是字符串，且非空，则尝试按逗号分隔
+                            else if (typeof value === 'string' && value.trim() !== '') {
+                                itemsToRender = value.split(',').map(s => s.trim());
+                            }
+                            // 其他情况（null, undefined, 空字符串），视为初始空数组
+                            else {
+                                itemsToRender = [];
+                            }
+
+                            itemsToRender.forEach((item) => {
+                                const itemValue = (item === null || item === undefined) ? '' : String(item).replace(/"/g, '&quot;');
+                                configContent += `
+                        <div class="plugin-config-array-item">
+                            <input type="text" class="plugin-config-array-input" value="${itemValue}" placeholder="请输入项的值">
+                            <button type="button" class="remove-plugin-config-array-item">删除</button>
+                        </div>
+                    `;
+                            });
+                            configContent += `
+                    <button type="button" class="add-plugin-config-array-item">添加项</button>
+                `;
+                            configContent += `</div>`;
                         } else if (type === 'object' && value && value.properties) {
+                            // --- 对象类型：递归渲染其属性 ---
+                            if (description) {
+                                configContent += `<strong>${description || key}:</strong><br>`;
+                            }
                             Object.entries(value.properties).forEach(([subKey, subItem]) => {
                                 renderField(subKey, subItem.value, subItem.description, subItem.type, subItem.options, fullKey);
                             });
                         } else {
-                            configContent += `<input type="text" id="${fullKey}" value="${value}" data-key="${fullKey}">`;
+                            // --- 普通文本输入框 ---
+                            const inputValue = (value === null || value === undefined) ? '' : String(value).replace(/"/g, '&quot;');
+                            configContent += `<input type="text" id="${fullKey}" value="${inputValue}" data-key="${fullKey}">`;
                         }
 
                         configContent += `<small style="color: #888;">(${fullKey})</small><br><br>`;
@@ -450,16 +509,41 @@
                     } else if (config.error) {
                         configContent = `<p>${config.error}</p>`;
                     } else {
-                        configContent = '<p>Invalid configuration format received from server.</p>';
+                        console.warn('Invalid configuration format received:', config);
+                        configContent = '<p>Received invalid configuration format from server.</p>';
                     }
 
                     const displayName = isPluginDisabled ? pluginName.substring(1) : pluginName;
                     pluginTitle.textContent = `${displayName} 配置`;
                     configurationArea.innerHTML = configContent;
 
+                    // --- 为动态生成的数组操作按钮绑定事件监听器 ---
+                    document.querySelectorAll('.add-plugin-config-array-item').forEach(button => {
+                        button.addEventListener('click', function () {
+                            const container = this.closest('.plugin-config-array-container');
+                            const newItemDiv = document.createElement('div');
+                            newItemDiv.classList.add('plugin-config-array-item');
+                            newItemDiv.innerHTML = `
+                    <input type="text" class="plugin-config-array-input" placeholder="请输入项的值">
+                    <button type="button" class="remove-plugin-config-array-item">删除</button>
+                `;
+                            container.insertBefore(newItemDiv, this);
+
+                            newItemDiv.querySelector('.remove-plugin-config-array-item').addEventListener('click', function () {
+                                this.closest('.plugin-config-array-item').remove();
+                            });
+                        });
+                    });
+
+                    document.querySelectorAll('.remove-plugin-config-array-item').forEach(button => {
+                        button.addEventListener('click', function () {
+                            this.closest('.plugin-config-array-item').remove();
+                        });
+                    });
+
                 } catch (error) {
                     console.error('Failed to load plugin configuration:', error);
-                    configurationArea.innerHTML = '<p>Failed to load configuration.</p>';
+                    configurationArea.innerHTML = `<p>Failed to load configuration: ${error.message}</p>`;
                 }
             }
 
@@ -477,55 +561,59 @@
                 }
             }
 
-            function deepMergeObject(target, path, value) {
-                const keys = path.split('.');
-                let current = target;
-
-                keys.forEach((key, index) => {
-                    if (index === keys.length - 1) {
-                        current[key] = value;
-                    } else {
-                        if (!current[key] || typeof current[key] !== 'object') {
-                            current[key] = {};
-                        }
-                        current = current[key];
-                    }
-                });
-
-                return target;
-            }
-
             saveButton.addEventListener('click', async function () {
                 if (!currentPluginName) {
                     showNotification('请先选择一个插件', 'error');
                     return;
                 }
 
-                let configData = {};
+                let configData = {}; // 用于存储要保存的配置数据
 
+                // 遍历所有带有 data-key 属性的元素，收集其值
                 document.querySelectorAll('#configuration-area [data-key]').forEach(el => {
-                    const key = el.dataset.key;
+                    const key = el.dataset.key; // 配置项的键（可能是点分路径）
                     let value;
-                    if (el.type === 'checkbox') {
+
+                    // --- 修改部分：处理数组容器 ---
+                    if (el.classList.contains('plugin-config-array-container')) {
+                        const items = [];
+                        // 遍历该数组容器内的所有数组项输入框
+                        el.querySelectorAll('.plugin-config-array-input').forEach(input => {
+                            // 仅收集非空字符串的项
+                            if (input.value.trim() !== '') {
+                                items.push(input.value.trim());
+                            }
+                        });
+                        value = items; // 将收集到的数组作为值
+                    }
+                    // --- 修改部分结束 ---
+                    else if (el.type === 'checkbox') {
+                        // 复选框的值为 checked 状态
                         value = el.checked;
-                    } else if (el.tagName === 'TEXTAREA') {
-                        value = el.value.split(',').map(s => s.trim());
-                    } else {
+                    } else if (el.tagName === 'SELECT') {
+                        // 下拉选择框的值
+                        value = el.value;
+                    }
+                    // elif (el.tagName === 'TEXTAREA') 已被移除，因为数组现在用动态输入框处理
+                    else {
+                        // 普通文本输入框或处理 "true"/"false" 字符串的逻辑
                         value = el.value === 'true' ? true : (el.value === 'false' ? false : el.value);
                     }
 
-
-
+                    // 使用 deepMergeObject 将值合并到 configData 中
                     deepMergeObject(configData, key, value);
                 });
 
                 try {
                     const jsonContent = JSON.stringify(configData);
                     console.log('Saving configuration:', jsonContent);
+
+                    // 构建保存配置的URL，并确保内容被URIComponent编码
                     const url = `/console/api/saveconfig?name=${currentPluginName}&content=${encodeURIComponent(jsonContent)}`;
                     const response = await fetch(url);
 
                     if (!response.ok) {
+                        // 如果HTTP响应不成功，尝试解析错误信息
                         const errorResult = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
                         throw new Error(errorResult.error || `HTTP error! status: ${response.status}`);
                     }
@@ -533,6 +621,7 @@
                     const result = await response.json();
                     showNotification(result.success || result.error, result.success ? 'success' : 'error');
 
+                    // 如果保存成功且插件未被禁用，延迟刷新插件列表
                     if (result.success && !isPluginDisabled) {
                         setTimeout(fetchPluginList, 1000);
                     }
