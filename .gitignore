@@ -16,3 +16,4 @@ static/
 *.tar.gz
 .VSCodeCounter/
 data/database.db
+*.tsbuildinfo

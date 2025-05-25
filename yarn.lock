@@ -2121,7 +2121,7 @@ __metadata:
     typescript: "npm:^5.8.3"
     yumeri: "workspace:^"
     yumeri-plugin-console: "workspace:^"
-    yumeri-plugin-server: "workspace:^"
+    yumeri-plugin-server: "npm:1.1.0-alpha.3"
   languageName: unknown
   linkType: soft
 
@@ -2148,7 +2148,17 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"yumeri-plugin-server@npm:1.1.0-alpha.3, yumeri-plugin-server@workspace:^, yumeri-plugin-server@workspace:plugins/yumeri-plugin-server":
+"yumeri-plugin-market@workspace:plugins/yumeri-plugin-market":
+  version: 0.0.0-use.local
+  resolution: "yumeri-plugin-market@workspace:plugins/yumeri-plugin-market"
+  dependencies:
+    "@types/node": "npm:^22.14.1"
+    typescript: "npm:^5.8.2"
+    yumeri: "npm:1.1.0-alpha.3"
+  languageName: unknown
+  linkType: soft
+
+"yumeri-plugin-server@npm:1.1.0-alpha.3, yumeri-plugin-server@workspace:plugins/yumeri-plugin-server":
   version: 0.0.0-use.local
   resolution: "yumeri-plugin-server@workspace:plugins/yumeri-plugin-server"
   dependencies:

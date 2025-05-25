@@ -35,6 +35,10 @@ const RAW_RUNTIME_STATE =
       "reference": "workspace:plugins/yumeri-plugin-echo"\
     },\
     {\
+      "name": "yumeri-plugin-market",\
+      "reference": "workspace:plugins/yumeri-plugin-market"\
+    },\
+    {\
       "name": "yumeri-plugin-server",\
       "reference": "workspace:plugins/yumeri-plugin-server"\
     },\
@@ -53,6 +57,7 @@ const RAW_RUNTIME_STATE =
     ["yumeri-dev", ["workspace:."]],\
     ["yumeri-plugin-console", ["workspace:plugins/yumeri-plugin-console"]],\
     ["yumeri-plugin-echo", ["workspace:plugins/yumeri-plugin-echo"]],\
+    ["yumeri-plugin-market", ["workspace:plugins/yumeri-plugin-market"]],\
     ["yumeri-plugin-server", ["workspace:plugins/yumeri-plugin-server"]],\
     ["yumeri-plugin-sqlite", ["workspace:plugins/yumeri-plugin-sqlite"]]\
   ],\
@@ -2488,6 +2493,18 @@ const RAW_RUNTIME_STATE =
           ["typescript", "patch:typescript@npm%3A5.8.3#optional!builtin<compat/typescript>::version=5.8.3&hash=5786d5"],\
           ["yumeri", "workspace:package/yumeri"],\
           ["yumeri-plugin-echo", "workspace:plugins/yumeri-plugin-echo"]\
+        ],\
+        "linkType": "SOFT"\
+      }]\
+    ]],\
+    ["yumeri-plugin-market", [\
+      ["workspace:plugins/yumeri-plugin-market", {\
+        "packageLocation": "./plugins/yumeri-plugin-market/",\
+        "packageDependencies": [\
+          ["@types/node", "npm:22.15.19"],\
+          ["typescript", "patch:typescript@npm%3A5.8.3#optional!builtin<compat/typescript>::version=5.8.3&hash=5786d5"],\
+          ["yumeri", "workspace:package/yumeri"],\
+          ["yumeri-plugin-market", "workspace:plugins/yumeri-plugin-market"]\
         ],\
         "linkType": "SOFT"\
       }]\

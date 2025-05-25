@@ -901,8 +901,8 @@ export async function apply(ctx: Context, config: Config) {
     });
 
   const operateconsole = {
-    addconsoleitem: (icon: string, name: string, htmlpath: string, staticpath: string) => {
-      consoleitem[name] = new ConsoleItem(icon, name, htmlpath, staticpath);
+    addconsoleitem: (name: string, icon: string, displayname: string, htmlpath: string, staticpath: string) => {
+      consoleitem[name] = new ConsoleItem(icon, displayname, htmlpath, staticpath);
     },
     removeconsoleitem: (name: string) => {
       delete consoleitem[name];
