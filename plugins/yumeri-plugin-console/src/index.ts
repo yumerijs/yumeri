@@ -906,6 +906,13 @@ export async function apply(ctx: Context, config: Config) {
     },
     removeconsoleitem: (name: string) => {
       delete consoleitem[name];
+    },
+    getloginstatus: (session: Session) => {
+      if (loginstatus[session.sessionid]) {
+        return true;
+      } else {
+        return false;
+      }
     }
   }
   ctx.registerComponent('console', operateconsole);

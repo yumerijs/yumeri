@@ -29,9 +29,9 @@ export class Context {
             return callback(...args);
         });
     }
-    /*@
-     *@ Unless nessesary, do not use core directly
-     */
+    /** 
+     * Unless nessesary, do not use core directly
+    */
     getCore() {
         return this.core;
     }
