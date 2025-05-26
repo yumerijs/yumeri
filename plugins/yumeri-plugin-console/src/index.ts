@@ -270,41 +270,46 @@ class PluginConfigManager {
    * @returns 插件配置schema
    */
   async getPluginSchema(pluginName: string): Promise<Record<string, ConfigSchema> | null> {
-    // 如果插件名以~开头，去掉~前缀获取schema
     const actualPluginName = pluginName.startsWith('~') ? pluginName.substring(1) : pluginName;
 
-    // 开发模式下不使用缓存
-    if (process.env.NODE_ENV === 'development' || !this.schemaCache[actualPluginName]) {
+    const isDev = process.env.NODE_ENV === 'development';
+
+    // 开发模式或缓存未命中才加载
+    if (isDev || !this.schemaCache[actualPluginName]) {
       try {
-        // 尝试从插件模块中获取配置schema
-        const pluginPath = path.join(process.cwd(), 'plugins', actualPluginName);
-
-        // 检查插件目录是否存在
-        if (!fs.existsSync(pluginPath)) {
-          return null;
-        }
-
-        // 尝试加载插件的配置schema
-        try {
-          // 清除模块缓存以确保获取最新的配置
+        // 清缓存：只在开发模式下清除模块缓存
+        if (isDev) {
           Object.keys(require.cache).forEach(key => {
             if (key.includes(actualPluginName)) {
               delete require.cache[key];
             }
           });
-
-          // 尝试导入插件模块
-          const pluginModule = require(pluginPath);
-
-          // 检查是否有config.schema导出
-          if (pluginModule.config?.schema) {
-            this.schemaCache[actualPluginName] = pluginModule.config.schema;
-          }
-        } catch (importError) {
-          logger.warn(`Failed to import plugin module ${actualPluginName}:`, importError);
         }
-      } catch (error) {
-        logger.error(`Failed to get schema for plugin ${actualPluginName}:`, error);
+
+        let pluginModule: any;
+
+        if (isDev) {
+          try {
+            // 优先尝试直接通过模块名导入（开发环境）
+            pluginModule = require(actualPluginName);
+          } catch {
+            // 如果模块名导入失败，再尝试通过路径导入（开发模式）
+            const pluginPath = path.join(process.cwd(), 'plugins', actualPluginName);
+            if (!fs.existsSync(pluginPath)) return null;
+
+            pluginModule = require(pluginPath);
+          }
+        } else {
+          // 生产环境只能通过模块名导入
+          pluginModule = require(actualPluginName);
+        }
+
+        if (pluginModule?.config?.schema) {
+          this.schemaCache[actualPluginName] = pluginModule.config.schema;
+        }
+
+      } catch (err) {
+        logger.warn(`Failed to load schema for plugin ${actualPluginName}:`, err);
       }
     }
 
@@ -803,10 +808,10 @@ export async function apply(ctx: Context, config: Config) {
             .map(([key, item]) => { // 解构赋值，key 是 record 的键名（例如 "settings"），item 是 ConsoleItem 实例
               const itemIcon = item.icon;
               const itemName = item.name; // 这里仍然使用 ConsoleItem 内部的 name 属性作为显示名称
-              
+
               // 路径拼接：使用 record 的键名 (key)
-              const itemPath = `/${config.get<string>('path', 'console')}/${key}`; 
-        
+              const itemPath = `/${config.get<string>('path', 'console')}/${key}`;
+
               return {
                 item: itemIcon,
                 name: itemName,
