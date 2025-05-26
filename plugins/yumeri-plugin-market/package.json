@@ -1,12 +1,13 @@
 {
     "name": "yumeri-plugin-market",
-    "version": "1.0.0",
+    "version": "1.0.3",
     "description": "Plugin market for Yumeri",
     "main": "dist/index.js",
     "dev": "src/index.ts",
     "types": "dist/index.d.ts",
     "files": [
-        "dist"
+        "dist",
+        "static"
     ],
     "scripts": {
         "build": "tsc",
@@ -32,6 +33,6 @@
         "typescript": "^5.8.2"
     },
     "dependencies": {
-        "yumeri": "1.1.0-alpha.3"
+        "yumeri": "1.1.0-alpha.5"
     }
 }

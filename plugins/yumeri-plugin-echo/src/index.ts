@@ -4,9 +4,6 @@ const logger = new Logger("echo");
 
 export const depend = ['server']; // 需要的服务
 
-/**
- * 控制台插件配置接口
- */
 export interface EchoConfig {
   /**
    * 监听路径（命令）
@@ -26,9 +23,6 @@ interface contentobject {
   join: string;
 }
 
-/**
- * 控制台插件配置schema
- */
 export const config = {
   schema: {
     path: {

@@ -15,7 +15,7 @@
     "chokidar": "^4.0.3",
     "yumeri": "workspace:^",
     "yumeri-plugin-console": "workspace:^",
-    "yumeri-plugin-server": "1.1.0-alpha.3"
+    "yumeri-plugin-server": "1.1.0-alpha.5"
   },
   "devDependencies": {
     "@types/chalk": "^2.2.4",

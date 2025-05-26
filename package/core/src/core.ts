@@ -157,6 +157,8 @@ export class Core {
     let loadAttempted: { [name: string]: boolean } = {};
     // 使用插件名数组来管理剩余待加载的插件
     let remainingPluginNames = [...pluginNamesToLoad];
+    // 不加载名称以~开头的插件
+    remainingPluginNames = remainingPluginNames.filter(name => !name.startsWith('~'));
 
     // 多次尝试加载插件，直到所有插件加载完毕或检测到循环依赖
     while (remainingPluginNames.length > 0) {
