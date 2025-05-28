@@ -77,98 +77,101 @@ async function fetchPluginsDataFromUrl(url: string): Promise<PluginInfo[] | null
 }
 
 export async function apply(ctx: Context, config: Config) {
+
+    const console: OperateConsole = ctx.getComponent('console');
     // 注册Echo命令
     ctx.command('market')
         .action(async (session: Session, param?: any) => {
-            if (param.path === '/list') {
-                const plugins = await fetchPluginsDataFromUrl(config.get<string>('url', 'https://yumeri.flweb.cn/registry.json'));
-                if (plugins) {
-                    session.body = JSON.stringify(plugins);
+            if (console.getloginstatus(session)) {
+                if (param.path === '/list') {
+                    const plugins = await fetchPluginsDataFromUrl(config.get<string>('url', 'https://yumeri.flweb.cn/registry.json'));
+                    if (plugins) {
+                        session.body = JSON.stringify(plugins);
+                    } else {
+                        session.body = JSON.stringify({ success: false, message: 'Failed to fetch plugins' });
+                    }
+                } else if (param.path === '/search') {
+                    const content = param.q;
+                    const pluginsData = await fetchPluginsDataFromUrl(config.get<string>('url', 'https://yumeri.flweb.cn/registry.json'));
+                    if (pluginsData) {
+                        const filteredPlugins = pluginsData.filter(plugin => plugin.name.toLowerCase().includes(content.toLowerCase()));
+                        session.body = JSON.stringify(filteredPlugins);
+                        session.setMime('json')
+                    }
+                } else if (param.path === '/install') {
+                    const packagename = param.name;
+                    if (!packagename.includes('yumeri')) {
+                        session.body = JSON.stringify({ success: false, message: 'Invalid package name' });
+                    }
+                    // 通过当前的包管理工具安装插件
+                    const packageManager = getPackageManager();
+                    if (packageManager === 'npm') {
+                        await exec(`npm install ${packagename}`, (error, stdout, stderr) => {
+                            logger.info(`${stdout}`);
+                            logger.error(`${stderr}`);
+                        });
+                    } else if (packageManager === 'yarn') {
+                        await exec(`yarn add ${packagename}`, (error, stdout, stderr) => {
+                            logger.info(`${stdout}`);
+                            logger.error(`${stderr}`);
+                        });
+                    } else if (packageManager === 'pnpm') {
+                        await exec(`pnpm add ${packagename}`, (error, stdout, stderr) => {
+                            logger.info(`${stdout}`);
+                            logger.error(`${stderr}`);
+                        });
+                    } else {
+                    }
+                    session.body = JSON.stringify({ success: true });
+                } else if (param.path === '/versions') {
+                    const packagename = param.name;
+                    if (!packagename.includes('yumeri')) {
+                        session.body = JSON.stringify({ success: false, message: 'Invalid package name' });
+                    }
+                    // 从registry拉取版本列表，只筛选版本列表而不发送相关信息
+                    const response = await fetch(`${config.get<string>('npmregistry', 'https://registry.npmmirror.com')}/${packagename}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        session.body = JSON.stringify(data.versions);
+                        session.setMime('json')
+                    } else {
+                        session.body = JSON.stringify({ success: false, message: 'Failed to fetch versions' });
+                    }
+                } else if (param.path === '/uninstall') {
+                    const packagename = param.name;
+                    if (!packagename.includes('yumeri')) {
+                        session.body = 'Invalid package name';
+                    }
+                    // 卸载插件
+                    const packageManager = getPackageManager();
+                    if (packageManager === 'npm') {
+                        await exec(`npm uninstall ${packagename}`, (error, stdout, stderr) => {
+                            logger.info(`${stdout}`);
+                            logger.error(`${stderr}`);
+                        });
+                    } else if (packageManager === 'yarn') {
+                        await exec(`yarn remove ${packagename}`, (error, stdout, stderr) => {
+                            logger.info(`${stdout}`);
+                            logger.error(`${stderr}`);
+                        });
+                    } else if (packageManager === 'pnpm') {
+                        await exec(`pnpm remove ${packagename}`, (error, stdout, stderr) => {
+                            logger.info(`${stdout}`);
+                            logger.error(`${stderr}`);
+                        });
+                    } else {
+                    }
+                    session.body = JSON.stringify({ success: true });
+                } else if (param.path === '/currentver') {
+                    // 返回当前项目内的包版本
+                    const correntversion = await getSpecificPackageVersion(param.name);
+                    session.body = correntversion;
                 } else {
-                    session.body = JSON.stringify({ success: false, message: 'Failed to fetch plugins' });
+                    session.body = JSON.stringify({ success: false, message: '未知API请求' });
                 }
-            } else if (param.path === '/search') {
-                const content = param.q;
-                const pluginsData = await fetchPluginsDataFromUrl(config.get<string>('url', 'https://yumeri.flweb.cn/registry.json'));
-                if (pluginsData) {
-                    const filteredPlugins = pluginsData.filter(plugin => plugin.name.toLowerCase().includes(content.toLowerCase()));
-                    session.body = JSON.stringify(filteredPlugins);
-                    session.setMime('json')
-                }
-            } else if (param.path === '/install') {
-                const packagename = param.name;
-                if (!packagename.includes('yumeri')) {
-                    session.body = JSON.stringify({ success: false, message: 'Invalid package name' });
-                }
-                // 通过当前的包管理工具安装插件
-                const packageManager = getPackageManager();
-                if (packageManager === 'npm') {
-                    await exec(`npm install ${packagename}`, (error, stdout, stderr) => {
-                        logger.info(`${stdout}`);
-                        logger.error(`${stderr}`);
-                    });
-                } else if (packageManager === 'yarn') {
-                    await exec(`yarn add ${packagename}`, (error, stdout, stderr) => {
-                        logger.info(`${stdout}`);
-                        logger.error(`${stderr}`);
-                    });
-                } else if (packageManager === 'pnpm') {
-                    await exec(`pnpm add ${packagename}`, (error, stdout, stderr) => {
-                        logger.info(`${stdout}`);
-                        logger.error(`${stderr}`);
-                    });
-                } else {
-                }
-                session.body = JSON.stringify({ success: true });
-            } else if (param.path === '/versions') {
-                const packagename = param.name;
-                if (!packagename.includes('yumeri')) {
-                    session.body = JSON.stringify({ success: false, message: 'Invalid package name' });
-                }
-                // 从registry拉取版本列表，只筛选版本列表而不发送相关信息
-                const response = await fetch(`${config.get<string>('npmregistry', 'https://registry.npmmirror.com')}/${packagename}`);
-                if (response.ok) {
-                    const data = await response.json();
-                    session.body = JSON.stringify(data.versions);
-                    session.setMime('json')
-                } else {
-                    session.body = JSON.stringify({ success: false, message: 'Failed to fetch versions' });
-                }
-            } else if (param.path === '/uninstall') {
-                const packagename = param.name;
-                if (!packagename.includes('yumeri')) {
-                    session.body = 'Invalid package name';
-                }
-                // 卸载插件
-                const packageManager = getPackageManager();
-                if (packageManager === 'npm') {
-                    await exec(`npm uninstall ${packagename}`, (error, stdout, stderr) => {
-                        logger.info(`${stdout}`);
-                        logger.error(`${stderr}`);
-                    });
-                } else if (packageManager === 'yarn') {
-                    await exec(`yarn remove ${packagename}`, (error, stdout, stderr) => {
-                        logger.info(`${stdout}`);
-                        logger.error(`${stderr}`);
-                    });
-                } else if (packageManager === 'pnpm') {
-                    await exec(`pnpm remove ${packagename}`, (error, stdout, stderr) => {
-                        logger.info(`${stdout}`);
-                        logger.error(`${stderr}`);
-                    });
-                } else {
-                }
-                session.body = JSON.stringify({ success: true });
-            } else if (param.path === '/currentver') {
-                // 返回当前项目内的包版本
-                const correntversion = await getSpecificPackageVersion(param.name);
-                session.body = correntversion;
-            } else {
-                session.body = JSON.stringify({ success: false, message: '未知API请求' });
+                session.setMime('json')
             }
-            session.setMime('json')
         });
-    const console: OperateConsole = ctx.getComponent('console');
     console.addconsoleitem('market', 'fa-plug', '插件市场', path.join(__dirname, '../static/index.html'), path.join(__dirname, '../static/'));
 }
 export function disable(ctx: Context) {

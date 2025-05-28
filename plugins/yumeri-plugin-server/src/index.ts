@@ -4,6 +4,7 @@ import * as mime from 'mime-types';
 import http from 'http';
 import * as path from 'path';
 import { URL } from 'url';
+import Ws from 'ws';
 
 import { IncomingMessage } from 'http'; // 引入 Node.js HTTP 模块的 IncomingMessage 类型
 import * as formidable from 'formidable'; // 引入 formidable 库
@@ -276,6 +277,17 @@ export class Server extends Platform {
             });
         }
       });
+      const wss = new Ws.Server({ server: this.httpServer });
+      wss.on('connection', (ws, req) => {
+        const clientip = this.getClientIP(req);
+        const clientcookie = this.parseCookies(req);
+        const session = this.createSession(clientip, clientcookie, params);
+        session.properties = { req, ws };
+        this.core.on('message', (session, data) => {
+          if (session.properties?.ws === ws) {
+            ws.send(data);
+          }
+        });
 
       this.httpServer.listen(this.port, this.host, () => {
         this.status = 'running';

@@ -15,6 +15,8 @@ interface ActionFn {
 export class Command {
   name: string;
   actionFn: ActionFn | null = null;
+  connectFn: ActionFn | null = null;
+  closeFn: ActionFn | null = null;
   core: Core;
   middlewares: Middleware[] = []; // 存储命令特定的中间件
 
@@ -30,6 +32,16 @@ export class Command {
    */
   action(fn: ActionFn): this {
     this.actionFn = fn;
+    return this;
+  }
+
+  close(fn: ActionFn): this {
+    this.closeFn = fn;
+    return this;
+  }
+
+  connect(fn: ActionFn): this {
+    this.connectFn = fn;
     return this;
   }
 
