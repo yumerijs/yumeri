@@ -1,361 +1,527 @@
 import { Context, Config, Session, Logger, ConfigSchema } from 'yumeri';
-import mysql, { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise'; // 导入 mysql2/promise
+import mysql from 'mysql2/promise'; // 导入 mysql2/promise
+import {
+    TableSchema,
+    ColumnDefinition,
+    QueryConditions,
+    QueryOperator,
+    FindOptions,
+    OrderByOption,
+    AlterColumnAction,
+    ColumnAlteration
+} from './types'; // 假设类型定义在同目录下的 types.ts
 
 export const provide = ['database'];
-// 定义一个精确的 RunResult 接口，以匹配 mysql2 db.execute() 对非SELECT语句的实际返回。
-interface MysqlWrapperRunResult {
-    insertId?: number;    // 对于 INSERT 操作，返回插入的行 ID
-    affectedRows?: number; // 对于 UPDATE/DELETE 操作，返回受影响的行数
-    // 更多：warningStatus?: number; changedRows?: number;
+
+const logger = new Logger("mysql"); // 提前实例化 Logger
+
+// 辅助函数：将友好类型映射到 SQL 类型
+function mapFriendlyTypeToSQL(def: ColumnDefinition): string {
+    let sqlType = def.type.toUpperCase();
+    switch (sqlType) {
+        case 'STRING':
+            return `VARCHAR(${def.length || 255})`; // 默认长度 255
+        case 'NUMBER':
+            return `INT`; // 默认 INT, 也可以根据 length/precision 进一步判断
+        case 'BOOLEAN':
+            return `TINYINT(1)`;
+        case 'DECIMAL':
+            return `DECIMAL(${def.precision || 10},${def.scale || 2})`;
+        case 'CHAR':
+            return `CHAR(${def.length || 1})`;
+        case 'VARCHAR':
+            return `VARCHAR(${def.length || 255})`;
+        case 'ENUM':
+            if (!def.enum || def.enum.length === 0) {
+                throw new Error(`ENUM type requires 'enum' property with at least one value for field: ${def.comment || ''}`);
+            }
+            return `ENUM(${def.enum.map(val => `'${val}'`).join(', ')})`;
+        default:
+            return sqlType;
+    }
 }
 
-/**
- * 通用的数据库操作类，封装了MySQL连接和常见的CRUD操作。
- * 其公共方法接口与SqliteDatabase保持一致。
- */
-class MysqlDatabase {
-    private connectionPoolPromise: Promise<Pool>;
-    private pool: Pool | undefined; // 存储已创建的连接池实例
+// 辅助函数：构建列的 SQL 片段
+function buildColumnSQL(field: string, def: ColumnDefinition): string {
+    let parts = [`\`${field}\` ${mapFriendlyTypeToSQL(def)}`];
 
-    /**
-     * 构造函数，在实例化时尝试连接到MySQL数据库。
-     * @param options MySQL连接选项 (host, port, user, password, database, connectionLimit 等)
-     */
-    constructor(options: mysql.PoolOptions) {
-        // 使用连接池在插件环境中更好地管理连接资源
-        this.connectionPoolPromise = (async () => {
-            try {
-                // 创建连接池
-                this.pool = mysql.createPool(options);
-                
-                // 尝试获取一个连接以验证连接是否成功
-                // get a connection and release it immediately to test connectivity
-                const connection = await this.pool.getConnection();
-                connection.release(); 
+    if (def.unsigned) parts.push('UNSIGNED');
+    if (def.zerofill) parts.push('ZEROFILL');
+    if (def.notNull) parts.push('NOT NULL');
+    if (def.unique) parts.push('UNIQUE');
+    if (def.autoIncrement) parts.push('AUTO_INCREMENT');
 
-                logger.info(`Successfully connected to MySQL database: '${options.database}' at ${options.host}:${options.port}`);
-                return this.pool;
-            } catch (error) {
-                logger.error(`Error connecting to MySQL database: '${options.database}' at ${options.host}:${options.port}:`, error);
-                throw error; // 抛出错误以便外部捕获
-            }
-        })();
-    }
-
-    /**
-     * 内部辅助方法：获取已连接的数据库连接池实例。
-     * 任何操作都需要等待此 Promise 完成，确保数据库已连接。
-     * @returns Promise<Pool> 已连接的数据库连接池实例。
-     */
-    private async getPool(): Promise<Pool> {
-        return this.connectionPoolPromise;
-    }
-
-    /**
-     * 执行原始SQL语句（如INSERT, UPDATE, DELETE, CREATE TABLE），不返回行数据。
-     * @param sql SQL查询字符串。
-     * @param params 可选参数，用于SQL中的占位符 (`?`)。
-     * @returns Promise<MysqlWrapperRunResult> 包含 insertId (插入操作) 和 affectedRows (修改/删除操作) 的结果对象。
-     */
-    public async runSQL(sql: string, params: any[] = []): Promise<MysqlWrapperRunResult> {
-        const pool = await this.getPool();
-        // execute() 方法用于预处理语句，比 query() 更安全高效
-        const [result] = await pool.execute(sql, params); 
-
-        // 对于 INSERT/UPDATE/DELETE/DDL 语句，result 的类型通常是 ResultSetHeader
-        if (typeof result === 'object' && 'affectedRows' in result) {
-            const resultSetHeader = result as ResultSetHeader;
-            return {
-                insertId: resultSetHeader.insertId,
-                affectedRows: resultSetHeader.affectedRows
-            };
+    if (def.default !== undefined) {
+        if (def.default === 'CURRENT_TIMESTAMP_FUNC' && ['DATETIME', 'TIMESTAMP'].includes(def.type.toUpperCase())) {
+            parts.push('DEFAULT CURRENT_TIMESTAMP');
+        } else if (typeof def.default === 'string') {
+            parts.push(`DEFAULT '${def.default}'`);
+        } else if (def.default === null) {
+            parts.push(`DEFAULT NULL`); // 明确指定 NULL
         } else {
-            // 对于某些DDL（如CREATE TABLE）或不返回行数据的语句，affectedRows可能是0
-            // 或者 result 可能不是 ResultSetHeader (例如，一个空的 RowDataPacket 数组 for SELECT)
-            // 但此方法主要设计用于非SELECT语句。
-            logger.warn(`runSQL executed a query that did not return a ResultSetHeader (SQL: ${sql.substring(0, 100)}...)`);
-            return { affectedRows: 0, insertId: 0 }; 
+            parts.push(`DEFAULT ${def.default}`);
         }
     }
 
-    /**
-     * 执行原始SQL SELECT查询，返回所有匹配的行。
-     * @param sql SQL SELECT查询字符串。
-     * @param params 可选参数，用于SQL中的占位符。
-     * @returns Promise<any[]> 包含查询结果的数组。
-     */
-    public async all(sql: string, params: any[] = []): Promise<any[]> {
-        const pool = await this.getPool();
-        const [rows] = await pool.execute(sql, params); // rows 是一个 RowDataPacket[] 数组
-        return rows as RowDataPacket[]; // 类型断言为 any[]
+    if (def.onUpdate === 'CURRENT_TIMESTAMP_FUNC' && ['DATETIME', 'TIMESTAMP'].includes(def.type.toUpperCase())) {
+        parts.push('ON UPDATE CURRENT_TIMESTAMP');
     }
 
-    /**
-     * 执行原始SQL SELECT查询，返回第一个匹配的行。
-     * @param sql SQL SELECT查询字符串。
-     * @param params 可选参数，用于SQL中的占位符。
-     * @returns Promise<any | undefined> 第一个匹配的行对象，如果没有匹配则为 undefined。
-     */
-    public async get(sql: string, params: any[] = []): Promise<any | undefined> {
-        const pool = await this.getPool();
-        const [rows] = await pool.execute(sql, params);
-        const data = rows as RowDataPacket[]; // 类型断言
-        return data.length > 0 ? data[0] : undefined;
+    if (def.comment) {
+        parts.push(`COMMENT '${def.comment}'`);
     }
 
-    /**
-     * 向指定表中插入单条记录。
-     * @param tableName 表名。
-     * @param data 一个对象，键为列名，值为要插入的数据。
-     * @returns Promise<number> 新插入记录的 ID。
-     */
-    public async insert(tableName: string, data: Record<string, any>): Promise<number> {
-        const columns = Object.keys(data);
-        const placeholders = columns.map(() => '?').join(', ');
-        const values = Object.values(data);
+    return parts.join(' ');
+}
+// 辅助函数：构建 WHERE 子句及其参数
+function buildWhereClause(conditions: QueryConditions, params: any[]): string {
+    const clauseParts: string[] = [];
 
-        const sql = `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`;
-        const result = await this.runSQL(sql, values);
-        // insertId 通常在MySQL中是自增ID，如果不存在则返回0
-        return result.insertId || 0; 
+    // 辅助函数：判断一个对象是否是普通的 JavaScript 对象（非数组、非Date等）
+    function isPlainObject(val: any): val is Record<string, any> {
+        return typeof val === 'object' && val !== null && !Array.isArray(val) && !(val instanceof Date);
     }
 
-    /**
-     * 在事务中批量插入多条记录到指定表。
-     * @param tableName 表名。
-     * @param dataArray 一个对象数组，每个对象代表要插入的一行数据。
-     * @returns Promise<void>
-     */
-    public async batchInsert(tableName: string, dataArray: Record<string, any>[]): Promise<void> {
-        if (dataArray.length === 0) {
-            return; // 没有数据可插入
+    for (const key in conditions) {
+        if (!Object.prototype.hasOwnProperty.call(conditions, key)) continue;
+
+        const value = conditions[key];
+
+        if (key === '$or' || key === '$and') { // 合并处理 $or 和 $and
+            if (Array.isArray(value) && value.length > 0) {
+                const operatorGroup: string[] = [];
+                const logicalOperator = key === '$or' ? ' OR ' : ' AND ';
+
+                for (const subCondition of value) {
+                    if (isPlainObject(subCondition)) {
+                        const subParams: any[] = [];
+                        // 修复点：先断言为 unknown，再断言为 QueryConditions
+                        const subClause = buildWhereClause(subCondition as unknown as QueryConditions, subParams);
+                        if (subClause) {
+                            operatorGroup.push(`(${subClause})`);
+                            params.push(...subParams);
+                        }
+                    } else {
+                        logger.warn(`Invalid ${key} condition detected for key: ${key}. Expected a plain object for sub-condition.`);
+                    }
+                }
+                if (operatorGroup.length > 0) {
+                    clauseParts.push(`(${operatorGroup.join(logicalOperator)})`);
+                }
+            } else {
+                logger.warn(`Invalid ${key} value for key: ${key}. Expected a non-empty array.`);
+            }
         }
+        else if (isPlainObject(value) && Object.keys(value).some(opKey => opKey.startsWith('$'))) {
+            // ... (这部分逻辑保持不变，因为 $eq 等操作符内部的值可以是 Date，但 value 本身必须是纯对象)
+            const field = `\`${key}\``;
+            const operatorConditions: string[] = [];
+            const queryOperator = value as QueryOperator;
 
-        const pool = await this.getPool();
-        // 假设所有数据对象具有相同的键，从中获取列名
-        const columns = Object.keys(dataArray[0]);
-        // 为单行数据构建占位符字符串，例如 "(?, ?, ?)"
-        const singleRowPlaceholders = `(${columns.map(() => '?').join(', ')})`;
+            for (const opKey in queryOperator) {
+                if (!Object.prototype.hasOwnProperty.call(queryOperator, opKey)) continue;
 
-        // 为所有待插入数据构建多行占位符字符串，例如 "(?,?),(?,?)"
-        const multiRowPlaceholders = dataArray.map(() => singleRowPlaceholders).join(', ');
-        const sql = `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES ${multiRowPlaceholders}`;
+                const opValue = queryOperator[opKey as keyof QueryOperator];
 
-        // 将所有行的值扁平化为一个单独的数组作为参数传递
-        const allValues = dataArray.flatMap(data => columns.map(col => data[col]));
-
-        // --- 事务处理 ---
-        // 从连接池中获取一个专用连接，以便在同一事务中使用
-        const connection = await pool.getConnection(); 
-        try {
-            await connection.beginTransaction(); // 开始事务
-            await connection.execute(sql, allValues); // 执行批量插入语句
-            await connection.commit(); // 提交事务
-            logger.info(`Batch insert into ${tableName} successful.`);
-        } catch (error) {
-            await connection.rollback(); // 发生错误时回滚事务
-            logger.error(`Batch insert into ${tableName} failed, rolling back:`, error);
-            throw error; // 重新抛出错误
-        } finally {
-            connection.release(); // 无论成功失败，总是释放连接回连接池
-        }
-    }
-
-    /**
-     * 更新指定表的记录。
-     * @param tableName 表名。
-     * @param data 一个对象，键为要更新的列名，值为新数据。
-     * @param conditions 一个对象，键为列名，值为过滤更新的条件。
-     * @returns Promise<void>
-     */
-    public async update(tableName: string, data: Record<string, any>, conditions: Record<string, any>): Promise<void> {
-        const setParts = Object.keys(data).map(key => `${key} = ?`);
-        const whereParts = Object.keys(conditions).map(key => `${key} = ?`);
-
-        if (setParts.length === 0) {
-            logger.error("No data provided for update.");
-        }
-        if (whereParts.length === 0) {
-            logger.warn("Update operation without conditions will affect all rows. Consider adding conditions to prevent unintended updates.");
-        }
-
-        const sql = `UPDATE ${tableName} SET ${setParts.join(', ')} ${whereParts.length > 0 ? `WHERE ${whereParts.join(' AND ')}` : ''}`;
-        // 参数顺序：先是SET部分的值，然后是WHERE部分的条件值
-        const params = [...Object.values(data), ...Object.values(conditions)];
-
-        await this.runSQL(sql, params);
-    }
-
-    /**
-     * 从指定表中删除记录。
-     * @param tableName 表名。
-     * @param conditions 一个对象，键为列名，值为过滤删除的条件。
-     * @returns Promise<void>
-     */
-    public async delete(tableName: string, conditions: Record<string, any>): Promise<void> {
-        const whereParts = Object.keys(conditions).map(key => `${key} = ?`);
-
-        if (whereParts.length === 0) {
-            // 强制要求条件，防止意外删除整个表的数据
-            logger.error("Delete operation requires conditions to prevent accidental full table deletion.");
-        }
-
-        const sql = `DELETE FROM ${tableName} WHERE ${whereParts.join(' AND ')}`;
-        const params = Object.values(conditions);
-
-        await this.runSQL(sql, params);
-    }
-
-    /**
-     * 在指定表中查找多条记录。
-     * @param tableName 表名。
-     * @param conditions 可选对象，键为列名，值为过滤查询的条件。
-     * @param options 可选对象，用于 orderBy (排序), limit (限制数量), offset (偏移量)。
-     * @returns Promise<any[]> 匹配的行对象数组。
-     */
-    public async find(
-        tableName: string,
-        conditions?: Record<string, any>,
-        options?: { orderBy?: string, limit?: number, offset?: number }
-    ): Promise<any[]> {
-        let sql = `SELECT * FROM ${tableName}`;
-        const params: any[] = [];
-        const whereParts: string[] = [];
-
-        if (conditions) {
-            for (const key in conditions) {
-                // 确保只处理对象自身的属性，排除原型链上的属性
-                if (Object.prototype.hasOwnProperty.call(conditions, key)) {
-                    whereParts.push(`${key} = ?`);
-                    params.push(conditions[key]);
+                switch (opKey) {
+                    case '$eq': operatorConditions.push(`${field} = ?`); params.push(opValue); break;
+                    case '$ne': operatorConditions.push(`${field} != ?`); params.push(opValue); break;
+                    case '$gt': operatorConditions.push(`${field} > ?`); params.push(opValue); break;
+                    case '$gte': operatorConditions.push(`${field} >= ?`); params.push(opValue); break;
+                    case '$lt': operatorConditions.push(`${field} < ?`); params.push(opValue); break;
+                    case '$lte': operatorConditions.push(`${field} <= ?`); params.push(opValue); break;
+                    case '$in':
+                        if (Array.isArray(opValue) && opValue.length > 0) {
+                            operatorConditions.push(`${field} IN (${opValue.map(() => '?').join(', ')})`);
+                            params.push(...opValue);
+                        } else { operatorConditions.push('FALSE'); }
+                        break;
+                    case '$nin':
+                        if (Array.isArray(opValue) && opValue.length > 0) {
+                            operatorConditions.push(`${field} NOT IN (${opValue.map(() => '?').join(', ')})`);
+                            params.push(...opValue);
+                        } else { operatorConditions.push('TRUE'); }
+                        break;
+                    case '$like': operatorConditions.push(`${field} LIKE ?`); params.push(opValue); break;
+                    case '$notLike': operatorConditions.push(`${field} NOT LIKE ?`); params.push(opValue); break;
+                    case '$between':
+                        if (Array.isArray(opValue) && opValue.length === 2) {
+                            operatorConditions.push(`${field} BETWEEN ? AND ?`);
+                            params.push(opValue[0], opValue[1]);
+                        }
+                        break;
+                    case '$notBetween':
+                        if (Array.isArray(opValue) && opValue.length === 2) {
+                            operatorConditions.push(`${field} NOT BETWEEN ? AND ?`);
+                            params.push(opValue[0], opValue[1]);
+                        }
+                        break;
+                    case '$isNull':
+                        if (opValue === true) { operatorConditions.push(`${field} IS NULL`); } else if (opValue === false) { operatorConditions.push(`${field} IS NOT NULL`); }
+                        break;
+                    case '$notNull':
+                        if (opValue === true) { operatorConditions.push(`${field} IS NOT NULL`); } else if (opValue === false) { operatorConditions.push(`${field} IS NULL`); }
+                        break;
+                    default:
+                        logger.warn(`Unsupported query operator: ${opKey} for field \`${key}\`.`);
+                        break;
                 }
             }
-        }
-
-        if (whereParts.length > 0) {
-            sql += ` WHERE ${whereParts.join(' AND ')}`;
-        }
-
-        if (options?.orderBy) {
-            sql += ` ORDER BY ${options.orderBy}`;
-        }
-        // 检查 limit 是否明确给出且不是 null/undefined
-        if (options?.limit !== undefined && options.limit !== null) {
-            sql += ` LIMIT ?`;
-            params.push(options.limit);
-        }
-        // 检查 offset 是否明确给出且不是 null/undefined
-        if (options?.offset !== undefined && options.offset !== null) {
-            sql += ` OFFSET ?`;
-            params.push(options.offset);
-        }
-
-        return this.all(sql, params);
-    }
-
-    /**
-     * 在指定表中查找单条记录。
-     * 这个方法是对 find 的便捷封装，内部限制 limit 为 1。
-     * @param tableName 表名。
-     * @param conditions 可选对象，键为列名，值为过滤查询的条件。
-     * @returns Promise<any | undefined> 第一个匹配的行对象，如果没有匹配则为 undefined。
-     */
-    public async findOne(tableName: string, conditions?: Record<string, any>): Promise<any | undefined> {
-        // 利用 find 方法，并限制 limit 为 1
-        const results = await this.find(tableName, conditions, { limit: 1 });
-        return results.length > 0 ? results[0] : undefined;
-    }
-
-    /**
-     * 关闭数据库连接池。
-     * 这个方法是幂等的，可以多次调用而不会出错。
-     */
-    public async close(): Promise<void> {
-        try {
-            // 确保连接池已初始化
-            await this.getPool(); 
-            if (this.pool) {
-                await this.pool.end(); // 关闭连接池中的所有连接
-                logger.info("MySQL connection pool closed.");
-                this.pool = undefined; // 清除引用
+            if (operatorConditions.length > 0) {
+                clauseParts.push(`(${operatorConditions.join(' AND ')})`);
             }
-        } catch (error) {
-            logger.warn("Could not close MySQL connection pool cleanly:", error);
+        }
+        else {
+            // 简单相等匹配
+            clauseParts.push(`\`${key}\` = ?`);
+            params.push(value);
+        }
+    }
+
+    return clauseParts.join(' AND ');
+}
+
+export class MysqlDatabase {
+    private pool: mysql.Pool;
+
+    constructor(config: mysql.PoolOptions) {
+        this.pool = mysql.createPool(config);
+    }
+
+    // 执行 SQL，返回影响行数和插入 ID
+    async runSQL(sql: string, params: any[] = []): Promise<{ insertId?: number; affectedRows?: number }> {
+        try {
+            const [result] = await this.pool.execute(sql, params);
+            const { insertId, affectedRows } = result as mysql.ResultSetHeader;
+            return { insertId, affectedRows };
+        } catch (error: any) {
+            logger.error(`Error running SQL: ${sql} with params: ${JSON.stringify(params)} - ${error.message}`, error);
+            throw error; // 重新抛出以便上层处理
+        }
+    }
+
+    // 查询所有结果
+    async all(sql: string, params: any[] = []): Promise<any[]> {
+        try {
+            const [rows] = await this.pool.execute(sql, params);
+            return rows as any[];
+        } catch (error: any) {
+            logger.error(`Error querying all: ${sql} with params: ${JSON.stringify(params)} - ${error.message}`, error);
+            throw error;
+        }
+    }
+
+    // 查询单个结果
+    async get(sql: string, params: any[] = []): Promise<any | undefined> {
+        const rows = await this.all(sql, params);
+        return rows[0];
+    }
+
+    // 插入一条数据，返回 insertId
+    async insert(tableName: string, data: Record<string, any>): Promise<number> {
+        const keys = Object.keys(data);
+        const values = Object.values(data);
+        const placeholders = keys.map(() => '?').join(', ');
+
+        if (keys.length === 0) {
+            logger.warn(`No data provided for insert into table \`${tableName}\`. Returning 0 for insertId.`);
+            return 0; // 或者抛出错误
+        }
+
+        const sql = `INSERT INTO \`${tableName}\` (${keys.map(k => `\`${k}\``).join(', ')}) VALUES (${placeholders})`;
+        const result = await this.runSQL(sql, values);
+        return result.insertId || 0; // 当没有 insertId 时返回 0
+    }
+
+    // 批量插入（事务处理）
+    async batchInsert(tableName: string, dataArray: Record<string, any>[]): Promise<void> {
+        if (dataArray.length === 0) {
+            logger.warn(`No data provided for batch insert into table \`${tableName}\`.`);
+            return;
+        }
+
+        const connection = await this.pool.getConnection();
+        try {
+            await connection.beginTransaction();
+
+            for (const data of dataArray) {
+                const keys = Object.keys(data);
+                if (keys.length === 0) {
+                    logger.warn(`Skipping empty data object in batch insert for table \`${tableName}\`.`);
+                    continue;
+                }
+                const values = Object.values(data);
+                const placeholders = keys.map(() => '?').join(', ');
+                const sql = `INSERT INTO \`${tableName}\` (${keys.map(k => `\`${k}\``).join(', ')}) VALUES (${placeholders})`;
+                await connection.execute(sql, values);
+            }
+
+            await connection.commit();
+            logger.info(`Batch insert into table \`${tableName}\` successful.`);
+        } catch (err: any) {
+            await connection.rollback();
+            logger.error(`Batch insert into table \`${tableName}\` failed: ${err.message}`, err);
+            throw err;
+        } finally {
+            connection.release();
+        }
+    }
+
+    // 更新数据
+    async update(tableName: string, data: Record<string, any>, conditions: QueryConditions): Promise<number> {
+        const setClause = Object.keys(data).map(key => `\`${key}\` = ?`).join(', ');
+        const setValues = Object.values(data);
+
+        if (setClause === '') {
+            logger.warn(`No data to update for table \`${tableName}\`.`);
+            return 0;
+        }
+
+        const whereParams: any[] = [];
+        const whereClause = buildWhereClause(conditions, whereParams);
+
+        let sql = `UPDATE \`${tableName}\` SET ${setClause}`;
+        if (whereClause) {
+            sql += ` WHERE ${whereClause}`;
+        } else {
+            logger.warn(`No WHERE conditions provided for update on table \`${tableName}\`. All rows will be updated.`);
+            // 可以选择抛出错误或要求明确允许全局更新
+        }
+
+        const result = await this.runSQL(sql, [...setValues, ...whereParams]);
+        return result.affectedRows || 0;
+    }
+
+    // 删除数据
+    async delete(tableName: string, conditions: QueryConditions): Promise<number> {
+        const whereParams: any[] = [];
+        const whereClause = buildWhereClause(conditions, whereParams);
+
+        let sql = `DELETE FROM \`${tableName}\``;
+        if (whereClause) {
+            sql += ` WHERE ${whereClause}`;
+        } else {
+            logger.warn(`No WHERE conditions provided for delete on table \`${tableName}\`. All rows will be deleted.`);
+            // 可以选择抛出错误或要求明确允许全局删除
+        }
+
+        const result = await this.runSQL(sql, whereParams);
+        return result.affectedRows || 0;
+    }
+
+    // 查询列表
+    async find(tableName: string, conditions: QueryConditions = {}, options: FindOptions = {}): Promise<any[]> {
+        const params: any[] = [];
+        const whereClause = buildWhereClause(conditions, params);
+
+        let selectClause = options.select && options.select.length > 0
+            ? options.select.map(col => `\`${col}\``).join(', ')
+            : '*';
+
+        let sql = `SELECT ${selectClause} FROM \`${tableName}\``;
+
+        if (whereClause) sql += ` WHERE ${whereClause}`;
+
+        if (options.groupBy) {
+            const groupByColumns = Array.isArray(options.groupBy) ? options.groupBy : [options.groupBy];
+            sql += ` GROUP BY ${groupByColumns.map(col => `\`${col}\``).join(', ')}`;
+        }
+
+        if (options.having) {
+            sql += ` HAVING ${options.having}`; // HAVING 语句通常不使用占位符，如果需要，请自行构建
+        }
+
+        if (options.orderBy) {
+            const orderByArr: OrderByOption[] = Array.isArray(options.orderBy)
+                ? options.orderBy.map(item => typeof item === 'string' ? { field: item } : item)
+                : [typeof options.orderBy === 'string' ? { field: options.orderBy } : options.orderBy];
+
+            const orderByParts = orderByArr.map(item => {
+                const direction = item.direction ? ` ${item.direction}` : '';
+                return `\`${item.field}\`${direction}`;
+            });
+            sql += ` ORDER BY ${orderByParts.join(', ')}`;
+        }
+
+        if (options.limit) sql += ` LIMIT ${options.limit}`;
+        if (options.offset) sql += ` OFFSET ${options.offset}`;
+
+        return await this.all(sql, params);
+    }
+
+    // 查询单个记录
+    async findOne(tableName: string, conditions: QueryConditions = {}, options: FindOptions = {}): Promise<any | undefined> {
+        const results = await this.find(tableName, conditions, { ...options, limit: 1 });
+        return results[0];
+    }
+
+    // 关闭连接池
+    async close(): Promise<void> {
+        try {
+            await this.pool.end();
+            logger.info('MySQL connection pool closed.');
+        } catch (error: any) {
+            logger.error(`Error closing MySQL pool: ${error.message}`, error);
+            throw error;
+        }
+    }
+
+    async createTable(tableName: string, schema: TableSchema): Promise<void> {
+        const exists = await this.tableExists(tableName);
+        if (exists) {
+            logger.info(`Table \`${tableName}\` already exists, skipping creation.`);
+            return;
+        }
+
+        const columns = Object.entries(schema).map(([field, def]) => buildColumnSQL(field, def));
+        const primaryKeys = Object.entries(schema)
+            .filter(([, def]) => def.primaryKey)
+            .map(([field]) => `\`${field}\``);
+
+        if (primaryKeys.length > 0) {
+            columns.push(`PRIMARY KEY (${primaryKeys.join(', ')})`);
+        }
+
+        const sql = `CREATE TABLE \`${tableName}\` (${columns.join(', ')})`;
+        await this.runSQL(sql);
+        logger.info(`Table \`${tableName}\` created successfully.`);
+    }
+
+    // 更新表结构（支持 ADD COLUMN, MODIFY COLUMN, DROP COLUMN）
+    async updateTableStructure(tableName: string, alterations: ColumnAlteration[]): Promise<void> {
+        if (alterations.length === 0) {
+            logger.warn(`No alterations provided for table \`${tableName}\`.`);
+            return;
+        }
+
+        const alterStatements: string[] = [];
+        for (const alt of alterations) {
+            switch (alt.action) {
+                case 'ADD':
+                    if (!alt.definition) throw new Error(`Column definition required for ADD action for field: ${alt.field}`);
+                    alterStatements.push(`ADD COLUMN ${buildColumnSQL(alt.field, alt.definition)}`);
+                    break;
+                case 'MODIFY':
+                    if (!alt.definition) throw new Error(`Column definition required for MODIFY action for field: ${alt.field}`);
+                    // MODIFY COLUMN 保持原有位置，或明确指定 AFTER/FIRST
+                    alterStatements.push(`MODIFY COLUMN ${buildColumnSQL(alt.field, alt.definition)}`);
+                    break;
+                case 'DROP':
+                    alterStatements.push(`DROP COLUMN \`${alt.field}\``);
+                    break;
+                default:
+                    logger.warn(`Unsupported alteration action: ${alt.action} for table \`${tableName}\`, field \`${alt.field}\`.`);
+                    break;
+            }
+        }
+
+        if (alterStatements.length === 0) {
+            logger.warn(`No valid alterations to apply for table \`${tableName}\`.`);
+            return;
+        }
+
+        const sql = `ALTER TABLE \`${tableName}\` ${alterStatements.join(', ')}`;
+        await this.runSQL(sql);
+        logger.info(`Table \`${tableName}\` structure updated successfully.`);
+    }
+
+    // 判断表是否存在
+    async tableExists(tableName: string): Promise<boolean> {
+        // 使用 pool.query 来避免 SHOW TABLES LIKE 的预处理问题
+        try {
+            const [rows] = await this.pool.query('SHOW TABLES LIKE ?', [tableName]);
+            // rows 是一个包含 RowDataPacket 的数组，需要检查它的长度
+            return (rows as mysql.RowDataPacket[]).length > 0;
+        } catch (error: any) {
+            logger.error(`Error checking table existence for \`${tableName}\`: ${error.message}`, error);
+            throw error;
         }
     }
 }
 
-const logger = new Logger("mysql");
-
 // 模块的配置 schema
+// ConfigSchema 应该从 yumeri 导入，这里假设它是一个 Record<string, any>
 export const config = {
-  schema: {
-    host: {
-      type: 'string',
-      default: 'localhost',
-      description: 'MySQL数据库主机名'
-    },
-    port: {
-      type: 'number',
-      default: 3306,
-      description: 'MySQL数据库端口'
-    },
-    user: {
-      type: 'string',
-      required: true, // 标记为必填项
-      description: 'MySQL用户名'
-    },
-    password: {
-      type: 'string',
-      required: true, // 标记为必填项
-      description: 'MySQL密码'
-    },
-    database: {
-      type: 'string',
-      required: true, // 标记为必填项
-      description: '要连接的数据库名称'
-    },
-    connectionLimit: {
-        type: 'number',
-        default: 10,
-        description: '连接池最大连接数'
-    },
-    // 其他可能的 mysql.PoolOptions, 如果需要在配置中暴露
-    // 例如：
-    // ssl: {
-    //   type: 'boolean',
-    //   default: false,
-    //   description: '是否启用SSL连接'
-    // }
-  } as Record<string, ConfigSchema>
+    schema: {
+        host: {
+            type: 'string',
+            default: 'localhost',
+            description: 'MySQL数据库主机名'
+        },
+        port: {
+            type: 'number',
+            default: 3306,
+            description: 'MySQL数据库端口'
+        },
+        user: {
+            type: 'string',
+            required: true,
+            description: 'MySQL用户名'
+        },
+        password: {
+            type: 'string',
+            required: true,
+            description: 'MySQL密码'
+        },
+        database: {
+            type: 'string',
+            required: true,
+            description: '要连接的数据库名称'
+        },
+        connectionLimit: {
+            type: 'number',
+            default: 10,
+            description: '连接池最大连接数'
+        },
+        charset: {
+            type: 'string',
+            default: 'utf8mb4',
+            description: '数据库连接字符集'
+        },
+        dateStrings: {
+            type: 'boolean',
+            default: false,
+            description: '是否将日期时间类型作为字符串返回'
+        }
+    } as Record<string, ConfigSchema> // 确保与 Yumeri 的 ConfigSchema 类型兼容
 };
 
 // 插件的 apply 函数
 export async function apply(ctx: Context, config: Config) {
-    // 从 Config 中获取 MySQL 连接配置
     const mysqlOptions: mysql.PoolOptions = {
         host: config.get<string>('host', 'localhost'),
         port: config.get<number>('port', 3306),
-        user: config.get<string>('user', ''), 
-        password: config.get<string>('password', ''), 
+        user: config.get<string>('user', ''),
+        password: config.get<string>('password', ''),
         database: config.get<string>('database', ''),
         connectionLimit: config.get<number>('connectionLimit', 10),
+        charset: config.get<string>('charset', 'utf8mb4'),
+        dateStrings: config.get<boolean>('dateStrings', false),
         namedPlaceholders: false, // 强制使用 ? 占位符
         rowsAsArray: false // 返回结果为对象而不是数组
     };
 
-    // 检查必填项，虽然 schema 中有 required，但为了代码健壮性再次检查
+    // 检查必填项，并直接抛出错误以防止后续连接失败
     if (!mysqlOptions.user) {
-        logger.error("MySQL plugin: 'user' is required in config.");
+        throw new Error("MySQL plugin: 'user' is required in config.");
     }
     if (!mysqlOptions.password) {
-        logger.error("MySQL plugin: 'password' is required in config.");
+        throw new Error("MySQL plugin: 'password' is required in config.");
     }
     if (!mysqlOptions.database) {
-        logger.error("MySQL plugin: 'database' is required in config.");
+        throw new Error("MySQL plugin: 'database' is required in config.");
     }
 
     const db = new MysqlDatabase(mysqlOptions);
+
+    try {
+        // 尝试获取一个连接以验证配置和连接性
+        const connection = await db['pool'].getConnection(); // 直接访问 private pool
+        connection.release();
+        logger.info('MySQL database connection test successful.');
+    } catch (error: any) {
+        logger.error(`MySQL database connection test failed: ${error.message}`, error);
+    }
 
     ctx.registerComponent('database', db);
     logger.info('MySQL database component registered.');

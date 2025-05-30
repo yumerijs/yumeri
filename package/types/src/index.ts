@@ -100,14 +100,49 @@ export interface Database {
 /**
  * 表结构定义
  */
-type TableSchema = Record<
-string,
-{
-  type: string
-  primaryKey?: boolean
-  autoIncrement?: boolean
-  notNull?: boolean
-  unique?: boolean
-  default?: any
+export interface ColumnDefinition {
+  type: ColumnType | 'string' | 'number' | 'boolean'; // 允许使用更友好的类型名称，在 buildColumnSQL 中映射
+  length?: number; // 长度，例如 VARCHAR(255)
+  precision?: number; // 精度，例如 DECIMAL(10,2)
+  scale?: number; // 小数位数
+  primaryKey?: boolean;
+  autoIncrement?: boolean;
+  notNull?: boolean;
+  unique?: boolean;
+  default?: any | 'CURRENT_TIMESTAMP_FUNC'; // 'CURRENT_TIMESTAMP_FUNC' 是特殊标记
+  onUpdate?: 'CURRENT_TIMESTAMP_FUNC'; // 仅用于 TIMESTAMP/DATETIME
+  unsigned?: boolean; // 仅用于数值类型
+  zerofill?: boolean; // 仅用于数值类型
+  comment?: string; // 列注释
+  enum?: string[]; // ENUM 类型的值
 }
->
+
+export type TableSchema = Record<string, ColumnDefinition>;
+
+export type ColumnType =
+    | 'TINYINT'
+    | 'SMALLINT'
+    | 'MEDIUMINT'
+    | 'INT'
+    | 'BIGINT'
+    | 'FLOAT'
+    | 'DOUBLE'
+    | 'DECIMAL'
+    | 'BOOLEAN' // 会映射到 TINYINT(1)
+    | 'DATE'
+    | 'TIME'
+    | 'DATETIME'
+    | 'TIMESTAMP'
+    | 'YEAR'
+    | 'CHAR'
+    | 'VARCHAR'
+    | 'TINYTEXT'
+    | 'TEXT'
+    | 'MEDIUMTEXT'
+    | 'LONGTEXT'
+    | 'TINYBLOB'
+    | 'BLOB'
+    | 'MEDIUMBLOB'
+    | 'LONGBLOB'
+    | 'JSON'
+    | 'ENUM'; // 可以根据需要扩展
