@@ -3,6 +3,7 @@ import { Context, Config, Session, Logger, ConfigSchema } from 'yumeri';
 const logger = new Logger("echo");
 
 export const depend = ['server']; // 需要的服务
+export const usage = `用于测试的简单输出服务，可配置多个字符串进行串联`
 
 export interface EchoConfig {
   /**

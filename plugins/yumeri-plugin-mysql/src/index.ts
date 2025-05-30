@@ -1,6 +1,7 @@
 import { Context, Config, Session, Logger, ConfigSchema } from 'yumeri';
 import mysql, { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise'; // 导入 mysql2/promise
 
+export const provide = ['database'];
 // 定义一个精确的 RunResult 接口，以匹配 mysql2 db.execute() 对非SELECT语句的实际返回。
 interface MysqlWrapperRunResult {
     insertId?: number;    // 对于 INSERT 操作，返回插入的行 ID

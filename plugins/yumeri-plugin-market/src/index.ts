@@ -6,6 +6,7 @@ import path from 'path';
 const logger = new Logger("market");
 
 export const depend = ['console']; // 需要的服务
+export const usage = `Yumeri 插件市场<br>由于插件市场的官方 Registry 是通过 Cloudflare Worker 部署的，可能会出现不稳定的情况<br>可在https://github.com/yumerijs/yumeri-tools找到Registry的部署文件然后自行部署`
 
 interface OperateConsole {
     addconsoleitem: (name: string, icon: string, displayname: string, htmlpath: string, staticpath: string) => void;
@@ -28,7 +29,7 @@ export const config = {
     schema: {
         url: {
             type: 'string',
-            default: 'https://yumeri.flweb.cn/registry.json',
+            default: 'https://registry.yumeri.dev',
             description: '插件市场 Registry 地址'
         },
         npmregistry: {
@@ -84,7 +85,7 @@ export async function apply(ctx: Context, config: Config) {
         .action(async (session: Session, param?: any) => {
             if (console.getloginstatus(session)) {
                 if (param.path === '/list') {
-                    const plugins = await fetchPluginsDataFromUrl(config.get<string>('url', 'https://yumeri.flweb.cn/registry.json'));
+                    const plugins = await fetchPluginsDataFromUrl(config.get<string>('url', 'https://registry.yumeri.dev'));
                     if (plugins) {
                         session.body = JSON.stringify(plugins);
                     } else {
@@ -92,7 +93,7 @@ export async function apply(ctx: Context, config: Config) {
                     }
                 } else if (param.path === '/search') {
                     const content = param.q;
-                    const pluginsData = await fetchPluginsDataFromUrl(config.get<string>('url', 'https://yumeri.flweb.cn/registry.json'));
+                    const pluginsData = await fetchPluginsDataFromUrl(config.get<string>('url', 'https://registry.yumeri.dev'));
                     if (pluginsData) {
                         const filteredPlugins = pluginsData.filter(plugin => plugin.name.toLowerCase().includes(content.toLowerCase()));
                         session.body = JSON.stringify(filteredPlugins);

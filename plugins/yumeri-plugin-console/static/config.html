@@ -277,7 +277,8 @@
             margin-top: 10px;
         }
 
-        .add-array-item, .remove-array-item {
+        .add-array-item,
+        .remove-array-item {
             padding: 5px 10px;
             font-size: 12px;
             margin-right: 5px;
@@ -383,6 +384,7 @@
     </aside>
     <main class="main-content">
         <h2 id="plugin-title">请选择插件</h2>
+        <p id="plugin-usage"></p><br>
         <div id="plugin-status"></div>
         <div id="configuration-area">
             <p>请从左侧选择一个插件进行配置。</p>
@@ -409,6 +411,7 @@
             const disableButton = document.querySelector('.disable-button');
             const notification = document.getElementById('notification');
             const returnHomeButton = document.getElementById('return-home');
+            const pluginUsage = document.getElementById('plugin-usage');
 
             // 返回主页
             returnHomeButton.addEventListener('click', function () {
@@ -535,11 +538,17 @@
                     updatePluginStatus();
 
                     const response = await fetch(`./api/config?name=${pluginName}`);
+                    let usage = await fetch(`./api/pluginusage?name=${pluginName}`);
+                    if (!usage.ok) {
+                        throw new Error(`HTTP error! status: ${usage.status}`);
+                    }
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
 
                     const config = await response.json();
+                    pluginUsage.innerHTML = '';
+                    usage = await usage.json();
                     configurationArea.innerHTML = '';
 
                     // 渲染配置项
@@ -551,7 +560,7 @@
                         console.warn('Invalid configuration format received:', config);
                         configurationArea.innerHTML = '<p>Received invalid configuration format from server.</p>';
                     }
-
+                    if (usage.usage) { pluginUsage.innerHTML = usage.usage; }
                     const displayName = isPluginDisabled ? pluginName.substring(1) : pluginName;
                     pluginTitle.textContent = `${displayName} 配置`;
 
@@ -837,11 +846,11 @@
                     // 对象类型，渲染其属性
                     Object.entries(itemSchema.properties).forEach(([propKey, propSchema]) => {
                         const propValue = value && typeof value === 'object' ? value[propKey] : undefined;
-                        const finalValue = propValue !== undefined ? propValue : 
-                                          (propSchema.default !== undefined ? propSchema.default : 
-                                           (propSchema.type === 'object' ? {} : 
-                                            (propSchema.type === 'array' ? [] : '')));
-                        
+                        const finalValue = propValue !== undefined ? propValue :
+                            (propSchema.default !== undefined ? propSchema.default :
+                                (propSchema.type === 'object' ? {} :
+                                    (propSchema.type === 'array' ? [] : '')));
+
                         const propItem = {
                             key: `${arrayKey}[${index}].${propKey}`,
                             value: finalValue,
@@ -883,7 +892,7 @@
                         type: 'array',
                         itemType: itemSchema.items.type
                     };
-                    
+
                     renderArrayInput(content, arrayItem);
                 } else {
                     // 基本类型，渲染单个输入框
@@ -891,10 +900,10 @@
                         key: `${arrayKey}[${index}]`,
                         value: value,
                         description: itemSchema.description || `项 ${index + 1}`,
-                        type: itemSchema.type === 'boolean' ? 'boolean' : 
-                              (itemSchema.type === 'number' ? 'number' : 'text')
+                        type: itemSchema.type === 'boolean' ? 'boolean' :
+                            (itemSchema.type === 'number' ? 'number' : 'text')
                     };
-                    
+
                     switch (basicItem.type) {
                         case 'boolean':
                             renderBooleanInput(content, basicItem);
@@ -916,12 +925,12 @@
                 const header = document.createElement('div');
                 header.className = 'object-header';
                 header.textContent = item.description || item.key;
-                
+
                 const objectContainer = document.createElement('div');
                 objectContainer.className = 'object-container';
                 objectContainer.dataset.key = item.key;
                 objectContainer.dataset.type = 'object';
-                
+
                 container.appendChild(header);
                 container.appendChild(objectContainer);
             }
@@ -930,11 +939,11 @@
             function bindEventListeners() {
                 // 添加数组项按钮
                 document.querySelectorAll('[data-action="add-array-item"]').forEach(button => {
-                    button.addEventListener('click', function() {
+                    button.addEventListener('click', function () {
                         const targetKey = this.dataset.target;
                         const arrayContainer = document.querySelector(`.array-container[data-key="${targetKey}"]`);
                         const itemType = arrayContainer.dataset.itemType || 'string';
-                        
+
                         const newItem = createArrayItem('', itemType);
                         arrayContainer.appendChild(newItem);
                     });
@@ -942,22 +951,22 @@
 
                 // 添加复杂数组项按钮
                 document.querySelectorAll('[data-action="add-complex-array-item"]').forEach(button => {
-                    button.addEventListener('click', function() {
+                    button.addEventListener('click', function () {
                         const targetKey = this.dataset.target;
                         const arrayContainer = document.querySelector(`.array-container[data-key="${targetKey}"]`);
                         const itemSchema = JSON.parse(arrayContainer.dataset.itemSchema);
                         const currentItems = arrayContainer.querySelectorAll('.complex-array-item');
                         const newIndex = currentItems.length;
-                        
+
                         // 创建默认值
                         let defaultValue;
                         if (itemSchema.type === 'object') {
                             defaultValue = {};
                             if (itemSchema.properties) {
                                 Object.entries(itemSchema.properties).forEach(([key, prop]) => {
-                                    defaultValue[key] = prop.default !== undefined ? prop.default : 
-                                                      (prop.type === 'object' ? {} : 
-                                                       (prop.type === 'array' ? [] : ''));
+                                    defaultValue[key] = prop.default !== undefined ? prop.default :
+                                        (prop.type === 'object' ? {} :
+                                            (prop.type === 'array' ? [] : ''));
                                 });
                             }
                         } else if (itemSchema.type === 'array') {
@@ -965,17 +974,17 @@
                         } else {
                             defaultValue = itemSchema.default !== undefined ? itemSchema.default : '';
                         }
-                        
+
                         const newItem = createComplexArrayItem(targetKey, newIndex, defaultValue, itemSchema);
                         arrayContainer.appendChild(newItem);
-                        
+
                         // 重新绑定事件
                         bindEventListeners();
                     });
                 });
 
                 // 使用事件委托处理删除按钮
-                document.addEventListener('click', function(e) {
+                document.addEventListener('click', function (e) {
                     if (e.target.dataset.action === 'remove-array-item') {
                         e.target.closest('.array-item').remove();
                     } else if (e.target.dataset.action === 'remove-complex-array-item') {
@@ -1046,7 +1055,7 @@
                             const inputKey = input.dataset.key;
                             // 从inputKey中提取属性名
                             const match = inputKey.match(new RegExp(`${key}\\[(\\d+)\\]\\.(.+)`));
-                            
+
                             if (match) {
                                 const propKey = match[2];
                                 let value;
@@ -1075,7 +1084,7 @@
                             const nestedKey = nestedArray.dataset.key;
                             // 从nestedKey中提取属性名
                             const match = nestedKey.match(new RegExp(`${key}\\[(\\d+)\\](.+)`));
-                            
+
                             if (match) {
                                 const propPath = match[2];
                                 const nestedItems = [];

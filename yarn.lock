@@ -2316,6 +2316,19 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"yumeri-plugin-user@workspace:plugins/yumeri-plugin-user":
+  version: 0.0.0-use.local
+  resolution: "yumeri-plugin-user@workspace:plugins/yumeri-plugin-user"
+  dependencies:
+    "@types/node": "npm:^22.14.1"
+    chalk: "npm:^5.4.1"
+    sqlite: "npm:^5.1.1"
+    sqlite3: "npm:^5.1.7"
+    typescript: "npm:^5.8.2"
+    yumeri: "npm:1.1.0-alpha.5"
+  languageName: unknown
+  linkType: soft
+
 "yumeri@npm:1.1.0-alpha.5, yumeri@workspace:^, yumeri@workspace:package/yumeri":
   version: 0.0.0-use.local
   resolution: "yumeri@workspace:package/yumeri"

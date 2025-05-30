@@ -6,6 +6,8 @@ import { Database as SQLite3Driver } from 'sqlite3';
 import { open, Database } from 'sqlite';
 import path from 'path';
 
+export const provide = ['database'];
+
 // 定义一个更精确的 RunResult 接口，以匹配 sqlite 包装库 db.run() 的实际返回。
 // 它通常只包含 lastID 和 changes。
 interface SqliteWrapperRunResult {

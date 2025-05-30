@@ -1,6 +1,6 @@
 {
     "compilerOptions": {
-      "target": "es2020",
+      "target": "esnext",
       "module": "commonjs",
       "rootDir": "src",
       "outDir": "dist",

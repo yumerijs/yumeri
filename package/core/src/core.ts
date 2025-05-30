@@ -53,11 +53,18 @@ export class Core {
   public mdwtoplu: Record<string, string> = {}; // 存储中间件与插件名的映射关系
   public plftoplu: Record<string, string> = {}; // 存储平台与插件名的映射关系
 
+  /**
+   * 创建Core实例
+   * @param pluginLoader 插件加载器
+   */
   constructor(pluginLoader: PluginLoader) {
     this.pluginLoader = pluginLoader;
   }
 
-  // 加载配置文件
+  /**
+   * 加载配置文件
+   * @param configPath 配置文件路径
+   */
   async loadConfig(configPath: string): Promise<void> {
     try {
       this.configPath = configPath; // 保存配置文件路径
@@ -106,7 +113,11 @@ export class Core {
 
     this.logger.info(`Watching for config changes at ${configPath}`);
   }
-
+  /**
+   * 获取插件配置
+   * @param pluginName 插件名称
+   * @returns 配置
+   */
   async getPluginConfig(pluginName: string): Promise<Config> {
     // 如果插件名以~开头，则去掉~前缀获取配置
     const actualPluginName = pluginName.startsWith('~') ? pluginName.substring(1) : pluginName;
@@ -130,7 +141,10 @@ export class Core {
     return config;
   }
 
-  // 加载插件
+  /**
+   * 加载插件
+   * @returns Promise<void>
+   */
   async loadPlugins(): Promise<void> {
     // 检查 plugins 配置是否存在且是对象类型
     if (!this.config || typeof this.config.plugins !== 'object' || this.config.plugins === null) {
@@ -386,7 +400,12 @@ export class Core {
     }
   }
 
-  // 注册组件
+  /**
+   * 注册组件
+   * @param name 组件名称
+   * @param component 组件
+   * @returns void
+   */
   registerComponent(name: string, component: any): void {
     if (this.components.hasOwnProperty(name)) {
       this.logger.warn(`Component "${name}" already registered by plugin "${this.providedComponents[`${name}`]}".`);
@@ -396,19 +415,30 @@ export class Core {
     this.logger.info(`Component "${name}" registered.`);
   }
 
-  // 获取组件
+  /**
+   * 获取组件
+   * @param name 组件名称
+   * @returns 组件
+   */
   getComponent(name: string): any {
     return this.components[`${name}`];
   }
 
-  // 取消注册组件
+  /**
+   * 取消注册组件
+   * @param name 组件名称
+   */
   unregisterComponent(name: string): void {
     delete this.components[`${name}`];
     delete this.providedComponents[`${name}`];
     delete this.comtoplu[`${name}`]
   }
 
-  // 事件系统：监听事件
+  /**
+   * 监听事件
+   * @param event 事件名称
+   * @param listener 回调函数
+   */
   on(event: string, listener: (...args: any[]) => Promise<void>): void {
     if (!this.eventListeners[`${event}`]) {
       this.eventListeners[`${event}`] = [];
@@ -417,7 +447,11 @@ export class Core {
     //this.logger.info(`Listener added for event "${event}".`);
   }
 
-  // 事件系统：触发事件
+  /**
+   * 触发事件
+   * @param event 事件名称
+   * @param args 参数
+   */
   async emit(event: string, ...args: any[]): Promise<void> {
     if (this.eventListeners[`${event}`]) {
       // this.logger.info(`Emitting event "${event}" with args:`, args);
@@ -433,20 +467,35 @@ export class Core {
     }
   }
 
-  // 注册全局中间件
+  /**
+   * 注册全局中间件
+   * @param name 中间件名称
+   * @param middleware 中间件
+   * @returns Core对象
+   */
   use(name: string, middleware: Middleware): Core {
     this.globalMiddlewares[name] = middleware;
     return this;
   }
 
-  // 定义指令
+  /**
+   * 定义指令
+   * @param name 指令名称
+   * @returns 指令对象
+   */
   command(name: string): Command {
     const command = new Command(this, name); // 传递 Core 实例
     this.commands[`${name}`] = command;
     return command;
   }
 
-  // 执行指令
+  /**
+   * 执行指令
+   * @param name 指令名称
+   * @param session 会话
+   * @param args 参数
+   * @returns 回话/null
+   */
   async executeCommand(name: string, session: any, ...args: any[]): Promise<Session | null> {
     const command = this.commands[`${name}`];
     if (command) {
@@ -478,12 +527,19 @@ export class Core {
     return null;
   }
 
-
+  /**
+   * 注册平台
+   * @param platform 平台名称
+   * @returns 启动结果
+   */
   registerPlatform(platform: Platform): any {
     this.platforms.push(platform);
     return platform.startPlatform(this);
   }
-
+  /**
+   * 取消注册插件
+   * @param pluginname 插件名称
+   */
   unregall(pluginname: string): void {
     let cmdtodel = [];
     for (const cmd in this.cmdtoplu) {
@@ -532,6 +588,18 @@ export class Core {
     for (const mdw of mdwtodel) {
       delete this.mdwtoplu[mdw];
       delete this.globalMiddlewares[mdw];
+    }
+  }
+  /**
+   * 获取指令对象
+   * @param name 指令名称
+   * @returns null/指令对象
+   */
+  getCommand(name: string): Command | null {
+    if (Object.hasOwn(this.commands, name)) {
+      return this.commands[name]; 
+    } else {
+      return null;
     }
   }
 }
