@@ -1,5 +1,7 @@
 # Yumerijs —— 新一代模块化Web应用构建平台
 
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fyumerijs%2Fyumeri.svg?type=shield&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Fyumerijs%2Fyumeri?ref=badge_shield&issueType=license)
+
 ## 什么是Yumeri
 
 Yumeri是一个基于Node.js的新一代模块化Web应用构建平台。作为一个现代化的框架，Yumeri通过插件系统提供了高度的可扩展性和灵活性，使开发者能够快速构建模块化的Web应用。
@@ -16,9 +18,9 @@ Yumeri的核心设计理念是模块化和可扩展性。通过精心设计的�
 
 1. **模块化架构**：Yumeri采用模块化设计，核心功能和扩展功能通过插件系统清晰分离，便于维护和扩展。
 
-2. **插件驱动**：作为模块化框架，Yumeri的各个操作都通过插件完成。插件系统是Yumeri的核心，提供了强大的扩展能力。
+2. **插件与中间件双驱动**：作为模块化框架，Yumeri的各个操作都通过插件和中间件完成。插件系统是Yumeri的核心，中间件就像洋葱一般包裹在插件外部，提供了强大的扩展能力。
 
-3. **指令系统**：Yumeri中的"指令"概念在Web系统里面非常模糊。它不像机器人中那样是实时响应的会话，而是在Yumeri当中，若非websocket连接，所有的页面响应都将在指令执行完成后返回。
+3. **路由系统**：快速定义路由及请求方式，开发者仅需关注业务逻辑，无需关心底层实现。
 
 4. **TypeScript支持**：Yumeri使用TypeScript开发，提供了类型安全和更好的开发体验。
 
@@ -34,6 +36,7 @@ Yumeri框架主要由以下几个部分组成：
    - yumeri-plugin-console：控制台插件
    - yumeri-plugin-echo：（测试专用）输出内容插件
    - yumeri-plugin-server：服务器插件
+   - yumeri-plugin-sqlite: SQLite数据库插件
 
 ## 适用场景
 
