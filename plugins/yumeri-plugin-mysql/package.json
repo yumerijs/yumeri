@@ -1,6 +1,6 @@
 {
     "name": "yumeri-plugin-mysql",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "MySQL database for Yumeri",
     "main": "dist/index.js",
     "dev": "src/index.ts",
