@@ -9,7 +9,7 @@ import {
     OrderByOption,
     AlterColumnAction,
     ColumnAlteration
-} from './types'; // 假设类型定义在同目录下的 types.ts
+} from '@yumerijs/types/dist/database'; // 假设类型定义在同目录下的 types.ts
 
 export const provide = ['database'];
 

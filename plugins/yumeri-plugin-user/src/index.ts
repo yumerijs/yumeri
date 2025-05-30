@@ -1,5 +1,5 @@
 import { Context, Config, Session, Logger, ConfigSchema } from 'yumeri';
-import { Database } from '@yumerijs/types'
+import { Database } from '@yumerijs/types/dist/database'
 const logger = new Logger("user");
 
 export const depend = ['database'];
@@ -33,6 +33,14 @@ export const config = {
 };
 class User {
   constructor(private database: Database, private config: Config) {}
+  async getuserinfo(username: string): Promise<Record<string, any> | null>{
+    const result = this.database.findOne(this.config.get<string>('name', 'user'), { username });
+    return result;
+  }
+  async changepassword(username: string, password: string): Promise<number> {
+    const result = await this.database.update(this.config.get<string>('name', 'user'), { password }, { username });
+    return result;
+  }
 }
 export async function apply(ctx: Context, config: Config) {
   const database: Database = ctx.getComponent('database');
