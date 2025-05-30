@@ -256,6 +256,15 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@yumerijs/types@workspace:package/types":
+  version: 0.0.0-use.local
+  resolution: "@yumerijs/types@workspace:package/types"
+  dependencies:
+    "@types/node": "npm:^22.14.1"
+    typescript: "npm:^5.8.2"
+  languageName: unknown
+  linkType: soft
+
 "abbrev@npm:1":
   version: 1.1.1
   resolution: "abbrev@npm:1.1.1"
