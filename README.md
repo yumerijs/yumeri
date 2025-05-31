@@ -1,47 +1,58 @@
-# Yumerijs —— 新一代模块化Web应用构建平台
+# Yumerijs — A New-Generation Modular Web Application Framework
+
+[English](README.md) | [简体中文 🇨🇳](README_zh.md)
 
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fyumerijs%2Fyumeri.svg?type=shield&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Fyumerijs%2Fyumeri?ref=badge_shield&issueType=license)
 
-## 什么是Yumeri
+## What is Yumeri?
 
-Yumeri是一个基于Node.js的新一代模块化Web应用构建平台。作为一个现代化的框架，Yumeri通过插件系统提供了高度的可扩展性和灵活性，使开发者能够快速构建模块化的Web应用。
+**Yumeri** is a next-generation modular web application framework based on Node.js. As a modern framework, it offers high extensibility and flexibility through its powerful plugin system, enabling developers to rapidly build modular and scalable web applications.
 
-## 名称由来
+## Origin of the Name
 
-"Yumeri"这个名字来自日语的ゆめり，意为梦莉，代表的是FireGuo为他的机器人设定的OC。在风梨团队的产品线中，yumeri代表着开源与共享，因此以Yumeri命名的项目（包括Yumerijs、Yumeri Chat、Yumeri Bot）等都传递着风梨团队的开放开源理念。
+The name **"Yumeri"** (Japanese: ゆめり) comes from FireGuo's original character (OC) concept of "梦莉 (Mengli)", representing openness and sharing in the product ecosystem of the *Fengli Team*. Projects named after Yumeri (such as **Yumerijs**, **Yumeri Chat**, **Yumeri Bot**) are built with the spirit of open source and free software in mind.
 
-## 设计理念
+## Design Philosophy
 
-Yumeri的核心设计理念是模块化和可扩展性。通过精心设计的插件系统，Yumeri实现了功能的高度解耦，使得开发者可以根据需求灵活组合各种功能模块，同时也便于团队协作开发和代码维护。
+Yumeri is designed with modularity and extensibility as its core principles. Through a carefully designed plugin architecture, it decouples core functionalities, allowing developers to mix and match features as needed. This approach also facilitates collaborative development and long-term maintainability.
 
-### 核心特点
+### Core Features
 
-1. **模块化架构**：Yumeri采用模块化设计，核心功能和扩展功能通过插件系统清晰分离，便于维护和扩展。
+1. **Modular Architecture**  
+   Yumeri separates core features and extended functionality through a plugin system, making it easy to maintain, scale, and customize.
 
-2. **插件与中间件双驱动**：作为模块化框架，Yumeri的各个操作都通过插件和中间件完成。插件系统是Yumeri的核心，中间件就像洋葱一般包裹在插件外部，提供了强大的扩展能力。
+2. **Plugin & Middleware Driven**  
+   All operations in Yumeri are driven by plugins and middleware. Plugins are the heart of Yumeri, while middleware wraps around them like layers of an onion, enabling powerful extension capabilities.
 
-3. **路由系统**：快速定义路由及请求方式，开发者仅需关注业务逻辑，无需关心底层实现。
+3. **Built-in Routing System**  
+   Quickly define routes and request methods. Developers can focus on business logic without worrying about low-level implementation details.
 
-4. **TypeScript支持**：Yumeri使用TypeScript开发，提供了类型安全和更好的开发体验。
+4. **TypeScript Support**  
+   Yumeri is fully written in TypeScript, ensuring type safety and a better developer experience.
 
-## 框架结构
+## Framework Structure
 
-Yumeri框架主要由以下几个部分组成：
+The Yumeri framework consists of the following components:
 
-1. **核心模块（core）**：提供框架的基础功能和API，是整个框架的核心。
+1. **Core Module (`core`)**  
+   Provides the base functionality and APIs of the framework — the foundation of everything.
 
-2. **加载器（loader）**：负责加载和管理插件，是连接核心和插件的桥梁。
+2. **Loader (`loader`)**  
+   Manages plugin loading and lifecycle — acting as the bridge between core and plugins.
 
-3. **插件系统**：Yumeri的插件采用npm包形式，包名前缀为yumeri-plugin-，用于识别此为Yumeri的插件。框架自带了几个基础插件：
-   - yumeri-plugin-console：控制台插件
-   - yumeri-plugin-echo：（测试专用）输出内容插件
-   - yumeri-plugin-server：服务器插件
-   - yumeri-plugin-sqlite: SQLite数据库插件
+3. **Plugin System**  
+   Yumeri plugins are distributed as npm packages with the prefix `yumeri-plugin-` for easy recognition. The framework currently includes several built-in plugins:
+   - `yumeri-plugin-console`: Console interface plugin  
+   - `yumeri-plugin-echo`: A testing plugin that outputs content  
+   - `yumeri-plugin-server`: HTTP server plugin  
+   - `yumeri-plugin-sqlite`: SQLite database support plugin
 
-## 适用场景
+## Use Cases
 
-Yumeri适合构建各种类型的Web应用，特别是那些需要高度模块化和可扩展性的项目。无论是简单的网站还是复杂的Web应用，Yumeri都能提供灵活的解决方案。
+Yumeri is suitable for building various types of web applications, especially those requiring a high degree of modularity and extensibility. Whether it’s a simple website or a complex web service, Yumeri offers a flexible and robust foundation.
 
-## 开源协议
+## License
 
-Yumeri是一个开源项目，遵循MIT开源协议，**在标明原作者的情况下**允许随意分发与商务使用。我们非常鼓励社区贡献和参与。
+Yumeri is an open-source project under the [MIT License](https://opensource.org/licenses/MIT).  
+You are free to use, modify, and distribute it — even commercially — as long as the original author is credited.  
+Community contributions are highly encouraged and welcome!
