@@ -35,6 +35,6 @@
         "chalk": "^5.4.1",
         "sqlite": "^5.1.1",
         "sqlite3": "^5.1.7",
-        "yumeri": "1.1.0-alpha.5"
+        "yumeri": "1.1.0"
     }
 }

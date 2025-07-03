@@ -1,6 +1,6 @@
 {
   "name": "yumeri-plugin-console",
-  "version": "1.1.5",
+  "version": "1.1.6",
   "description": "Web console for yumeri",
   "main": "dist/index.js",
   "dev": "src/index.ts",
@@ -35,7 +35,7 @@
   },
   "dependencies": {
     "js-yaml": "^4.1.0",
-    "yumeri": "1.1.0-alpha.5",
-    "yumeri-plugin-server": "1.1.0-alpha.5"
+    "yumeri": "1.1.0",
+    "yumeri-plugin-server": "1.1.0"
   }
 }

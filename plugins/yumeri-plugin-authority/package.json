@@ -1,16 +1,14 @@
 {
-  "name": "yumeri",
-  "version": "1.1.0",
-  "description": "基于nodejs的API管理平台",
+  "name": "yumeri-plugin-authority",
+  "version": "1.0.0",
+  "description": "Authority module for Yumeri",
   "main": "dist/index.js",
+  "dev": "src/index.ts",
   "types": "dist/index.d.ts",
   "files": [
-    "dist",
-    "index.js"
+    "dist"
   ],
-  "bin": "dist/run.js",
   "scripts": {
-    "start": "node dist/run.js",
     "build": "tsc",
     "prepublishOnly": "yarn build"
   },
@@ -20,7 +18,9 @@
   },
   "keywords": [
     "yumeri",
-    "api"
+    "api",
+    "webserver",
+    "authority"
   ],
   "author": "WindyPear-Team,FireGuo",
   "license": "MIT",
@@ -29,12 +29,10 @@
   },
   "homepage": "https://github.com/yumerijs/yumeri#readme",
   "devDependencies": {
-    "@types/formidable": "^3.4.5",
-    "@types/node": "^22.13.10",
+    "@types/node": "^22.14.1",
     "typescript": "^5.8.2"
   },
   "dependencies": {
-    "@yumerijs/core": "1.1.0",
-    "@yumerijs/loader": "1.1.0"
+    "yumeri": "1.1.0"
   }
 }

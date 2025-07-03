@@ -2,7 +2,7 @@
   "name": "yumeri-dev",
   "version": "1.0.0",
   "private": true,
-  "packageManager": "yarn@4.9.1",
+  "packageManager": "yarn@4.9.2",
   "workspaces": [
     "package/*",
     "plugins/*"
@@ -15,7 +15,7 @@
     "chokidar": "^4.0.3",
     "yumeri": "workspace:^",
     "yumeri-plugin-console": "workspace:^",
-    "yumeri-plugin-server": "1.1.0-alpha.5"
+    "yumeri-plugin-server": "1.1.0"
   },
   "devDependencies": {
     "@types/chalk": "^2.2.4",

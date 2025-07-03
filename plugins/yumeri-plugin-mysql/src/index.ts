@@ -285,7 +285,6 @@ export class MysqlDatabase {
             sql += ` WHERE ${whereClause}`;
         } else {
             logger.warn(`No WHERE conditions provided for update on table \`${tableName}\`. All rows will be updated.`);
-            // 可以选择抛出错误或要求明确允许全局更新
         }
 
         const result = await this.runSQL(sql, [...setValues, ...whereParams]);
@@ -302,7 +301,6 @@ export class MysqlDatabase {
             sql += ` WHERE ${whereClause}`;
         } else {
             logger.warn(`No WHERE conditions provided for delete on table \`${tableName}\`. All rows will be deleted.`);
-            // 可以选择抛出错误或要求明确允许全局删除
         }
 
         const result = await this.runSQL(sql, whereParams);
