@@ -256,7 +256,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@yumerijs/types@workspace:package/types":
+"@yumerijs/types@workspace:^, @yumerijs/types@workspace:package/types":
   version: 0.0.0-use.local
   resolution: "@yumerijs/types@workspace:package/types"
   dependencies:
@@ -2327,6 +2327,7 @@ __metadata:
   resolution: "yumeri-plugin-sqlite@workspace:plugins/yumeri-plugin-sqlite"
   dependencies:
     "@types/node": "npm:^22.14.1"
+    "@yumerijs/types": "workspace:^"
     chalk: "npm:^5.4.1"
     sqlite: "npm:^5.1.1"
     sqlite3: "npm:^5.1.7"

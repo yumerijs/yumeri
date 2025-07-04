@@ -186,6 +186,7 @@ export type ColumnType =
   | 'MEDIUMBLOB'
   | 'LONGBLOB'
   | 'JSON'
+  | 'INTEGER'
   | 'ENUM'; // 可以根据需要扩展
 export interface QueryConditions {
   [key: string]: ConditionValue | QueryConditions | QueryOperator;

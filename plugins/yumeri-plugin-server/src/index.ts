@@ -208,6 +208,8 @@ export class Server extends Platform {
         const clientcookie = this.parseCookies(req);
         const session = this.createSession(clientip, clientcookie, params);
         session.properties = { req: req, res: res, protocol: ProtocolType.HTTP };
+        const header = req.headers;
+        session.properties['header'] = header;
 
         let commandname = '';
         let path = '';
