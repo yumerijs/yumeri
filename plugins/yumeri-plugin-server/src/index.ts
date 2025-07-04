@@ -245,7 +245,6 @@ export class Server extends Platform {
             const reqpost = await this.parseRequestBody(req);
             body = reqpost;
 
-            req.on('end', () => {
               try {
                 const postData = body;
                 Object.assign(params, postData);
@@ -310,7 +309,6 @@ export class Server extends Platform {
                   logger.error('Invalid POST data', urlError);
                 }
               }
-            });
           } catch (error) {
             res.writeHead(400, { 'Content-Type': 'text/plain' });
             res.end('Error parsing request body');
