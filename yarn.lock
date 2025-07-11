@@ -256,7 +256,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@yumerijs/types@workspace:^, @yumerijs/types@workspace:package/types":
+"@yumerijs/types@npm:^1.0.0, @yumerijs/types@workspace:^, @yumerijs/types@workspace:package/types":
   version: 0.0.0-use.local
   resolution: "@yumerijs/types@workspace:package/types"
   dependencies:
@@ -2256,6 +2256,7 @@ __metadata:
     "@types/node": "npm:^22.14.1"
     typescript: "npm:^5.8.2"
     yumeri: "npm:1.1.0"
+    yumeri-plugin-user: "npm:^1.0.0"
   languageName: unknown
   linkType: soft
 
@@ -2304,7 +2305,32 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"yumeri-plugin-server@npm:1.1.0, yumeri-plugin-server@workspace:plugins/yumeri-plugin-server":
+"yumeri-plugin-permission@workspace:plugins/yumeri-plugin-permission":
+  version: 0.0.0-use.local
+  resolution: "yumeri-plugin-permission@workspace:plugins/yumeri-plugin-permission"
+  dependencies:
+    "@types/node": "npm:^22.14.1"
+    "@yumerijs/types": "npm:^1.0.0"
+    typescript: "npm:^5.8.2"
+    yumeri: "npm:1.1.0"
+    yumeri-plugin-user: "npm:^1.0.0"
+  languageName: unknown
+  linkType: soft
+
+"yumeri-plugin-server@npm:1.1.0":
+  version: 1.1.0
+  resolution: "yumeri-plugin-server@npm:1.1.0"
+  dependencies:
+    chalk: "npm:^5.4.1"
+    formidable: "npm:^3.5.4"
+    mime-types: "npm:^3.0.1"
+    ws: "npm:^8.18.2"
+    yumeri: "npm:1.1.0"
+  checksum: 10c0/b02c40ef18a7e5288ae02216c70858a7f8b8e0df13e8d484e401b09cacd636e30fb7c2abf9f7d378295148792f8449aed4fcae76f94fbf3df42caf3ad6927ce7
+  languageName: node
+  linkType: hard
+
+"yumeri-plugin-server@workspace:plugins/yumeri-plugin-server":
   version: 0.0.0-use.local
   resolution: "yumeri-plugin-server@workspace:plugins/yumeri-plugin-server"
   dependencies:
@@ -2336,7 +2362,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"yumeri-plugin-user@workspace:plugins/yumeri-plugin-user":
+"yumeri-plugin-user@npm:^1.0.0, yumeri-plugin-user@workspace:plugins/yumeri-plugin-user":
   version: 0.0.0-use.local
   resolution: "yumeri-plugin-user@workspace:plugins/yumeri-plugin-user"
   dependencies:

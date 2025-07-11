@@ -1,7 +1,7 @@
 {
-  "name": "yumeri-plugin-authority",
-  "version": "1.0.2",
-  "description": "Authority module for Yumeri",
+  "name": "yumeri-plugin-permission",
+  "version": "1.0.1",
+  "description": "Permission module for Yumeri",
   "main": "dist/index.js",
   "dev": "src/index.ts",
   "types": "dist/index.d.ts",
@@ -31,6 +31,7 @@
   "homepage": "https://github.com/yumerijs/yumeri#readme",
   "devDependencies": {
     "@types/node": "^22.14.1",
+    "@yumerijs/types": "^1.0.0",
     "typescript": "^5.8.2"
   },
   "dependencies": {

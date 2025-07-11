@@ -12,7 +12,6 @@ config.yml
 tmp/
 temp/
 .yarn/
-static/
 *.tar.gz
 .VSCodeCounter/
 data/database.db

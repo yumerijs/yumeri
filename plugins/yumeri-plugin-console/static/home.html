@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>控制台主页</title>
+    <!-- Font Awesome Icons - (请确保这指向有效的最新版本CDN) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        /* 基础样式 */
+        :root {
+            --primary-bg: #282c34;
+            --secondary-bg: #3c4048;
+            --text-color: #f8f8f2;
+            --accent-color: #61afef;
+            --border-radius: 8px;
+            --spacing: 20px; /* 基础间距 */
+            --large-spacing: 30px; /* 大屏幕间距 */
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--primary-bg);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            justify-content: center;
+        }
+
+        .container {
+            /* 增大最大宽度，以允许更宽的布局和更多列 */
+            max-width: 1600px; 
+            margin: var(--spacing) auto;
+            padding: 0 var(--spacing);
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        /* 头部欢迎区域 */
+        .header {
+            text-align: center;
+            padding: var(--spacing) 0;
+            margin-bottom: var(--spacing);
+            background-color: var(--secondary-bg);
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin: 0;
+            color: var(--accent-color);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            margin-top: 10px;
+            color: var(--text-color);
+        }
+
+        /* 配置项网格 */
+        .config-grid {
+            display: grid;
+            /* 默认情况下（宽屏），每个项最小180px，允许更多项在一行显示 */
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: var(--spacing);
+            margin-bottom: var(--spacing);
+        }
+
+        .config-item {
+            background-color: var(--secondary-bg);
+            border-radius: var(--border-radius);
+            padding: var(--spacing);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, background-color 0.2s ease-in-out;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .config-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+            background-color: #4a4f57;
+        }
+
+        .config-item i {
+            font-size: 3em;
+            color: var(--accent-color);
+            margin-bottom: 15px;
+        }
+
+        .config-item h3 {
+            font-size: 1.3em;
+            margin: 0;
+            color: var(--text-color);
+        }
+
+        /* 底部信息 (可选) */
+        .footer {
+            text-align: center;
+            padding: 15px 0;
+            margin-top: auto;
+            font-size: 0.9em;
+            color: #888;
+        }
+
+        /* 媒体查询 (用于自适应) */
+
+        /* 针对超大屏幕（例如 1400px 以上） */
+        @media (min-width: 1400px) {
+            .container {
+                max-width: 1600px; /* 容器可以更宽 */
+                padding: 0 var(--large-spacing); /* 左右间距更大 */
+            }
+            .config-grid {
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* 更大的最小宽度，但仍能放更多 */
+                gap: var(--large-spacing); /* 网格间距更大 */
+            }
+            .header h1 {
+                font-size: 3em;
+            }
+            .header p {
+                font-size: 1.4em;
+            }
+            .config-item i {
+                font-size: 3.5em;
+            }
+            .config-item h3 {
+                font-size: 1.4em;
+            }
+        }
+
+        /* 针对桌面和大型平板 (小于 1400px, 大于 768px) */
+        @media (max-width: 1399px) and (min-width: 769px) {
+            .container {
+                max-width: 1200px;
+            }
+            .config-grid {
+                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); /* 保持适中的最小宽度 */
+                gap: var(--spacing);
+            }
+        }
+
+        /* 针对平板电脑 (小于 768px) */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+            .header p {
+                font-size: 1em;
+            }
+            .config-grid {
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); /* 进一步减小最小宽度以适应平板 */
+                gap: 15px;
+            }
+            .config-item i {
+                font-size: 2.5em;
+            }
+            .config-item h3 {
+                font-size: 1.1em;
+            }
+        }
+
+        /* 针对手机 (小于 480px) */
+        @media (max-width: 480px) {
+            .container {
+                padding: 0 10px; /* 手机上容器左右边距更小 */
+            }
+            .config-grid {
+                grid-template-columns: 1fr; /* 在非常小的屏幕上，每行一个卡片 */
+                gap: 10px; /* 手机上间距更紧凑 */
+            }
+            .config-item {
+                padding: 15px; /* 手机上卡片内边距减小 */
+            }
+            .config-item i {
+                font-size: 2em; /* 手机上图标更小 */
+                margin-bottom: 10px;
+            }
+            .config-item h3 {
+                font-size: 1em; /* 手机上文字更小 */
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1 id="greeting">加载中...</h1>
+            <p>欢迎来到您的控制台主页！</p>
+        </header>
+
+        <!-- 配置项将通过 JavaScript 动态加载到这里 -->
+        <main id="configGrid" class="config-grid">
+            <p style="text-align: center; color: #aaa;">正在加载配置项...</p>
+        </main>
+    </div>
+
+    <footer class="footer">
+        <p>&copy; Yumerijs</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const greetingElement = document.getElementById('greeting');
+            const configGridElement = document.getElementById('configGrid');
+
+            // --- 欢迎文字逻辑 ---
+            const now = new Date();
+            const hour = now.getHours();
+            let greetingText = '';
+
+            if (hour >= 5 && hour < 12) {
+                greetingText = '早上好！';
+            } else if (hour >= 12 && hour < 18) {
+                greetingText = '中午好！';
+            } else {
+                greetingText = '晚上好！';
+            }
+
+            greetingElement.textContent = greetingText;
+
+            // --- 动态加载配置项逻辑 ---
+            async function loadConsoleItems() {
+                try {
+                    // 清空加载提示
+                    configGridElement.innerHTML = '';
+
+                    // 调用 ../api/consoleitem 接口
+                    const response = await fetch('./api/consoleitem');
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const items = await response.json(); // 解析JSON响应
+
+                    if (items.length === 0) {
+                        configGridElement.innerHTML = '<p style="text-align: center; color: #aaa;">没有找到任何配置项。</p>';
+                        return;
+                    }
+
+                    // 遍历数据并创建 HTML 元素
+                    items.forEach(item => {
+                        const configItemDiv = document.createElement('div');
+                        configItemDiv.className = 'config-item';
+                        
+                        // 点击事件处理
+                        configItemDiv.onclick = () => {
+                            window.location.href = item.path; 
+                        };
+
+                        const iconElement = document.createElement('i');
+                        iconElement.className = `fa-solid ${item.item}`; 
+
+                        const nameElement = document.createElement('h3');
+                        nameElement.textContent = item.name;
+
+                        configItemDiv.appendChild(iconElement);
+                        configItemDiv.appendChild(nameElement);
+                        configGridElement.appendChild(configItemDiv);
+                    });
+
+                } catch (error) {
+                    console.error('加载控制台配置项失败:', error);
+                    configGridElement.innerHTML = `<p style="text-align: center; color: red;">加载配置项失败，请稍后再试。<br/>${error.message}</p>`;
+                }
+            }
+
+            // 页面加载完成后立即加载配置项
+            loadConsoleItems();
+        });
+    </script>
+</body>
+</html>
