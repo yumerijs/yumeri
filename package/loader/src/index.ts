@@ -5,7 +5,6 @@ import { promisify } from 'util';
 import { exec } from 'child_process';
 import * as tsNode from 'ts-node';
 const execAsync = promisify(exec);
-
 interface Plugin {
     apply: (ctx: Context, config: Config) => Promise<void>;
     disable: (ctx: Context) => Promise<void>;
@@ -54,10 +53,11 @@ class PluginLoader {
      * @throws 如果插件加载失败.
      */
     async load(pluginName: string): Promise<Plugin> {
-        if (this.pluginCache[pluginName]) {
-            this.logger.info(`Returning cached plugin: ${pluginName}`);
+        if (this.pluginCache[pluginName] && !this.isDev) {
+            // this.logger.info(`Returning cached plugin: ${pluginName}`);
             return this.pluginCache[pluginName];
         }
+        // this.logger.info('test')
 
         let pluginPath: string;
         let isLocalPlugin = false;
@@ -92,6 +92,7 @@ class PluginLoader {
                 throw e;  // 其他类型的错误，直接抛出
             }
         }
+        
 
         try {
             const plugin = await this.loadPluginFromPath(pluginPath, isLocalPlugin);
@@ -101,6 +102,9 @@ class PluginLoader {
             this.logger.error(`Failed to load plugin from ${pluginPath}:`, e);
             throw e;
         }
+        // const plugin = require(pluginName);
+        // this.pluginCache[pluginName] = plugin;
+        // return plugin;
     }
 
     /**

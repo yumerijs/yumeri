@@ -1,10 +1,15 @@
 {
-    "files": [],
-    "references": [
-      { "path": "./package/core" },
-      { "path": "./package/loader" },
-      { "path": "./package/yumeri" },
-      { "path": "./plugins/yumeri-plugin-server" },
-      { "path": "./plugins/yumeri-plugin-console" }
-    ]
-  }
+    "compilerOptions": {
+        "target": "es2022",
+        "module": "commonjs",
+        "sourceMap": false,
+        "declaration": true,
+        "emitDeclarationOnly": false,
+        "composite": true,
+        "incremental": true,
+        "skipLibCheck": true,
+        "esModuleInterop": true,
+        "moduleResolution": "node",
+        "strictBindCallApply": true
+    },
+}

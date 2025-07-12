@@ -1,6 +1,6 @@
 /**
- * @time: 2025/04/20 11:45
- * @author: FireGuo
+ * @time: 2025/07/12 18:14
+ * @author: FireGuo & Manus
  * WindyPear-Team All right reserved
  **/
 import * as yaml from 'js-yaml';
@@ -20,7 +20,6 @@ interface Plugin {
   disable: (ctx: Context) => Promise<void>;
   depend: Array<string>;
   provide: Array<string>;
-  // Note: depend and provide are handled after plugin load due to loader constraints
 }
 
 interface PluginLoader {
@@ -30,8 +29,18 @@ interface PluginLoader {
   installPluginDependencies(pluginName: string): Promise<void>;
   logger: Logger;
 }
+
 interface CoreOptions {
   // TODO: Core的配置项
+}
+
+/**
+ * 定义插件状态枚举
+ */
+export const enum PluginStatus {
+  ENABLED = 'enabled', // 正常启用
+  DISABLED = 'disabled', // 已禁用
+  PENDING = 'pending', // 依赖未满足，等待加载
 }
 
 export class Core {
@@ -45,46 +54,42 @@ export class Core {
   public logger = new Logger('core');
   public providedComponents: { [name: string]: string } = {};
   private pluginModules: { [name: string]: any } = {};
-  private configPath: string = ''; // 存储配置文件路径
-  private globalMiddlewares: Record<string, Middleware> = {}; // 全局中间件数组
-  public cmdtoplu: Record<string, string> = {}; // 存储命令与插件名的映射关系
-  public comtoplu: Record<string, string> = {}; // 存储组件与插件名的映射关系
-  public evttoplu: Record<string, Record<string, ((...args: any[]) => Promise<void>)[]>> = {}; // 存储事件与插件名的映射关系
-  public mdwtoplu: Record<string, string> = {}; // 存储中间件与插件名的映射关系
-  public plftoplu: Record<string, string> = {}; // 存储平台与插件名的映射关系
+  private configPath: string = '';
+  private globalMiddlewares: Record<string, Middleware> = {};
+  public cmdtoplu: Record<string, string> = {};
+  public comtoplu: Record<string, string> = {};
+  public evttoplu: Record<string, Record<string, ((...args: any[]) => Promise<void>)[]>> = {};
+  public mdwtoplu: Record<string, string> = {};
+  public plftoplu: Record<string, string> = {};
+  public pluginStatus: Record<string, PluginStatus> = {};
 
-  /**
-   * 创建Core实例
-   * @param pluginLoader 插件加载器
-   */
   constructor(pluginLoader: PluginLoader) {
     this.pluginLoader = pluginLoader;
   }
 
   /**
    * 加载配置文件
-   * @param configPath 配置文件路径
+   * @param configPath 配置文件的路径
    */
   async loadConfig(configPath: string): Promise<void> {
     try {
-      this.configPath = configPath; // 保存配置文件路径
+      this.configPath = configPath;
       const doc = yaml.load(fs.readFileSync(configPath, 'utf8'));
       this.config = doc;
       this.logger.info('Config loaded.');
 
-      // 开发环境下监听配置文件变化
       if (process.env.NODE_ENV === 'development') {
         this.watchConfig(configPath);
       }
     } catch (e) {
       this.logger.error('Failed to load config:', e);
-      throw e; // 抛出异常，让上层处理
+      throw e;
     }
   }
 
   /**
-   * 监听配置文件变化
-   * @param configPath 配置文件路径
+   * 监听配置文件变化，实现热重载
+   * @param configPath 配置文件的路径
    */
   private watchConfig(configPath: string): void {
     const watcher = chokidar.watch(configPath, {
@@ -97,32 +102,28 @@ export class Core {
     });
 
     watcher.on('change', async () => {
-      //this.logger.info('Config file changed, reloading...');
       try {
-        // 重新加载配置文件
-        const doc = yaml.load(fs.readFileSync(configPath, 'utf8'));
-        this.config = doc;
-        // this.logger.info('Config reloaded successfully.');
-
-        // 触发配置变更事件
+        const doc = yaml.load(fs.readFileSync(configPath, 'utf8')) as any;
+        if (doc && doc.plugins) {
+          this.config.plugins = doc.plugins;
+        }
         await this.emit('config-changed', this.config);
       } catch (error) {
-        // this.logger.error('Failed to reload config:', error);
+        this.logger.error('Failed to reload config:', error);
       }
     });
 
     this.logger.info(`Watching for config changes at ${configPath}`);
   }
+
   /**
-   * 获取插件配置
+   * 获取指定插件的配置
    * @param pluginName 插件名称
-   * @returns 配置
+   * @returns 插件的配置对象
    */
   async getPluginConfig(pluginName: string): Promise<Config> {
-    // 如果插件名以~开头，则去掉~前缀获取配置
     const actualPluginName = pluginName.startsWith('~') ? pluginName.substring(1) : pluginName;
 
-    // 如果配置文件路径存在且处于开发模式，每次都重新读取配置文件
     if (this.configPath && process.env.NODE_ENV === 'development') {
       try {
         const doc = yaml.load(fs.readFileSync(this.configPath, 'utf8')) as any;
@@ -137,106 +138,64 @@ export class Core {
     if (!this.config.plugins[actualPluginName]) {
       return new Config(actualPluginName);
     }
-    const config = new Config(actualPluginName, this.config.plugins[actualPluginName]);
-    return config;
+    return new Config(actualPluginName, this.config.plugins[actualPluginName]);
   }
 
   /**
-   * 加载插件
-   * @returns Promise<void>
+   * 加载所有在配置文件中启用的插件
    */
   async loadPlugins(): Promise<void> {
     if (!this.config || typeof this.config.plugins !== 'object' || this.config.plugins === null) {
-      this.logger.info('No plugins configuration found or it is not an object. No plugins to load.');
+      this.logger.info('No plugins configuration found. No plugins to load.');
       return;
     }
 
-    const pluginNamesToLoad = Object.keys(this.config.plugins).filter(name => !name.startsWith('~'));
+    const allPluginNames = Object.keys(this.config.plugins);
+    this.pluginStatus = {}; // 重置状态
 
-    if (pluginNamesToLoad.length === 0) {
-      this.logger.info('No enabled plugins found in configuration. All plugins might be disabled or configuration is empty.');
+    // 初始化所有插件的状态
+    for (const name of allPluginNames) {
+      if (name.startsWith('~')) {
+        const actualName = name.substring(1);
+        this.pluginStatus[actualName] = PluginStatus.DISABLED;
+      } else {
+        this.pluginStatus[name] = PluginStatus.PENDING; // 默认为等待加载
+      }
+    }
+
+    const enabledPlugins = allPluginNames.filter(name => !name.startsWith('~'));
+
+    if (enabledPlugins.length === 0) {
+      this.logger.info('No enabled plugins found in configuration.');
       return;
     }
 
-    const disabledPlugins = Object.keys(this.config.plugins).filter(name => name.startsWith('~'));
-    if (disabledPlugins.length > 0) {
-      this.logger.info(`Skipping disabled plugins: ${disabledPlugins.join(', ')}`);
-    }
+    // this.logger.info(`Disabled plugins: ${Object.keys(this.pluginStatus).filter(p => this.pluginStatus[p] === PluginStatus.DISABLED).join(', ') || 'None'}`);
 
-    const loadedPluginNames: string[] = [];
-    let loadAttempted: { [name: string]: boolean } = {};
-    let remainingPluginNames = [...pluginNamesToLoad];
-
-    while (remainingPluginNames.length > 0) {
-      let loadedInThisPass = false;
-      const nextRemainingPluginNames: string[] = [];
-
-      for (const pluginName of remainingPluginNames) {
-        if (loadedPluginNames.includes(pluginName)) {
+    // 循环加载，直到没有插件可以被加载
+    let loadedInLastPass = true;
+    while (loadedInLastPass) {
+      loadedInLastPass = false;
+      for (const pluginName of enabledPlugins) {
+        // 如果插件已经是启用状态，则跳过
+        if (this.pluginStatus[pluginName] === PluginStatus.ENABLED) {
           continue;
         }
 
-        try {
-          // this.logger.info(`Attempting to load plugin: ${pluginName}`);
-          const pluginInstance = await this.pluginLoader.load(pluginName);
-
-          if (pluginInstance) {
-            const depend: string[] | undefined = pluginInstance.depend;
-            const provide: string[] | undefined = pluginInstance.provide;
-
-            // 用 providedComponents 作为依赖判断来源（比 components 更准确）
-            const unmetDependencies = depend?.filter(dep => !this.providedComponents.hasOwnProperty(dep)) || [];
-
-            if (unmetDependencies.length === 0) {
-              this.plugins[pluginName] = Object.assign(pluginInstance, { depend, provide });
-              loadedPluginNames.push(pluginName);
-              loadedInThisPass = true;
-
-              if (pluginInstance.apply) {
-                await pluginInstance.apply(new Context(this, pluginName), await this.getPluginConfig(pluginName));
-                this.pluginLoader.logger.info(`apply plugin ${pluginName}`);
-              }
-
-              if (provide) {
-                for (const componentName of provide) {
-                  if (this.providedComponents.hasOwnProperty(componentName)) {
-                    this.logger.error(
-                      `Multiple plugins provide the component "${componentName}". Provided by "${this.providedComponents[componentName]}" and "${pluginName}". Only the first loaded will be active.`
-                    );
-                  } else {
-                    this.providedComponents[componentName] = pluginName;
-                  }
-                }
-              }
-
-            } else {
-              nextRemainingPluginNames.push(pluginName);
-              // 不加入 loadAttempted，让下一轮重试
-            }
-          }
-
-        } catch (err) {
-          this.pluginLoader.logger.error(`Failed to load or process plugin ${pluginName}:`, err);
-          loadAttempted[pluginName] = true; // 真正失败才标记
+        // 尝试加载单个插件
+        const success = await this.loadSinglePlugin(pluginName, false); // 内部加载，不触发后续的pending检查
+        if (success) {
+          loadedInLastPass = true;
         }
       }
-
-      if (!loadedInThisPass && nextRemainingPluginNames.length === remainingPluginNames.length && remainingPluginNames.length > 0) {
-        this.logger.error(
-          'Detected circular or unresolvable plugin dependencies. Remaining plugins:',
-          nextRemainingPluginNames
-        );
-        break;
-      }
-
-      remainingPluginNames = nextRemainingPluginNames;
     }
 
-    if (remainingPluginNames.length > 0) {
-      this.logger.warn(
-        'Some plugins could not be fully loaded due to unresolved dependencies or errors:',
-        remainingPluginNames
-      );
+    // 加载完所有能加载的插件后，统一检查并加载待定插件
+    await this._loadPendingPlugins();
+
+    const pendingPlugins = Object.keys(this.pluginStatus).filter(p => this.pluginStatus[p] === PluginStatus.PENDING);
+    if (pendingPlugins.length > 0) {
+      // this.logger.warn('Some plugins could not be loaded due to unresolved dependencies:', pendingPlugins);
     }
 
     if (process.env.NODE_ENV === 'development') {
@@ -245,14 +204,190 @@ export class Core {
   }
 
   /**
-   * 监听插件目录，实现热重载
-   * @param core Core实例
-   * @param pluginsDir 插件目录
+   * 导出的函数：加载单个插件
+   * @param pluginName 要加载的插件名
+   * @param triggerPendingCheck 是否在加载后触发对其他待定插件的检查，默认为 true
+   * @returns Promise<boolean> 是否加载成功
+   */
+  public async loadSinglePlugin(pluginName: string, triggerPendingCheck: boolean = true): Promise<boolean> {
+    // 如果插件不存在于状态记录中（例如，动态添加），则设为 PENDING
+    if (!this.pluginStatus[pluginName]) {
+        this.pluginStatus[pluginName] = PluginStatus.PENDING;
+    }
+
+    // 只有 PENDING 状态的插件才能被加载
+    if (this.pluginStatus[pluginName] !== PluginStatus.PENDING) {
+      // this.logger.info(`Plugin "${pluginName}" is not in a pending state (current: ${this.pluginStatus[pluginName]}). Skipping load.`);
+      return false;
+    }
+
+    try {
+      const pluginInstance = await this.pluginLoader.load(pluginName);
+      if (!pluginInstance) {
+        throw new Error('Plugin loader returned no instance.');
+      }
+
+      const deps = pluginInstance.depend || [];
+      const unmetDependencies = deps.filter(dep => !this.providedComponents[dep]);
+
+      if (unmetDependencies.length > 0) {
+        // this.logger.info(`Plugin "${pluginName}" has unmet dependencies: [${unmetDependencies.join(', ')}]. Will retry later.`);
+        return false;
+      }
+
+      // 依赖满足，开始加载
+      this.plugins[pluginName] = pluginInstance;
+
+      if (pluginInstance.apply) {
+        await pluginInstance.apply(new Context(this, pluginName), await this.getPluginConfig(pluginName));
+        this.pluginLoader.logger.info(`Applied plugin "${pluginName}"`);
+      }
+
+      // 注册提供的组件
+      if (pluginInstance.provide) {
+        for (const componentName of pluginInstance.provide) {
+          if (this.providedComponents[componentName]) {
+            this.logger.error(`Component "${componentName}" is provided by multiple plugins: "${this.providedComponents[componentName]}" and "${pluginName}".`);
+          } else {
+            this.providedComponents[componentName] = pluginName;
+          }
+        }
+      }
+
+      this.pluginStatus[pluginName] = PluginStatus.ENABLED; // 更新状态为已启用
+      // this.logger.info(`Plugin "${pluginName}" loaded successfully.`);
+
+      // 加载成功后，检查是否可以加载其他等待中的插件
+      if (triggerPendingCheck) {
+        await this._loadPendingPlugins();
+      }
+
+      return true;
+    } catch (err) {
+      this.pluginLoader.logger.error(`Failed to load plugin "${pluginName}":`, err);
+      // 加载失败的插件保持 PENDING 状态，以便后续重试
+      return false;
+    }
+  }
+
+  /**
+   * 内部函数：尝试加载所有处于 PENDING 状态的插件
+   */
+  private async _loadPendingPlugins(): Promise<void> {
+    const pendingPlugins = Object.keys(this.pluginStatus).filter(p => this.pluginStatus[p] === PluginStatus.PENDING);
+    if (pendingPlugins.length === 0) return;
+
+    // this.logger.info('Checking pending plugins...');
+    for (const pluginName of pendingPlugins) {
+      await this.loadSinglePlugin(pluginName, false); // 递归调用，但不触发顶层的pending检查
+    }
+  }
+
+  /**
+   * 卸载插件，并递归卸载依赖于它的其他插件
+   * @param pluginNameToUnload 要卸载的插件名
+   */
+  public async unloadPlugin(pluginNameToUnload: string): Promise<void> {
+    // 1. 找出所有直接或间接依赖于此插件的插件
+    const dependents: string[] = [];
+    const pluginsToCheck = [pluginNameToUnload];
+
+    while (pluginsToCheck.length > 0) {
+      const currentPluginName = pluginsToCheck.shift()!;
+      const provided = this.plugins[currentPluginName]?.provide || [];
+
+      if (provided.length === 0) continue;
+
+      for (const pluginName in this.plugins) {
+        if (dependents.includes(pluginName) || pluginName === pluginNameToUnload) continue;
+
+        const deps = this.plugins[pluginName].depend || [];
+        if (provided.some(p => deps.includes(p))) {
+          if (!dependents.includes(pluginName)) {
+            dependents.push(pluginName);
+            pluginsToCheck.push(pluginName); // 递归查找
+            // this.logger.info(`Plugin "${pluginName}" depends on "${currentPluginName}" and will be unloaded.`);
+          }
+        }
+      }
+    }
+
+    // 2. 卸载所有依赖者
+    for (const dependentName of dependents) {
+      await this._unloadSinglePlugin(dependentName);
+    }
+
+    // 3. 最后卸载目标插件
+    await this._unloadSinglePlugin(pluginNameToUnload);
+
+    // 4. 卸载完成后，尝试重新加载处于 PENDING 状态的插件
+    // await this._loadPendingPlugins();
+  }
+
+  /**
+   * 内部函数：执行单个插件的卸载逻辑
+   * @param pluginName 插件名
+   */
+  private async _unloadSinglePlugin(pluginName: string): Promise<void> {
+    if (this.pluginStatus[pluginName] !== PluginStatus.ENABLED) {
+      return; // 只卸载已启用的插件
+    }
+
+    this.logger.info(`Unloading plugin "${pluginName}"...`);
+    try {
+      const plugin = this.plugins[pluginName];
+      if (plugin && plugin.disable) {
+        await plugin.disable(new Context(this, pluginName));
+      }
+
+      await this.pluginLoader.unloadPlugin(pluginName);
+      this.unregall(pluginName); // 清理该插件注册的所有内容
+
+      delete this.plugins[pluginName];
+      delete this.pluginModules[pluginName];
+
+      // 更新状态为 PENDING，因为它的配置仍然是启用的
+      // 如果它被其他插件依赖，当那个插件被卸载时，它也会被重新评估
+      this.pluginStatus[pluginName] = PluginStatus.PENDING;
+
+      this.emit('plugin-unloaded', pluginName);
+      // this.logger.info(`Plugin "${pluginName}" unloaded.`);
+    } catch (error) {
+      this.logger.error(`Failed to unload plugin "${pluginName}":`, error);
+    }
+  }
+
+  /**
+   * 重新加载插件
+   * @param pluginName 插件名称
+   */
+  public async reloadPlugin(pluginName: string): Promise<void> {
+    // this.logger.info(`Reloading plugin "${pluginName}"...`);
+
+    // 1. 递归卸载插件及其依赖者
+    await this.unloadPlugin(pluginName);
+
+    // 2. 重新加载该插件
+    // unloadPlugin 已经将状态设置为 PENDING，所以 loadSinglePlugin 可以直接工作
+    const success = await this.loadSinglePlugin(pluginName);
+
+    if (success) {
+      // this.logger.info(`Plugin "${pluginName}" reloaded successfully.`);
+      this.emit('plugin-reloaded', pluginName);
+    } else {
+      this.logger.error(`Failed to reload plugin "${pluginName}". It may have unmet dependencies.`);
+    }
+  }
+
+  /**
+   * 监听插件文件变化，实现热更新
+   * @param core Core 实例
+   * @param pluginsDir 插件目录，默认为 'plugins'
    */
   watchPlugins(core: Core, pluginsDir: string = 'plugins') {
     const logger = new Logger('hmr');
     const watcher = chokidar.watch(pluginsDir, {
-      ignored: /(^|[/\\])\../, // 忽略点文件
+      ignored: /(^|[/\\])\../,
       persistent: true,
       ignoreInitial: true,
       awaitWriteFinish: {
@@ -260,192 +395,107 @@ export class Core {
         pollInterval: 100,
       },
     });
+
+    const getPluginNameFromPath = (changePath: string): string | null => {
+        if (!changePath.endsWith('.ts') && !changePath.endsWith('.js')) return null;
+        const parts = changePath.split(path.sep);
+        return parts.length > 1 ? parts[1] : null;
+    };
+
     watcher.on('change', async (changePath) => {
-      if (!changePath.endsWith('.ts') && !changePath.endsWith('.js')) return;
-      const parts = changePath.split(path.sep);
-      if (parts.length < 2) return;
-      const pluginName = parts[1];
-      this.logger.info(`Plugin file changed: ${changePath}`);
-      this.reloadPlugin(pluginName, core);
+      const pluginName = getPluginNameFromPath(changePath);
+      if (pluginName) {
+        logger.info(`Plugin file changed: ${changePath}`);
+        await core.reloadPlugin(pluginName);
+      }
     });
 
     watcher.on('add', async (changePath) => {
-      if (!changePath.endsWith('.ts') && !changePath.endsWith('.js')) return;
-      const parts = changePath.split(path.sep);
-      if (parts.length < 2) return;
-      const pluginName = parts[1];
-      this.logger.info(`New plugin file added: ${changePath}`);
-      this.reloadPlugin(pluginName, core);
+        const pluginName = getPluginNameFromPath(changePath);
+        if (pluginName) {
+            logger.info(`New plugin file added: ${changePath}`);
+            await core.reloadPlugin(pluginName);
+        }
     });
 
     watcher.on('unlink', async (changePath) => {
-      if (!changePath.endsWith('.ts') && !changePath.endsWith('.js')) return;
-      const parts = changePath.split(path.sep);
-      if (parts.length < 2) return;
-      const pluginName = parts[1];
-      this.logger.info(`Plugin file removed: ${changePath}`);
-      await this.unloadPluginAndEmit(pluginName, core);
+        const pluginName = getPluginNameFromPath(changePath);
+        if (pluginName) {
+            logger.info(`Plugin file removed: ${changePath}`);
+            await core.unloadPlugin(pluginName);
+        }
     });
 
     logger.info(`Watching for plugin changes in ${pluginsDir}`);
   }
 
   /**
-   * 重新加载插件
-   * @param pluginName 插件名称
-   * @param core Core实例
-   */
-  public async reloadPlugin(pluginName: string, core: Core) {
-    try {
-      // 强制重新读取配置文件，确保获取最新配置
-      if (this.configPath && process.env.NODE_ENV === 'development') {
-        try {
-          const doc = yaml.load(fs.readFileSync(this.configPath, 'utf8')) as any;
-          if (doc && doc.plugins) {
-            this.config.plugins = doc.plugins;
-          }
-        } catch (error) {
-          this.logger.warn('Failed to refresh config for plugin reload:', error);
-        }
-      }
-
-      // 获取最新的插件配置
-      const config = await core.getPluginConfig(pluginName);
-
-      // 加载插件实例
-      const plugin = await core.pluginLoader.load(pluginName);
-
-      // 如果插件存在，先禁用旧实例
-      if (plugin && plugin.disable) {
-        await plugin.disable(new Context(this, pluginName));
-      }
-
-      // 清理插件提供的组件
-      // if (plugin.provide) {
-      //   for (let providedmodules of plugin.provide) {
-      //     if (this.components[`${providedmodules}`]) {
-      //       this.unregisterComponent(providedmodules);
-      //     }
-      //   }
-      // }
-
-      // 卸载插件
-      await core.unloadPluginAndEmit(pluginName, core);
-
-      // 应用新的插件实例
-      if (plugin && plugin.apply) {
-        await plugin.apply(new Context(this, pluginName), config);
-      }
-
-      this.pluginLoader.logger.info(`apply plugin ${pluginName}`);
-
-      // 触发插件重载事件
-      core.emit('plugin-reloaded', pluginName);
-    } catch (error) {
-      this.logger.error(`Failed to reload plugin ${pluginName}:`, error);
-    }
-  }
-
-  /**
-   * 卸载插件并触发事件
-   * @param pluginName 插件名称
-   * @param core Core实例
-   */
-  public async unloadPluginAndEmit(pluginName: string, core: Core) {
-    try {
-      const plugin = core.plugins[`${pluginName}`];
-      if (plugin && plugin.disable) {
-        await plugin.disable(new Context(this, pluginName));
-      }
-      await core.pluginLoader.unloadPlugin(pluginName);
-      delete core.plugins[`${pluginName}`];
-      delete this.pluginModules[`${pluginName}`];
-      // Remove provided components from this plugin
-      // for (const componentName in this.providedComponents) {
-      //   if (this.providedComponents[`${componentName}`] === pluginName) {
-      //     delete this.components[`${componentName}`];
-      //     delete this.providedComponents[`${componentName}`];
-      //   }
-      // }
-      this.unregall(pluginName);
-      core.emit('plugin-unloaded', pluginName);
-    } catch (error) {
-      this.logger.error(`Failed to unload plugin ${pluginName}:`, error);
-    }
-  }
-
-  /**
    * 注册组件
    * @param name 组件名称
-   * @param component 组件
-   * @returns void
+   * @param component 组件实例
    */
   registerComponent(name: string, component: any): void {
     if (this.components.hasOwnProperty(name)) {
-      this.logger.warn(`Component "${name}" already registered by plugin "${this.providedComponents[`${name}`]}".`);
+      this.logger.warn(`Component "${name}" already registered by plugin "${this.providedComponents[name]}".`);
       return;
     }
-    this.components[`${name}`] = component;
-    this.logger.info(`Component "${name}" registered.`);
+    this.components[name] = component;
+    // this.logger.info(`Component "${name}" registered.`);
   }
 
   /**
    * 获取组件
    * @param name 组件名称
-   * @returns 组件
+   * @returns 组件实例
    */
   getComponent(name: string): any {
-    return this.components[`${name}`];
+    return this.components[name];
   }
 
   /**
-   * 取消注册组件
+   * 注销组件
    * @param name 组件名称
    */
   unregisterComponent(name: string): void {
-    delete this.components[`${name}`];
-    delete this.providedComponents[`${name}`];
-    delete this.comtoplu[`${name}`]
+    delete this.components[name];
+    delete this.providedComponents[name];
+    delete this.comtoplu[name];
   }
 
   /**
-   * 监听事件
+   * 注册事件监听器
    * @param event 事件名称
-   * @param listener 回调函数
+   * @param listener 事件回调函数
    */
   on(event: string, listener: (...args: any[]) => Promise<void>): void {
-    if (!this.eventListeners[`${event}`]) {
-      this.eventListeners[`${event}`] = [];
+    if (!this.eventListeners[event]) {
+      this.eventListeners[event] = [];
     }
-    this.eventListeners[`${event}`].push(listener);
-    //this.logger.info(`Listener added for event "${event}".`);
+    this.eventListeners[event].push(listener);
   }
 
   /**
    * 触发事件
    * @param event 事件名称
-   * @param args 参数
+   * @param args 传递给事件监听器的参数
    */
   async emit(event: string, ...args: any[]): Promise<void> {
-    if (this.eventListeners[`${event}`]) {
-      // this.logger.info(`Emitting event "${event}" with args:`, args);
-      for (const listener of this.eventListeners[`${event}`]) {
+    if (this.eventListeners[event]) {
+      for (const listener of this.eventListeners[event]) {
         try {
           await listener(...args);
         } catch (err) {
           this.logger.error(`Error in event listener for "${event}":`, err);
         }
       }
-    } else {
-      //this.logger.info(`No listeners for event "${event}".`);
     }
   }
 
   /**
    * 注册全局中间件
    * @param name 中间件名称
-   * @param middleware 中间件
-   * @returns Core对象
+   * @param middleware 中间件函数
+   * @returns Core 实例
    */
   use(name: string, middleware: Middleware): Core {
     this.globalMiddlewares[name] = middleware;
@@ -453,127 +503,104 @@ export class Core {
   }
 
   /**
-   * 定义指令
-   * @param name 指令名称
-   * @returns 指令对象
+   * 注册命令
+   * @param name 命令名称
+   * @returns Command 实例
    */
   command(name: string): Command {
-    const command = new Command(this, name); // 传递 Core 实例
-    this.commands[`${name}`] = command;
+    const command = new Command(this, name);
+    this.commands[name] = command;
     return command;
   }
 
   /**
-   * 执行指令
-   * @param name 指令名称
-   * @param session 会话
-   * @param args 参数
-   * @returns 回话/null
+   * 执行命令
+   * @param name 命令名称
+   * @param session 会话对象
+   * @param args 传递给命令处理函数的参数
+   * @returns 会话对象或 null
    */
   async executeCommand(name: string, session: any, ...args: any[]): Promise<Session | null> {
-    const command = this.commands[`${name}`];
+    const command = this.commands[name];
     if (command) {
-      // 将 globalMiddlewares 从对象转为数组
       const globalMiddlewareList = Object.values(this.globalMiddlewares || {});
       const commandMiddlewareList = command.middlewares || [];
+      const middlewares = [...globalMiddlewareList, ...commandMiddlewareList];
 
-      // 如果有中间件，执行中间件链
-      if (globalMiddlewareList.length > 0 || commandMiddlewareList.length > 0) {
-        const middlewares = [...globalMiddlewareList, ...commandMiddlewareList];
-
-        let index = 0;
-        const runner = async (): Promise<void> => {
-          if (index >= middlewares.length) {
-            await command.executeHandler(session, ...args);
-            return;
-          }
-
+      let index = 0;
+      const runner = async (): Promise<void> => {
+        if (index < middlewares.length) {
           const middleware = middlewares[index++];
           await middleware(session, runner);
-        };
+        } else {
+          await command.executeHandler(session, ...args);
+        }
+      };
 
-        await runner();
-        return session;
-      } else {
-        return await command.execute(session, ...args);
-      }
+      await runner();
+      return session;
     }
     return null;
   }
 
   /**
    * 注册平台
-   * @param platform 平台名称
-   * @returns 启动结果
+   * @param platform 平台实例
+   * @returns 平台启动结果
    */
   registerPlatform(platform: Platform): any {
     this.platforms.push(platform);
     return platform.startPlatform(this);
   }
+
   /**
-   * 取消注册插件
+   * 清理指定插件注册的所有内容
    * @param pluginname 插件名称
    */
   unregall(pluginname: string): void {
-    let cmdtodel = [];
-    for (const cmd in this.cmdtoplu) {
-      if (this.cmdtoplu[cmd] === pluginname) {
-        cmdtodel.push(cmd);
-      }
-    }
-    for (const cmd of cmdtodel) {
-      delete this.cmdtoplu[cmd];
-      delete this.commands[cmd];
-    }
-    let comptodel = [];
-    for (const comp in this.comtoplu) {
-      if (this.comtoplu[comp] === pluginname) {
-        comptodel.push(comp);
-      }
-    }
-    for (const comp of comptodel) {
-      delete this.comtoplu[comp];
-      delete this.components[comp];
-      delete this.providedComponents[comp];
-    }
-    let evttodel: string[] = [];
+    // 清理 commands
+    Object.keys(this.cmdtoplu)
+      .filter(cmd => this.cmdtoplu[cmd] === pluginname)
+      .forEach(cmd => {
+        delete this.cmdtoplu[cmd];
+        delete this.commands[cmd];
+      });
 
+    // 清理 components 和 providedComponents
+    Object.keys(this.comtoplu)
+      .filter(comp => this.comtoplu[comp] === pluginname)
+      .forEach(comp => {
+        delete this.comtoplu[comp];
+        delete this.components[comp];
+        delete this.providedComponents[comp];
+      });
+
+    // 清理 event listeners
     for (const evt in this.evttoplu) {
       if (this.evttoplu[evt][pluginname]) {
-        // 清除插件在 evttoplu 中的记录
-        delete this.evttoplu[evt][pluginname];
-
-        // 如果该事件的插件已经全部清除了，也可以选择删掉整个事件
-        if (Object.keys(this.evttoplu[evt]).length === 0) {
-          evttodel.push(evt);
-        }
-
-        // 同时在 this.eventListeners 中删掉对应 listener
         const pluginListeners = this.evttoplu[evt][pluginname] || [];
-        this.eventListeners[evt] = this.eventListeners[evt]?.filter(l => !pluginListeners.includes(l)) || [];
+        if (this.eventListeners[evt]) {
+          this.eventListeners[evt] = this.eventListeners[evt].filter(l => !pluginListeners.includes(l));
+        }
+        delete this.evttoplu[evt][pluginname];
       }
     }
-    let mdwtodel = [];
-    for (const mdw in this.mdwtoplu) {
-      if (this.mdwtoplu[mdw] === pluginname) {
-        mdwtodel.push(mdw);
-      }
-    }
-    for (const mdw of mdwtodel) {
-      delete this.mdwtoplu[mdw];
-      delete this.globalMiddlewares[mdw];
-    }
+
+    // 清理 middlewares
+    Object.keys(this.mdwtoplu)
+      .filter(mdw => this.mdwtoplu[mdw] === pluginname)
+      .forEach(mdw => {
+        delete this.mdwtoplu[mdw];
+        delete this.globalMiddlewares[mdw];
+      });
   }
+
   /**
-   * 获取指令对象
-   * @param name 指令名称
-   * @returns null/指令对象
+   * 获取命令
+   * @param name 命令名称
+   * @returns Command 实例或 null
    */
   getCommand(name: string): Command | null {
-    if (Object.hasOwn(this.commands, name)) {
-      return this.commands[name];
-    } else {
-      return null;
-    }
+    return this.commands[name] || null;
   }
 }

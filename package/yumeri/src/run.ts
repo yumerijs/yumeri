@@ -1,18 +1,16 @@
-import { Core } from '@yumerijs/core';
-import PluginLoader from '@yumerijs/loader';
+import { Core } from '@yumerijs/core'
+import PluginLoader from '@yumerijs/loader'
 
-async function main() {
-  const loader = new PluginLoader();
-  const core = new Core(loader);
+export async function runMain() {
+  const loader = new PluginLoader()
+  const core = new Core(loader)
 
   try {
-    await core.loadConfig('./config.yml');
-    await core.loadPlugins();
+    await core.loadConfig('./config.yml')
+    await core.loadPlugins()
 
-    // ...
   } catch (err) {
-    console.error('Application failed to start:', err);
+    console.error('Application failed to start:', err)
+    process.exit(1)
   }
 }
-
-main();

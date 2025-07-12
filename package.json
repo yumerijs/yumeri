@@ -8,20 +8,22 @@
     "plugins/*"
   ],
   "scripts": {
-    "start": "node package/yumeri/dist/run.js",
-    "dev": "cross-env NODE_ENV=development node package/yumeri/dist/run.js"
+    "start": "yumeri start",
+    "dev": "cross-env NODE_ENV=development yumeri start -r esbuild-register -r tsconfig-paths/register"
   },
   "dependencies": {
     "chokidar": "^4.0.3",
     "yumeri": "workspace:^",
     "yumeri-plugin-console": "workspace:^",
-    "yumeri-plugin-server": "1.1.0"
+    "yumeri-plugin-server": "^1.1.0"
   },
   "devDependencies": {
     "@types/chalk": "^2.2.4",
     "@types/node": "^22.15.19",
     "@types/semver": "^7.7.0",
     "cross-env": "^7.0.3",
+    "esbuild-register": "^3.6.0",
+    "tsconfig-paths": "^4.2.0",
     "typescript": "^5.8.3"
   }
 }

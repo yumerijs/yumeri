@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.base",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@yumerijs/*": ["package/*/src"],
+      "*": ["package/*/src"],
+      "yumeri-plugin-*": ["plugins/yumeri-plugin-*/src/index.ts"]
+    }
+  }
+}
