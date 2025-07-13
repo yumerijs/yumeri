@@ -9,9 +9,11 @@
   ],
   "scripts": {
     "start": "yumeri start",
-    "dev": "cross-env NODE_ENV=development yumeri start -r esbuild-register -r tsconfig-paths/register"
+    "dev": "cross-env NODE_ENV=development yumeri start -r esbuild-register -r tsconfig-paths/register",
+    "setup": "yumeri-scripts setup"
   },
   "dependencies": {
+    "@yumerijs/scripts": "workspace:^",
     "chokidar": "^4.0.3",
     "yumeri": "workspace:^",
     "yumeri-plugin-console": "workspace:^",

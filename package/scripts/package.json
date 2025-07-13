@@ -1,0 +1,43 @@
+{
+  "name": "@yumerijs/scripts",
+  "version": "1.0.1",
+  "description": "Development scripts for yumeri",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "template"
+  ],
+  "bin": {
+    "yumeri-scripts": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yumerijs/yumeri.git"
+  },
+  "keywords": [
+    "yumeri",
+    "api",
+    "webserver"
+  ],
+  "author": "WindyPear-Team,FireGuo",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/yumerijs/yumeri/issues"
+  },
+  "homepage": "https://github.com/yumerijs/yumeri#readme",
+  "devDependencies": {
+    "@types/fs-extra": "^11",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.14.1",
+    "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "fs-extra": "^11.3.0",
+    "js-yaml": "^4.1.0",
+    "yumeri": "1.1.0"
+  }
+}
