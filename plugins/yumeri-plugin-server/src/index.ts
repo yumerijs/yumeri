@@ -79,7 +79,7 @@ export const config = {
     enableWs: {
       type: 'boolean',
       default: true,
-      description: '是否启用WebSocket支持'
+      description: '是否启用WebSocket支持（实验性）'
     }
   } as Record<string, ConfigSchema>
 };
@@ -228,6 +228,7 @@ export class Server extends Platform {
 
         // 查找命令
         const command = this.core.getCommand(commandname);
+        const fallbackcommand = this.core.getCommand('/')
 
         // 检查命令是否存在且支持 HTTP 协议和当前 HTTP 方法
         if (!command ||
@@ -236,6 +237,9 @@ export class Server extends Platform {
           res.writeHead(404, { 'Content-Type': 'text/html' });
           res.end(`<html><head><title>404 Not Found</title></head><body><center><h1>404 Not Found</h1></center><hr><center>yumerijs</center></body>`);
           return;
+        }
+        if (!command && fallbackcommand) {
+          commandname = '/'
         }
 
         // 在 startPlatform 方法中，找到 httpMethod === 'post' 的处理部分
@@ -275,7 +279,6 @@ export class Server extends Platform {
                   });
               } catch (jsonError) {
                 try {
-                  // 这是原始代码中的备选解析方式，用于处理非标准 JSON 格式
                   const postData = new URLSearchParams(body as Record<string, string>);
                   for (const [key, value] of postData.entries()) {
                     params[key] = value;
