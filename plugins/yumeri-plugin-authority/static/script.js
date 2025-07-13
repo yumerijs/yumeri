@@ -37,7 +37,7 @@
                 .then(response => response.json())
                 .then(data => {
                     console.log(data);
-                    if (data.code = 0) {
+                    if (data.code === 0) {
                         alert('注册成功！');
                         // 跳转到登录页面
                         window.location.href = '/auth/login';
@@ -67,7 +67,7 @@
                 .then(response => response.json())
                 .then(data => {
                     console.log(data);
-                    if (data.code = 0) {
+                    if (data.code === 0) {
                         alert('登录成功！');
                         // 跳转到前端ref的query参数的页面（就是ref=xxx）
                         const params = new URLSearchParams(window.location.search);
