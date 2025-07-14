@@ -146,9 +146,14 @@ export async function apply(ctx: Context, config: Config) {
           try {
             // 解析配置数据
             const parsedConfig = typeof configData === 'string' ? JSON.parse(configData) : configData;
+            // // 通过是否禁用来判断带不带~
+            let parsedname = pluginName
+            if (configManager.getPluginStatus(pluginName) === 'disabled') { 
+              parsedname = `~${pluginName}`
+            }
 
             // 保存配置
-            const success = await configManager.savePluginConfig(pluginName, parsedConfig, reload);
+            const success = await configManager.savePluginConfig(parsedname, parsedConfig, reload);
 
             if (success) {
               session.body = JSON.stringify({ success: true, message: '配置保存成功' });
@@ -178,6 +183,19 @@ export async function apply(ctx: Context, config: Config) {
             session.body = JSON.stringify({ success: false, message: '插件禁用失败' });
           }
           return;
+        }
+        if (param.path === '/api/pluginstatus') {
+          const pluginName = param.name;
+
+          if (!pluginName) {
+            session.body = JSON.stringify({ success: false, message: '缺少插件名称参数' });
+            return;
+          }
+          const status = configManager.getPluginStatus(pluginName).toUpperCase();
+          if (status) {
+            session.body = status;
+          }
+          return
         }
         if (param.path === '/api/pluginusage') {
           const pluginName = param.name;

@@ -36,25 +36,7 @@ export class PluginConfigManager {
      */
     async getPluginConfig(pluginName: string): Promise<any> {
         const actualPluginName = pluginName.startsWith('~') ? pluginName.substring(1) : pluginName;
-
-        if (process.env.NODE_ENV === 'development' || !this.configCache[actualPluginName]) {
-            try {
-                const configFileContent = fs.readFileSync(this.configPath, 'utf8');
-                const configData: any = yaml.load(configFileContent);
-
-                if (configData?.plugins?.[actualPluginName]) {
-                    this.configCache[actualPluginName] = configData.plugins[actualPluginName];
-                } else if (configData?.plugins?.[pluginName]) {
-                    this.configCache[actualPluginName] = configData.plugins[pluginName];
-                } else {
-                    this.configCache[actualPluginName] = null;
-                }
-            } catch (error) {
-                logger.error(`Failed to get config for plugin ${actualPluginName}:`, error);
-                return null;
-            }
-        }
-
+        this.configCache[actualPluginName] = this.core?.getPluginConfig(actualPluginName) || {};
         const schema = await this.getPluginSchema(actualPluginName);
         const config = this.configCache[actualPluginName] || {};
 
@@ -296,11 +278,8 @@ export class PluginConfigManager {
             // 如果需要重载插件且Core实例存在
             if (reload && this.core && !isDisabled) {
                 try {
-                    // 触发配置变更事件
-                    await this.core.emit('config-changed', configData);
-
                     // 重新加载插件
-                    await this.core.reloadPlugin(actualPluginName, this.core);
+                    await this.core.reloadPlugin(actualPluginName);
                     // logger.info(`Plugin ${actualPluginName} reloaded after config change.`);
                 } catch (reloadError) {
                     logger.error(`Failed to reload plugin ${actualPluginName} after config change:`, reloadError);
@@ -397,7 +376,7 @@ export class PluginConfigManager {
 
                 // 卸载插件
                 try {
-                    await this.core.unloadPluginAndEmit(pluginName, this.core);
+                    await this.core.unloadPlugin(pluginName);
                     // logger.info(`Plugin ${pluginName} unloaded after being disabled.`);
                 } catch (unloadError) {
                     logger.error(`Failed to unload plugin ${pluginName} after being disabled:`, unloadError);
@@ -418,11 +397,14 @@ export class PluginConfigManager {
      */
     async enablePlugin(pluginName: string): Promise<boolean> {
         // 如果插件名不以~开头，则已经是启用状态
-        if (!pluginName.startsWith('~')) {
-            return true;
-        }
+        // if (!pluginName.startsWith('~')) {
+        //     return true;
+        // }
 
-        const actualPluginName = pluginName.substring(1);
+        // const actualPluginName = pluginName.substring(1);
+        const actualPluginName = pluginName;
+        pluginName = `~${pluginName}`
+        // logger.info(`actualPluginName: ${actualPluginName}, `, `pluginName : ${pluginName}`)
 
         try {
             const configTmpYmlPath = this.configPath + '.tmp';
@@ -466,28 +448,15 @@ export class PluginConfigManager {
             // 触发配置变更事件
             if (this.core) {
                 await this.core.emit('config-changed', configData);
-
-                // 加载插件
                 try {
-                    // 获取插件配置
-                    const config = await this.core.getPluginConfig(actualPluginName);
-
-                    // 加载插件
-                    const plugin = await this.core.pluginLoader.load(actualPluginName);
-
-                    // 应用插件
-                    if (plugin && plugin.apply) {
-                        await plugin.apply(new Context(this.core, actualPluginName), config);
-                        // logger.info(`Plugin ${actualPluginName} loaded after being enabled.`);
-                    }
+                    await this.core.loadSinglePlugin(actualPluginName)
                 } catch (loadError) {
                     logger.error(`Failed to load plugin ${actualPluginName} after being enabled:`, loadError);
                 }
             }
-
             return true;
         } catch (error) {
-            logger.error(`Failed to enable plugin ${pluginName}:`, error);
+            logger.error(`Failed to enable plugin ${actualPluginName}:`, error);
             return false;
         }
     }
@@ -497,25 +466,8 @@ export class PluginConfigManager {
      * @param pluginName 插件名称
      * @returns 是否被禁用
      */
-    async isPluginDisabled(pluginName: string): Promise<boolean> {
-        // 如果插件名以~开头，则是禁用状态
-        if (pluginName.startsWith('~')) {
-            return true;
-        }
-
-        try {
-            const configFileContent = fs.readFileSync(this.configPath, 'utf8');
-            const configData: any = yaml.load(configFileContent);
-
-            // 确保plugins对象存在
-            configData.plugins = configData.plugins || {};
-
-            // 检查是否存在禁用的插件配置
-            return configData.plugins[`~${pluginName}`] !== undefined;
-        } catch (error) {
-            logger.error(`Failed to check if plugin ${pluginName} is disabled:`, error);
-            return false;
-        }
+    getPluginStatus(pluginName: string): string {
+        return this.core?.pluginStatus[pluginName] || "DISABLED";
     }
 
     /**

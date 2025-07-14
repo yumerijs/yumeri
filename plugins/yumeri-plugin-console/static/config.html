@@ -138,6 +138,10 @@
         }
 
         .plugin-status.disabled {
+            background-color: #ccc;
+        }
+
+        .plugin-status.pending {
             background-color: var(--danger);
         }
 
@@ -418,7 +422,7 @@
                 window.location.href = './home';
             });
             let currentPluginName = null; // 用于存储当前选中的插件名称
-            let isPluginDisabled = false; // 用于存储当前插件是否被禁用
+            let currentPluginStatus = null; // 用于存储当前插件状态
 
             // 初始隐藏启用/禁用按钮
             enableButton.style.display = 'none';
@@ -458,6 +462,23 @@
                 }, 3000);
             }
 
+            // 获取插件状态
+            async function getPluginStatus(pluginName) {
+                try {
+                    // 去掉插件名称中的~符号
+                    const cleanPluginName = pluginName.replace(/^~/, '');
+                    const response = await fetch(`./api/pluginstatus?name=${cleanPluginName}`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const status = await response.text();
+                    return status.trim(); // 返回 PENDING, DISABLED, ENABLED
+                } catch (error) {
+                    console.error('Failed to get plugin status:', error);
+                    return 'DISABLED'; // 默认返回禁用状态
+                }
+            }
+
             // 获取并显示插件列表
             async function fetchPluginList() {
                 try {
@@ -468,7 +489,9 @@
                     const plugins = await response.json();
 
                     pluginList.innerHTML = ''; // 清空现有列表
-                    plugins.forEach(pluginName => {
+                    
+                    // 为每个插件获取状态并创建列表项
+                    for (const pluginName of plugins) {
                         const listItem = document.createElement('li');
 
                         // 创建状态指示器
@@ -478,24 +501,29 @@
                         // 创建插件名称元素
                         const nameSpan = document.createElement('span');
 
-                        // 判断插件是否被禁用
-                        if (pluginName.startsWith('~')) {
-                            statusIndicator.classList.add('disabled');
-                            nameSpan.textContent = pluginName.substring(1); // 去掉~显示名称
-                            listItem.dataset.plugin = pluginName; // 保留~作为数据属性
-                            listItem.dataset.disabled = 'true';
-                        } else {
+                        // 去掉~符号显示名称
+                        const cleanPluginName = pluginName.replace(/^~/, '');
+                        nameSpan.textContent = cleanPluginName;
+
+                        // 获取插件状态
+                        const status = await getPluginStatus(pluginName);
+                        
+                        // 根据状态设置圆点颜色
+                        if (status === 'ENABLED') {
                             statusIndicator.classList.add('enabled');
-                            nameSpan.textContent = pluginName;
-                            listItem.dataset.plugin = pluginName;
-                            listItem.dataset.disabled = 'false';
+                        } else if (status === 'PENDING') {
+                            statusIndicator.classList.add('pending');
+                        } else { // DISABLED
+                            statusIndicator.classList.add('disabled');
                         }
 
                         listItem.appendChild(statusIndicator);
                         listItem.appendChild(nameSpan);
+                        listItem.dataset.plugin = cleanPluginName; // 存储清理后的插件名
+                        listItem.dataset.status = status; // 存储插件状态
 
                         listItem.addEventListener('click', function () {
-                            loadPluginConfiguration(listItem.dataset.plugin);
+                            loadPluginConfiguration(listItem.dataset.plugin, listItem.dataset.status);
                             if (window.innerWidth <= 768) {
                                 sidebar.classList.remove('open');
                                 overlay.style.display = 'none';
@@ -503,7 +531,7 @@
                             }
                         });
                         pluginList.appendChild(listItem);
-                    });
+                    }
                 } catch (error) {
                     console.error('Failed to fetch plugin list:', error);
                     pluginList.innerHTML = '<li>Failed to load plugins.</li>';
@@ -531,10 +559,10 @@
             }
 
             // 加载插件配置
-            async function loadPluginConfiguration(pluginName) {
+            async function loadPluginConfiguration(pluginName, pluginStatus) {
                 try {
                     currentPluginName = pluginName;
-                    isPluginDisabled = pluginName.startsWith('~');
+                    currentPluginStatus = pluginStatus;
                     updatePluginStatus();
 
                     const response = await fetch(`./api/config?name=${pluginName}`);
@@ -561,8 +589,7 @@
                         configurationArea.innerHTML = '<p>Received invalid configuration format from server.</p>';
                     }
                     if (usage.usage) { pluginUsage.innerHTML = usage.usage; }
-                    const displayName = isPluginDisabled ? pluginName.substring(1) : pluginName;
-                    pluginTitle.textContent = `${displayName} 配置`;
+                    pluginTitle.textContent = `${pluginName} 配置`;
 
                     // 绑定事件监听器
                     bindEventListeners();
@@ -1124,11 +1151,15 @@
 
             // 更新插件状态UI
             function updatePluginStatus() {
-                if (isPluginDisabled) {
-                    pluginStatus.innerHTML = '<p style="color: #f44336;">当前状态: 已禁用</p>';
+                if (currentPluginStatus === 'DISABLED') {
+                    pluginStatus.innerHTML = '<p style="color: #ccc;">当前状态: 未启用</p>';
                     enableButton.style.display = 'inline-block';
                     disableButton.style.display = 'none';
-                } else {
+                } else if (currentPluginStatus === 'PENDING') {
+                    pluginStatus.innerHTML = '<p style="color: #f44336;">当前状态: 依赖未满足</p>';
+                    enableButton.style.display = 'none';
+                    disableButton.style.display = 'inline-block';
+                } else { // ENABLE
                     pluginStatus.innerHTML = '<p style="color: #4CAF50;">当前状态: 已启用</p>';
                     enableButton.style.display = 'none';
                     disableButton.style.display = 'inline-block';
@@ -1146,7 +1177,6 @@
                     const configData = collectConfigData();
                     const jsonContent = JSON.stringify(configData);
                     console.log('Saving configuration:', jsonContent);
-
                     // 构建保存配置的URL，并确保内容被URIComponent编码
                     const url = `./api/saveconfig?name=${currentPluginName}&config=${encodeURIComponent(jsonContent)}`;
                     const response = await fetch(url);
@@ -1160,8 +1190,8 @@
                     const result = await response.json();
                     showNotification(result.success ? '配置保存成功' : result.message, result.success ? 'success' : 'error');
 
-                    // 如果保存成功且插件未被禁用，延迟刷新插件列表
-                    if (result.success && !isPluginDisabled) {
+                    // 如果保存成功，延迟刷新插件列表
+                    if (result.success) {
                         setTimeout(fetchPluginList, 1000);
                     }
 
@@ -1173,7 +1203,7 @@
 
             // 启用插件按钮事件
             enableButton.addEventListener('click', async function () {
-                if (!currentPluginName || !isPluginDisabled) {
+                if (!currentPluginName || currentPluginStatus !== 'DISABLED') {
                     showNotification('当前插件不需要启用', 'error');
                     return;
                 }
@@ -1191,16 +1221,15 @@
                     if (result.success) {
                         showNotification('插件启用成功', 'success');
 
-                        // 更新当前插件名称（去掉~前缀）
-                        currentPluginName = currentPluginName.substring(1);
-                        isPluginDisabled = false;
+                        // 更新当前插件状态
+                        currentPluginStatus = 'ENABLED';
                         updatePluginStatus();
 
                         // 刷新插件列表
                         setTimeout(fetchPluginList, 1000);
 
                         // 重新加载插件配置
-                        setTimeout(() => loadPluginConfiguration(currentPluginName), 1500);
+                        setTimeout(() => loadPluginConfiguration(currentPluginName, currentPluginStatus), 1500);
                     } else {
                         showNotification(result.message || '插件启用失败', 'error');
                     }
@@ -1212,7 +1241,7 @@
 
             // 禁用插件按钮事件
             disableButton.addEventListener('click', async function () {
-                if (!currentPluginName || isPluginDisabled) {
+                if (!currentPluginName || currentPluginStatus === 'DISABLED') {
                     showNotification('当前插件不需要禁用', 'error');
                     return;
                 }
@@ -1230,9 +1259,8 @@
                     if (result.success) {
                         showNotification('插件禁用成功', 'success');
 
-                        // 更新当前插件名称（添加~前缀）
-                        currentPluginName = `~${currentPluginName}`;
-                        isPluginDisabled = true;
+                        // 更新当前插件状态
+                        currentPluginStatus = 'DISABLED';
                         updatePluginStatus();
 
                         // 刷新插件列表
@@ -1253,3 +1281,4 @@
 </body>
 
 </html>
+

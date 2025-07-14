@@ -8,6 +8,7 @@ const logger = new Logger("permission");
 
 export const depend = ['database', 'user']; // 需要的服务
 export const usage = `用户权限模型<br>依赖于yumeri-plugin-user（用户模型）<br>超管权限大小为10`
+export const provide = ['permission']   // 提供的服务
 
 export const config = {
   schema: {

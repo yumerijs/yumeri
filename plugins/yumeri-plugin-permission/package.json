@@ -1,6 +1,6 @@
 {
   "name": "yumeri-plugin-permission",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Permission module for Yumeri",
   "main": "dist/index.js",
   "dev": "src/index.ts",
