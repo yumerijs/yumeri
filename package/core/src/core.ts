@@ -209,14 +209,14 @@ export class Core {
    * @param triggerPendingCheck 是否在加载后触发对其他待定插件的检查，默认为 true
    * @returns Promise<boolean> 是否加载成功
    */
-  public async loadSinglePlugin(pluginName: string, triggerPendingCheck: boolean = true): Promise<boolean> {
+  public async loadSinglePlugin(pluginName: string, triggerPendingCheck: boolean = true, onlypending: boolean = false): Promise<boolean> {
     // 如果插件不存在于状态记录中（例如，动态添加），则设为 PENDING
     if (!this.pluginStatus[pluginName]) {
         this.pluginStatus[pluginName] = PluginStatus.PENDING;
     }
 
     // 只有 PENDING 状态的插件才能被加载
-    if (this.pluginStatus[pluginName] !== PluginStatus.PENDING) {
+    if (this.pluginStatus[pluginName] !== PluginStatus.PENDING && onlypending) {
       // this.logger.info(`Plugin "${pluginName}" is not in a pending state (current: ${this.pluginStatus[pluginName]}). Skipping load.`);
       return false;
     }
@@ -239,8 +239,8 @@ export class Core {
       this.plugins[pluginName] = pluginInstance;
 
       if (pluginInstance.apply) {
+        this.pluginLoader.logger.info(`Apply plugin "${pluginName}"`);
         await pluginInstance.apply(new Context(this, pluginName), await this.getPluginConfig(pluginName));
-        this.pluginLoader.logger.info(`Applied plugin "${pluginName}"`);
       }
 
       // 注册提供的组件
@@ -255,7 +255,6 @@ export class Core {
       }
 
       this.pluginStatus[pluginName] = PluginStatus.ENABLED; // 更新状态为已启用
-      // this.logger.info(`Plugin "${pluginName}" loaded successfully.`);
 
       // 加载成功后，检查是否可以加载其他等待中的插件
       if (triggerPendingCheck) {
@@ -287,7 +286,7 @@ export class Core {
    * 卸载插件，并递归卸载依赖于它的其他插件
    * @param pluginNameToUnload 要卸载的插件名
    */
-  public async unloadPlugin(pluginNameToUnload: string): Promise<void> {
+  public async unloadPlugin(pluginNameToUnload: string, ispending = false): Promise<void> {
     // 1. 找出所有直接或间接依赖于此插件的插件
     const dependents: string[] = [];
     const pluginsToCheck = [pluginNameToUnload];
@@ -314,11 +313,11 @@ export class Core {
 
     // 2. 卸载所有依赖者
     for (const dependentName of dependents) {
-      await this._unloadSinglePlugin(dependentName);
+      await this.unloadPlugin(dependentName, true);
     }
 
     // 3. 最后卸载目标插件
-    await this._unloadSinglePlugin(pluginNameToUnload);
+    await this._unloadSinglePlugin(pluginNameToUnload, ispending);
 
     // 4. 卸载完成后，尝试重新加载处于 PENDING 状态的插件
     // await this._loadPendingPlugins();
@@ -328,7 +327,7 @@ export class Core {
    * 内部函数：执行单个插件的卸载逻辑
    * @param pluginName 插件名
    */
-  private async _unloadSinglePlugin(pluginName: string): Promise<void> {
+  private async _unloadSinglePlugin(pluginName: string, ispending = false): Promise<void> {
     if (this.pluginStatus[pluginName] !== PluginStatus.ENABLED) {
       return; // 只卸载已启用的插件
     }
@@ -346,12 +345,9 @@ export class Core {
       delete this.plugins[pluginName];
       delete this.pluginModules[pluginName];
 
-      // 更新状态为 PENDING，因为它的配置仍然是启用的
-      // 如果它被其他插件依赖，当那个插件被卸载时，它也会被重新评估
-      this.pluginStatus[pluginName] = PluginStatus.PENDING;
+      this.pluginStatus[pluginName] = ispending ? PluginStatus.PENDING : PluginStatus.DISABLED;
 
       this.emit('plugin-unloaded', pluginName);
-      // this.logger.info(`Plugin "${pluginName}" unloaded.`);
     } catch (error) {
       this.logger.error(`Failed to unload plugin "${pluginName}":`, error);
     }
