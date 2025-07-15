@@ -321,7 +321,7 @@ __metadata:
     fs-extra: "npm:^11.3.0"
     js-yaml: "npm:^4.1.0"
     typescript: "npm:^5.8.2"
-    yumeri: "npm:1.1.0"
+    yumeri: "npm:^1.1.0"
   bin:
     yumeri-scripts: dist/index.js
   languageName: unknown
@@ -2412,7 +2412,7 @@ __metadata:
   dependencies:
     "@types/node": "npm:^22.14.1"
     typescript: "npm:^5.8.2"
-    yumeri: "npm:1.1.0"
+    yumeri: "npm:^1.1.0"
     yumeri-plugin-user: "npm:^1.0.0"
   languageName: unknown
   linkType: soft
@@ -2425,8 +2425,8 @@ __metadata:
     "@types/node": "npm:^22.14.1"
     js-yaml: "npm:^4.1.0"
     typescript: "npm:^5.8.2"
-    yumeri: "npm:1.1.0"
-    yumeri-plugin-server: "npm:1.1.0"
+    yumeri: "npm:^1.1.0"
+    yumeri-plugin-server: "npm:^1.1.0"
   languageName: unknown
   linkType: soft
 
@@ -2436,7 +2436,7 @@ __metadata:
   dependencies:
     "@types/node": "npm:^22.14.1"
     typescript: "npm:^5.8.2"
-    yumeri: "npm:1.1.0"
+    yumeri: "npm:^1.1.0"
   languageName: unknown
   linkType: soft
 
@@ -2446,7 +2446,7 @@ __metadata:
   dependencies:
     "@types/node": "npm:^22.14.1"
     typescript: "npm:^5.8.2"
-    yumeri: "npm:1.1.0"
+    yumeri: "npm:^1.1.0"
   languageName: unknown
   linkType: soft
 
@@ -2458,7 +2458,7 @@ __metadata:
     chalk: "npm:^5.4.1"
     mysql2: "npm:^3.14.1"
     typescript: "npm:^5.8.2"
-    yumeri: "npm:1.1.0"
+    yumeri: "npm:^1.1.0"
   languageName: unknown
   linkType: soft
 
@@ -2469,23 +2469,10 @@ __metadata:
     "@types/node": "npm:^22.14.1"
     "@yumerijs/types": "npm:^1.0.0"
     typescript: "npm:^5.8.2"
-    yumeri: "npm:1.1.0"
+    yumeri: "npm:^1.1.0"
     yumeri-plugin-user: "npm:^1.0.0"
   languageName: unknown
   linkType: soft
-
-"yumeri-plugin-server@npm:1.1.0":
-  version: 1.1.0
-  resolution: "yumeri-plugin-server@npm:1.1.0"
-  dependencies:
-    chalk: "npm:^5.4.1"
-    formidable: "npm:^3.5.4"
-    mime-types: "npm:^3.0.1"
-    ws: "npm:^8.18.2"
-    yumeri: "npm:1.1.0"
-  checksum: 10c0/b02c40ef18a7e5288ae02216c70858a7f8b8e0df13e8d484e401b09cacd636e30fb7c2abf9f7d378295148792f8449aed4fcae76f94fbf3df42caf3ad6927ce7
-  languageName: node
-  linkType: hard
 
 "yumeri-plugin-server@npm:^1.1.0, yumeri-plugin-server@workspace:plugins/yumeri-plugin-server":
   version: 0.0.0-use.local
@@ -2501,7 +2488,7 @@ __metadata:
     mime-types: "npm:^3.0.1"
     typescript: "npm:^5.8.2"
     ws: "npm:^8.18.2"
-    yumeri: "npm:1.1.0"
+    yumeri: "npm:^1.1.0"
   languageName: unknown
   linkType: soft
 
@@ -2515,7 +2502,7 @@ __metadata:
     sqlite: "npm:^5.1.1"
     sqlite3: "npm:^5.1.7"
     typescript: "npm:^5.8.2"
-    yumeri: "npm:1.1.0"
+    yumeri: "npm:^1.1.0"
   languageName: unknown
   linkType: soft
 
@@ -2528,23 +2515,11 @@ __metadata:
     sqlite: "npm:^5.1.1"
     sqlite3: "npm:^5.1.7"
     typescript: "npm:^5.8.2"
-    yumeri: "npm:1.1.0"
+    yumeri: "npm:^1.1.0"
   languageName: unknown
   linkType: soft
 
-"yumeri@npm:1.1.0":
-  version: 1.1.0
-  resolution: "yumeri@npm:1.1.0"
-  dependencies:
-    "@yumerijs/core": "npm:1.1.0"
-    "@yumerijs/loader": "npm:1.1.0"
-  bin:
-    yumeri: dist/run.js
-  checksum: 10c0/9f0c32cef4da38817d1e48b087c4e8b634b57bd1cce1100f384114448de9fddb7258314f923542e6033b112b3e5e91af46d6fa2a92f5e607880c03751189e9ac
-  languageName: node
-  linkType: hard
-
-"yumeri@workspace:^, yumeri@workspace:package/yumeri":
+"yumeri@npm:^1.1.0, yumeri@workspace:^, yumeri@workspace:package/yumeri":
   version: 0.0.0-use.local
   resolution: "yumeri@workspace:package/yumeri"
   dependencies:

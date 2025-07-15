@@ -1,6 +1,6 @@
 {
     "name": "yumeri-plugin-user",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "description": "User model for Yumeri",
     "main": "dist/index.js",
     "dev": "src/index.ts",
@@ -35,6 +35,6 @@
         "chalk": "^5.4.1",
         "sqlite": "^5.1.1",
         "sqlite3": "^5.1.7",
-        "yumeri": "1.1.0"
+        "yumeri": "^1.1.0"
     }
 }

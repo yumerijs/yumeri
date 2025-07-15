@@ -1,6 +1,6 @@
 {
   "name": "@yumerijs/scripts",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Development scripts for yumeri",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -38,6 +38,6 @@
   "dependencies": {
     "fs-extra": "^11.3.0",
     "js-yaml": "^4.1.0",
-    "yumeri": "1.1.0"
+    "yumeri": "^1.1.0"
   }
 }
