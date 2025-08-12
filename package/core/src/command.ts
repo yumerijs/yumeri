@@ -57,6 +57,9 @@ export enum HttpMethod {
 /**
  * 命令类，用于注册和执行命令
  */
+/**
+ * @deprecated Use Route instead.
+ */
 export class Command {
   /** 命令名称 */
   name: string;

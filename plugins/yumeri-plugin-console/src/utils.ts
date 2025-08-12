@@ -3,7 +3,18 @@ import { fileURLToPath } from 'url';
 import * as yaml from 'js-yaml';
 import * as fs from 'fs'; // 引入同步 fs 模块
 import * as path from 'path';
-import { PluginConfigSchema, logger } from './index'
+
+const logger = new Logger('console');
+
+export interface PluginConfigSchema {
+    type: 'string' | 'number' | 'boolean' | 'object' | 'array';
+    default?: any;
+    description?: string;
+    required?: boolean;
+    enum?: any[];
+    items?: PluginConfigSchema;
+    properties?: Record<string, PluginConfigSchema>;
+}
 
 export class PluginConfigManager {
     private configCache: Record<string, any> = {};

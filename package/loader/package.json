@@ -8,8 +8,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc",
-    "prepublishOnly": "yarn build"
+    "build": "tsc"
   },
   "repository": {
     "type": "git",
@@ -33,7 +32,6 @@
   "dependencies": {
     "@yumerijs/core": "^1.1.0",
     "chokidar": "^4.0.3",
-    "semver": "^7.7.1",
-    "ts-node": "^10.9.2"
+    "semver": "^7.7.1"
   }
 }

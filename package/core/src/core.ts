@@ -11,8 +11,9 @@ import { Logger } from './logger';
 import { Command } from './command';
 import { Session } from './session';
 import { Platform } from './platform';
-import chokidar from 'chokidar';
+import * as chokidar from 'chokidar';
 import { Middleware } from './middleware';
+import { Route } from './route';
 import { Context } from './context';
 
 interface Plugin {
@@ -50,6 +51,7 @@ export class Core {
   private eventListeners: { [event: string]: ((...args: any[]) => Promise<void>)[] } = {};
   public components: { [name: string]: any } = {};
   public commands: Record<string, Command> = {};
+  public routes: Record<string, Route> = {};
   public pluginLoader: PluginLoader;
   public logger = new Logger('core');
   public providedComponents: { [name: string]: string } = {};
@@ -57,11 +59,13 @@ export class Core {
   private configPath: string = '';
   private globalMiddlewares: Record<string, Middleware> = {};
   public cmdtoplu: Record<string, string> = {};
+  public routetoplu: Record<string, string> = {};
   public comtoplu: Record<string, string> = {};
   public evttoplu: Record<string, Record<string, ((...args: any[]) => Promise<void>)[]>> = {};
   public mdwtoplu: Record<string, string> = {};
   public plftoplu: Record<string, string> = {};
   public pluginStatus: Record<string, PluginStatus> = {};
+  private pluginWatchers: Record<string, chokidar.FSWatcher> = {};
 
   constructor(pluginLoader: PluginLoader) {
     this.pluginLoader = pluginLoader;
@@ -197,10 +201,6 @@ export class Core {
     if (pendingPlugins.length > 0) {
       // this.logger.warn('Some plugins could not be loaded due to unresolved dependencies:', pendingPlugins);
     }
-
-    if (process.env.NODE_ENV === 'development') {
-      this.watchPlugins(this);
-    }
   }
 
   /**
@@ -212,7 +212,7 @@ export class Core {
   public async loadSinglePlugin(pluginName: string, triggerPendingCheck: boolean = true, onlypending: boolean = false): Promise<boolean> {
     // 如果插件不存在于状态记录中（例如，动态添加），则设为 PENDING
     if (!this.pluginStatus[pluginName]) {
-        this.pluginStatus[pluginName] = PluginStatus.PENDING;
+      this.pluginStatus[pluginName] = PluginStatus.PENDING;
     }
 
     // 只有 PENDING 状态的插件才能被加载
@@ -259,6 +259,31 @@ export class Core {
       // 加载成功后，检查是否可以加载其他等待中的插件
       if (triggerPendingCheck) {
         await this._loadPendingPlugins();
+      }
+
+      // In development mode, watch the plugin for changes.
+      if (process.env.NODE_ENV === 'development') {
+        let pluginPathToWatch: string | null = null;
+        try {
+          // Try resolving as a module
+          const pluginEntryPoint = require.resolve(pluginName);
+          pluginPathToWatch = path.dirname(pluginEntryPoint);
+        } catch (e) {
+          // Fallback for local plugins relative to CWD
+          const localPluginPath = path.resolve(process.cwd(), pluginName);
+          const localPluginPathInPlugins = path.resolve(process.cwd(), 'plugins', pluginName);
+          if (fs.existsSync(localPluginPath)) {
+            pluginPathToWatch = localPluginPath;
+          } else if (fs.existsSync(localPluginPathInPlugins)) {
+            pluginPathToWatch = localPluginPathInPlugins;
+          }
+        }
+
+        if (pluginPathToWatch) {
+          this.watchPlugin(pluginName, pluginPathToWatch);
+        } else {
+          this.logger.warn(`Could not resolve path for plugin ${pluginName} to watch for changes.`);
+        }
       }
 
       return true;
@@ -347,6 +372,12 @@ export class Core {
 
       this.pluginStatus[pluginName] = ispending ? PluginStatus.PENDING : PluginStatus.DISABLED;
 
+      // Stop watching the plugin directory
+      if (this.pluginWatchers[pluginName]) {
+        this.pluginWatchers[pluginName].close();
+        delete this.pluginWatchers[pluginName];
+      }
+
       this.emit('plugin-unloaded', pluginName);
     } catch (error) {
       this.logger.error(`Failed to unload plugin "${pluginName}":`, error);
@@ -376,14 +407,18 @@ export class Core {
   }
 
   /**
-   * 监听插件文件变化，实现热更新
-   * @param core Core 实例
-   * @param pluginsDir 插件目录，默认为 'plugins'
+   * Watch a single plugin for changes.
+   * @param pluginName The name of the plugin.
+   * @param pluginPath The root path of the plugin to watch.
    */
-  watchPlugins(core: Core, pluginsDir: string = 'plugins') {
+  private watchPlugin(pluginName: string, pluginPath: string): void {
+    if (this.pluginWatchers[pluginName]) {
+      return; // Already watching
+    }
+
     const logger = new Logger('hmr');
-    const watcher = chokidar.watch(pluginsDir, {
-      ignored: /(^|[/\\])\../,
+    const watcher = chokidar.watch(pluginPath, {
+      ignored: /(^|[\/])\../,
       persistent: true,
       ignoreInitial: true,
       awaitWriteFinish: {
@@ -392,37 +427,23 @@ export class Core {
       },
     });
 
-    const getPluginNameFromPath = (changePath: string): string | null => {
-        if (!changePath.endsWith('.ts') && !changePath.endsWith('.js')) return null;
-        const parts = changePath.split(path.sep);
-        return parts.length > 1 ? parts[1] : null;
-    };
-
     watcher.on('change', async (changePath) => {
-      const pluginName = getPluginNameFromPath(changePath);
-      if (pluginName) {
-        logger.info(`Plugin file changed: ${changePath}`);
-        await core.reloadPlugin(pluginName);
-      }
+      logger.info(`Plugin file changed: ${changePath}`);
+      await this.reloadPlugin(pluginName);
     });
 
     watcher.on('add', async (changePath) => {
-        const pluginName = getPluginNameFromPath(changePath);
-        if (pluginName) {
-            logger.info(`New plugin file added: ${changePath}`);
-            await core.reloadPlugin(pluginName);
-        }
+      logger.info(`New file added to plugin ${pluginName}: ${changePath}`);
+      await this.reloadPlugin(pluginName);
     });
 
     watcher.on('unlink', async (changePath) => {
-        const pluginName = getPluginNameFromPath(changePath);
-        if (pluginName) {
-            logger.info(`Plugin file removed: ${changePath}`);
-            await core.unloadPlugin(pluginName);
-        }
+      logger.info(`File removed from plugin ${pluginName}: ${changePath}`);
+      await this.reloadPlugin(pluginName);
     });
 
-    logger.info(`Watching for plugin changes in ${pluginsDir}`);
+    this.pluginWatchers[pluginName] = watcher;
+    // logger.info(`Watching for changes in plugin: ${pluginName}`);
   }
 
   /**
@@ -499,9 +520,7 @@ export class Core {
   }
 
   /**
-   * 注册命令
-   * @param name 命令名称
-   * @returns Command 实例
+   * @deprecated Use route() instead.
    */
   command(name: string): Command {
     const command = new Command(this, name);
@@ -509,12 +528,15 @@ export class Core {
     return command;
   }
 
+  route(path: string): Route {
+    const route = new Route(path);
+    this.routes[path] = route;
+    return route;
+  }
+
   /**
    * 执行命令
-   * @param name 命令名称
-   * @param session 会话对象
-   * @param args 传递给命令处理函数的参数
-   * @returns 会话对象或 null
+   * @deprecated
    */
   async executeCommand(name: string, session: any, ...args: any[]): Promise<Session | null> {
     const command = this.commands[name];
@@ -538,6 +560,38 @@ export class Core {
     }
     return null;
   }
+  /**
+   * 执行路由
+   * @param pathname 需要匹配的URL
+   * @param session 当前会话
+   * @param queryParams URL参数
+   * @returns 是否匹配成功
+   */
+  async executeRoute(pathname: string, session: Session, queryParams: URLSearchParams): Promise<boolean> {
+    for (const routePath in this.routes) {
+      const route = this.routes[routePath];
+      const result = route.match(pathname);
+      if (result) {
+        const globalMiddlewareList = Object.values(this.globalMiddlewares || {});
+        const routeMiddlewareList = route.middlewares || [];
+        const middlewares = [...globalMiddlewareList, ...routeMiddlewareList];
+
+        let index = 0;
+        const runner = async (): Promise<void> => {
+          if (index < middlewares.length) {
+            const middleware = middlewares[index++];
+            await middleware(session, runner);
+          } else {
+            await route.executeHandler(session, queryParams, result.pathParams);
+          }
+        };
+
+        await runner();
+        return true;
+      }
+    }
+    return false;
+  }
 
   /**
    * 注册平台
@@ -560,6 +614,14 @@ export class Core {
       .forEach(cmd => {
         delete this.cmdtoplu[cmd];
         delete this.commands[cmd];
+      });
+
+    // 清理 routes
+    Object.keys(this.routetoplu)
+      .filter(path => this.routetoplu[path] === pluginname)
+      .forEach(path => {
+        delete this.routetoplu[path];
+        delete this.routes[path];
       });
 
     // 清理 components 和 providedComponents
@@ -598,5 +660,20 @@ export class Core {
    */
   getCommand(name: string): Command | null {
     return this.commands[name] || null;
+  }
+
+  /**
+   * 获取路由
+   * @param path 匹配路径
+   * @return Route 实例或 false
+   */
+  getRoute(path: string): Route | false {
+    for (const routePath in this.routes) {
+      const route = this.routes[routePath];
+      if (route.match(path)) {
+        return route;
+      }
+    }
+    return false;
   }
 }

@@ -57,11 +57,12 @@ export const config = {
   } as Record<string, ConfigSchema>
 };
 export async function apply(ctx: Context, config: Config) {
-  // 注册Echo命令
-  ctx.command(config.get<string>('path', 'echo'))
-    .action(async (session: Session, param?: any) => {
-      session.setMime(config.get<string>('type', 'html')); // 默认设置为 HTML 类型
-      session.body = config.get<contentobject>('content').content?.join(config.get<contentobject>('content').join);
+  const routePath = `/${config.get<string>('path', 'echo')}`;
+  ctx.route(routePath)
+    .action((session: Session) => {
+      session.setMime(config.get<string>('type', 'html'));
+      const contentConfig = config.get<contentobject>('content');
+      session.body = contentConfig.content?.join(contentConfig.join);
     });
-  logger.info('Echo plugin loaded');
+  logger.info(`Echo plugin loaded at route: ${routePath}`);
 }

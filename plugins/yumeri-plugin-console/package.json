@@ -35,6 +35,7 @@
   },
   "dependencies": {
     "js-yaml": "^4.1.0",
+    "mime": "^4.0.7",
     "yumeri": "^1.1.0",
     "yumeri-plugin-server": "^1.1.0"
   }

@@ -79,74 +79,96 @@ export async function apply(ctx: Context, config: Config) {
       }
     }
   } as Authority)
-  const user = ctx.getComponent('user') as User
-  ctx.command('auth')
-    .action(async (session: Session, param?: any) => {
-      if (param.path === '/login') {
-        if (fs.existsSync(resolvePath(config.get<string>('template.loginpath', '../static/login.html'), __dirname))) {
-          const content = fs.readFileSync(resolvePath(config.get<string>('template.loginpath', '../static/login.html'), __dirname), 'utf-8');
-          session.body = content;
-          session.setMime('html')
-        }
-      } else if (param.path === '/register') {
-        if (fs.existsSync(resolvePath(config.get<string>('template.regpath', '../static/reg.html'), __dirname))) {
-          const content = fs.readFileSync(resolvePath(config.get<string>('template.regpath', '../static/reg.html'), __dirname), 'utf-8');
-          session.setMime('html')
-          session.body = content;
-        }
-      } else if (param.path === '/style.css') {
-        if (fs.existsSync(resolvePath('../static/style.css', __dirname))) {
-          const content = fs.readFileSync(resolvePath('../static/style.css', __dirname), 'utf-8');
-          session.body = content;
-          session.setMime('text/css')
-        }
-      } else if (param.path === '/script.js') {
-        if (fs.existsSync(resolvePath('../static/script.js', __dirname))) {
-          const content = fs.readFileSync(resolvePath('../static/script.js', __dirname), 'utf-8');
-          session.body = content;
-          session.setMime('text/javascript')
-        }
+  const user = ctx.getComponent('user') as User;
+
+  // HTML Pages
+  ctx.route('/auth/login').action((session) => {
+    const loginPath = resolvePath(config.get<string>('template.loginpath', '../static/login.html'), __dirname);
+    if (fs.existsSync(loginPath)) {
+      session.body = fs.readFileSync(loginPath, 'utf-8');
+      session.setMime('html');
+    }
+  });
+
+  ctx.route('/auth/register').action((session) => {
+    const regPath = resolvePath(config.get<string>('template.regpath', '../static/reg.html'), __dirname);
+    if (fs.existsSync(regPath)) {
+      session.body = fs.readFileSync(regPath, 'utf-8');
+      session.setMime('html');
+    }
+  });
+
+  // Static Assets
+  ctx.route('/auth/style.css').action((session) => {
+    const stylePath = resolvePath('../static/style.css', __dirname);
+    if (fs.existsSync(stylePath)) {
+      session.body = fs.readFileSync(stylePath, 'utf-8');
+      session.setMime('text/css');
+    }
+  });
+
+  ctx.route('/auth/script.js').action((session) => {
+    const scriptPath = resolvePath('../static/script.js', __dirname);
+    if (fs.existsSync(scriptPath)) {
+      session.body = fs.readFileSync(scriptPath, 'utf-8');
+      session.setMime('text/javascript');
+    }
+  });
+
+  // API routes
+  ctx.route('/auth/api/login').action(async (session, params) => {
+    const username = params.get('username');
+    const password = params.get('password');
+    
+    let fine = true;
+    const paramObj = Object.fromEntries(params.entries());
+    for (const hook in hookslogin) {
+      if (!hookslogin[hook](paramObj)) {
+        fine = false;
+        session.body = JSON.stringify({ code: 1, message: '登录失败' });
+        break;
       }
-      if (param.path.startsWith('/api/')) {
-        if (param.path === '/api/login') {
-          const { username, password } = param
-          let fine: boolean = true
-          for (const hook in hookslogin) {
-            if (!hookslogin[hook](param)) {
-              fine = false
-              session.body = JSON.stringify({ code: 1, message: '登录失败' })
-            }
-          }
-          if (fine) {
-            const result = await user.login(username, password)
-            if (!result) {
-              session.body = JSON.stringify({ code: 1, message: '用户名或密码错误' })
-              return
-            }
-            logins[session.sessionid] = (await user.getuserinfo(username))?.id
-            session.body = JSON.stringify({ code: 0, message: '登录成功' })
-            return
-          }
-        }
-        if (param.path === '/api/register') {
-          const { username, password } = param
-          let fine: boolean = true
-          for (const hook in hooksregister) {
-            if (!hooksregister[hook](param)) {
-              fine = false
-              session.body = JSON.stringify({ code: 1, message: '注册失败' })
-            }
-          }
-          if (fine) {
-            const result = await user.register(username, password)
-            if (!result) {
-              session.body = JSON.stringify({ code: 1, message: '注册失败' })
-              return
-            }
-            session.body = JSON.stringify({ code: 0, message: '注册成功' })
-            return
-          }
-        }
+    }
+
+    if (fine && username && password) {
+      const result = await user.login(username, password);
+      if (!result) {
+        session.body = JSON.stringify({ code: 1, message: '用户名或密码错误' });
+        return;
       }
-    });
+      const userInfo = await user.getuserinfo(username);
+      if (userInfo) {
+        logins[session.sessionid] = userInfo.id;
+      }
+      session.body = JSON.stringify({ code: 0, message: '登录成功' });
+    } else if (fine) {
+        session.body = JSON.stringify({ code: 1, message: '缺少用户名或密码' });
+    }
+  });
+
+  ctx.route('/auth/api/register').action(async (session, params) => {
+    const username = params.get('username');
+    const password = params.get('password');
+
+    let fine = true;
+    const paramObj = Object.fromEntries(params.entries());
+    for (const hook in hooksregister) {
+      if (!hooksregister[hook](paramObj)) {
+        fine = false;
+        session.body = JSON.stringify({ code: 1, message: '注册失败' });
+        break;
+      }
+    }
+
+    if (fine && username && password) {
+      const result = await user.register(username, password);
+      if (!result) {
+        session.body = JSON.stringify({ code: 1, message: '注册失败' });
+        return;
+      }
+      session.body = JSON.stringify({ code: 0, message: '注册成功' });
+    } else if (fine) {
+        session.body = JSON.stringify({ code: 1, message: '缺少用户名或密码' });
+    }
+  });
 }

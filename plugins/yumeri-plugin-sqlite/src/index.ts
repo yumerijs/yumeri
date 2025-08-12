@@ -1,7 +1,6 @@
 import { Context, Config, Session, Logger, ConfigSchema } from 'yumeri';
-// 从 'sqlite3' 模块中导入 Database (并重命名为 SQLite3Driver)。
-// 注意：RunResult 不从这里导入，因为它通常与 Statement 合并，且 sqlite 包装库返回的是简化结果。
 import { Database as SQLite3Driver } from 'sqlite3';
+import { Database as YumeriDatabase, QueryConditions, TableSchema, ColumnDefinition, ColumnAlteration } from '@yumerijs/types/dist/database';
 // 从 'sqlite' 包装库中导入 open 函数和 Database 类型。
 import { open, Database } from 'sqlite';
 import path from 'path';
@@ -18,7 +17,7 @@ interface SqliteWrapperRunResult {
 /**
  * 通用的数据库操作类，封装了SQLite连接和常见的CRUD操作。
  */
-class SqliteDatabase {
+class SqliteDatabase implements YumeriDatabase {
     // connectionPromise 在构造函数中被初始化为一个 Promise，用于确保数据库连接异步完成。
     private connectionPromise: Promise<Database>;
 
@@ -31,14 +30,14 @@ class SqliteDatabase {
             filename: dbPath,
             driver: SQLite3Driver // 使用重命名后的 SQLite3Driver 作为底层驱动
         })
-        .then(db => {
-            logger.info(`Successfully connected to SQLite database at ${dbPath}`);
-            return db; // 返回已连接的数据库实例
-        })
-        .catch(error => {
-            logger.error(`Error connecting to database at ${dbPath}:`, error);
-            throw error; // 抛出错误以便外部捕获
-        });
+            .then(db => {
+                logger.info(`Successfully connected to SQLite database at ${dbPath}`);
+                return db; // 返回已连接的数据库实例
+            })
+            .catch(error => {
+                logger.error(`Error connecting to database at ${dbPath}:`, error);
+                throw error; // 抛出错误以便外部捕获
+            });
     }
 
     /**
@@ -49,17 +48,43 @@ class SqliteDatabase {
     private async getDb(): Promise<Database> {
         return this.connectionPromise;
     }
+    /**
+     * 内部执行SQL
+     * @private
+     * @param sql SQL语句
+     * @param params 参数数组
+     * @returns Promise<any> 查询结果
+     */
+    private async run(sql: string, params?: any[]): Promise<any> {
+        const db = await this.getDb();
+        return db.run(sql, params);
+    }
 
     /**
-     * 执行原始SQL语句（如INSERT, UPDATE, DELETE），不返回行数据。
-     * @param sql SQL查询字符串。
-     * @param params 可选参数，用于SQL中的占位符 (`?`)。
-     * @returns Promise<SqliteWrapperRunResult> 包含 lastID (插入操作) 和 changes (修改/删除操作) 的结果对象。
+     * 执行原始SQL语句（如INSERT, UPDATE, DELETE）
+     * @param sql SQL语句
+     * @param params 参数数组
+     * @returns Promise<void> 操作完成后的Promise
      */
-    public async runSQL(sql: string, params: any[] = []): Promise<SqliteWrapperRunResult> {
+    public async runSQL(sql: string, params?: any[]): Promise<{
+        insertId?: number;
+        affectedRows?: number;
+    }> {
         const db = await this.getDb();
         const result = await db.run(sql, params);
-        return result;
+        return {
+            insertId: result.lastID,
+            affectedRows: result.changes
+        }
+    }
+    /**
+     * 检查表是否存在
+     * @param tableName 表名
+     */
+    public async tableExists(tableName: string): Promise<boolean> {
+        const db = await this.getDb();
+        const result = await db.get(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`, [tableName]);
+        return !!result;
     }
 
     /**
@@ -96,10 +121,8 @@ class SqliteDatabase {
         const values = Object.values(data);
 
         const sql = `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES (${placeholders})`;
-        const result = await this.runSQL(sql, values);
-        // lastID 属性可能为 undefined (例如：如果表没有自增ID列)
-        // 这里假设会返回一个 ID，如果你的表结构不支持，可能需要更严谨的处理。
-        return result.lastID as number;
+        const result = await this.run(sql, values);
+        return result.lastID;
     }
 
     /**
@@ -144,7 +167,7 @@ class SqliteDatabase {
      * @param conditions 一个对象，键为列名，值为过滤更新的条件。
      * @returns Promise<void>
      */
-    public async update(tableName: string, data: Record<string, any>, conditions: Record<string, any>): Promise<void> {
+    public async update(tableName: string, data: Record<string, any>, conditions: QueryConditions): Promise<number> {
         const setParts = Object.keys(data).map(key => `${key} = ?`);
         const whereParts = Object.keys(conditions).map(key => `${key} = ?`);
 
@@ -163,6 +186,7 @@ class SqliteDatabase {
         const params = [...Object.values(data), ...Object.values(conditions)];
 
         await this.runSQL(sql, params);
+        return params.length;
     }
 
     /**
@@ -171,7 +195,7 @@ class SqliteDatabase {
      * @param conditions 一个对象，键为列名，值为过滤删除的条件。
      * @returns Promise<void>
      */
-    public async delete(tableName: string, conditions: Record<string, any>): Promise<void> {
+    public async delete(tableName: string, conditions: QueryConditions): Promise<number> {
         const whereParts = Object.keys(conditions).map(key => `${key} = ?`);
 
         if (whereParts.length === 0) {
@@ -183,6 +207,7 @@ class SqliteDatabase {
         const params = Object.values(conditions);
 
         await this.runSQL(sql, params);
+        return params.length;
     }
 
     /**
@@ -263,20 +288,202 @@ class SqliteDatabase {
             logger.warn("Could not close database connection cleanly:", error);
         }
     }
+    async createTable(tableName: string, schema: TableSchema): Promise<void> {
+        const exists = await this.tableExists(tableName);
+        if (exists) {
+            logger.info(`Table \`${tableName}\` already exists, skipping creation.`);
+            return;
+        }
+
+        const columns = Object.entries(schema).map(([field, def]) => this.buildColumnSQL(field, def));
+        const primaryKeys = Object.entries(schema)
+            .filter(([, def]) => def.primaryKey)
+            .map(([field]) => `\`${field}\``);
+
+        if (primaryKeys.length > 0) {
+            columns.push(`PRIMARY KEY (${primaryKeys.join(', ')})`);
+        }
+
+        const sql = `CREATE TABLE \`${tableName}\` (${columns.join(', ')})`;
+        await this.runSQL(sql);
+        logger.info(`Table \`${tableName}\` created successfully.`);
+    }
+    // 辅助函数：构建列的 SQL 片段
+    private buildColumnSQL(field: string, def: ColumnDefinition): string {
+        let parts = [`\`${field}\` ${this.mapFriendlyTypeToSQL(def)}`];
+
+        if (def.unsigned) parts.push('UNSIGNED');
+        if (def.zerofill) parts.push('ZEROFILL');
+        if (def.notNull) parts.push('NOT NULL');
+        if (def.unique) parts.push('UNIQUE');
+        if (def.autoIncrement) parts.push('AUTO_INCREMENT');
+
+        if (def.default !== undefined) {
+            if (def.default === 'CURRENT_TIMESTAMP_FUNC' && ['DATETIME', 'TIMESTAMP'].includes(def.type.toUpperCase())) {
+                parts.push('DEFAULT CURRENT_TIMESTAMP');
+            } else if (typeof def.default === 'string') {
+                parts.push(`DEFAULT '${def.default}'`);
+            } else if (def.default === null) {
+                parts.push(`DEFAULT NULL`); // 明确指定 NULL
+            } else {
+                parts.push(`DEFAULT ${def.default}`);
+            }
+        }
+
+        if (def.onUpdate === 'CURRENT_TIMESTAMP_FUNC' && ['DATETIME', 'TIMESTAMP'].includes(def.type.toUpperCase())) {
+            parts.push('ON UPDATE CURRENT_TIMESTAMP');
+        }
+
+        if (def.comment) {
+            parts.push(`COMMENT '${def.comment}'`);
+        }
+
+        return parts.join(' ');
+    }
+    private mapFriendlyTypeToSQL(def: ColumnDefinition): string {
+        let sqlType = def.type.toUpperCase();
+        switch (sqlType) {
+            case 'STRING':
+                return `VARCHAR(${def.length || 255})`; // 默认长度 255
+            case 'NUMBER':
+                return `INT`; // 默认 INT, 也可以根据 length/precision 进一步判断
+            case 'BOOLEAN':
+                return `TINYINT(1)`;
+            case 'DECIMAL':
+                return `DECIMAL(${def.precision || 10},${def.scale || 2})`;
+            case 'CHAR':
+                return `CHAR(${def.length || 1})`;
+            case 'VARCHAR':
+                return `VARCHAR(${def.length || 255})`;
+            case 'ENUM':
+                if (!def.enum || def.enum.length === 0) {
+                    throw new Error(`ENUM type requires 'enum' property with at least one value for field: ${def.comment || ''}`);
+                }
+                return `ENUM(${def.enum.map(val => `'${val}'`).join(', ')})`;
+            default:
+                return sqlType;
+        }
+    }
+    public async updateTableStructure(tableName: string, alterations: ColumnAlteration[]): Promise<void> {
+        const db = await this.getDb();
+
+        // 1. 拿当前表结构
+        const pragmaColumns: Array<{
+            cid: number;
+            name: string;
+            type: string;
+            notnull: number;
+            dflt_value: any;
+            pk: number;
+        }> = await db.all(`PRAGMA table_info(${tableName})`);
+
+        const currentCols = pragmaColumns.reduce((acc, col) => {
+            acc[col.name] = col;
+            return acc;
+        }, {} as Record<string, typeof pragmaColumns[0]>);
+
+        // 判断有没有除新增以外的操作，除新增都需要重建表
+        let onlyAdd = alterations.every(a => a.action === 'ADD');
+
+        if (onlyAdd) {
+            // 只新增列，走ALTER TABLE ADD COLUMN
+            for (const alt of alterations) {
+                if (!alt.field || !alt.definition) continue;
+                const colSQL = this.buildColumnSQL(alt.field, alt.definition);
+                const sql = `ALTER TABLE ${tableName} ADD COLUMN ${colSQL}`;
+                await this.run(sql);
+            }
+            return;
+        }
+
+        // 2. 重建表流程：
+
+        // 收集要删的列名
+        const dropSet = new Set(alterations.filter(a => a.action === 'DROP').map(a => a.field));
+        // 收集修改的列定义映射
+        const modifyMap = new Map<string, ColumnDefinition>();
+        for (const alt of alterations) {
+            if (alt.action === 'MODIFY' && alt.field && alt.definition) {
+                modifyMap.set(alt.field, alt.definition);
+            }
+        }
+        // 收集新增列定义映射
+        const addMap = new Map<string, ColumnDefinition>();
+        for (const alt of alterations) {
+            if (alt.action === 'ADD' && alt.field && alt.definition) {
+                addMap.set(alt.field, alt.definition);
+            }
+        }
+
+        // 组合新表列
+        let newColumns: { name: string; definition: ColumnDefinition }[] = [];
+
+        // 先处理旧表的列，删的跳过，修改的用新定义，没改的原样
+        for (const col of pragmaColumns) {
+            if (dropSet.has(col.name)) continue; // 删掉
+
+            if (modifyMap.has(col.name)) {
+                newColumns.push({ name: col.name, definition: modifyMap.get(col.name)! });
+            } else {
+                newColumns.push({
+                    name: col.name,
+                    definition: {
+                        type: col.type as any || 'TEXT',
+                        notNull: col.notnull === 1,
+                        default: col.dflt_value,
+                        primaryKey: col.pk === 1,
+                    },
+                });
+            }
+        }
+
+        // 再加上新增列
+        for (const [name, def] of addMap.entries()) {
+            newColumns.push({ name, definition: def });
+        }
+
+        // 3. 生成新表名和建表SQL
+        const tmpTable = `${tableName}_tmp_${Date.now()}`;
+        const columnsSQL = newColumns.map(c => this.buildColumnSQL(c.name, c.definition)).join(', ');
+        let pkCols = newColumns.filter(c => c.definition.primaryKey).map(c => `\`${c.name}\``);
+        let pkSQL = pkCols.length > 0 ? `, PRIMARY KEY (${pkCols.join(', ')})` : '';
+        const createSQL = `CREATE TABLE ${tmpTable} (${columnsSQL}${pkSQL})`;
+        await this.run(createSQL);
+
+        // 4. 数据搬迁，旧表列名对应新表列名一样，新增列数据用NULL
+        // 旧表有效列（没删的）
+        const oldCols = pragmaColumns.filter(col => !dropSet.has(col.name)).map(c => `\`${c.name}\``);
+        // 新表列，顺序是newColumns，旧表有的列用原名，新增列用NULL
+        const selectCols = newColumns.map(c => {
+            if (oldCols.includes(`\`${c.name}\``)) {
+                return `\`${c.name}\``;
+            } else {
+                return 'NULL';
+            }
+        });
+
+        const insertSQL = `INSERT INTO ${tmpTable} (${newColumns.map(c => `\`${c.name}\``).join(', ')}) SELECT ${selectCols.join(', ')} FROM ${tableName}`;
+        await this.run(insertSQL);
+
+        // 5. 删除旧表，改名新表
+        await this.run(`DROP TABLE ${tableName}`);
+        await this.run(`ALTER TABLE ${tmpTable} RENAME TO ${tableName}`);
+    }
+
 }
 
 const logger = new Logger("database");
 
 export const config = {
-  schema: {
-    path: {
-      type: 'string',
-      default: 'data/database.db',
-      description: '数据库文件路径（相对路径）'
-    }
-  } as Record<string, ConfigSchema>
+    schema: {
+        path: {
+            type: 'string',
+            default: 'data/database.db',
+            description: '数据库文件路径（相对路径）'
+        }
+    } as Record<string, ConfigSchema>
 };
 export async function apply(ctx: Context, config: Config) {
-  const db = new SqliteDatabase(path.join(process.cwd(), config.get<string>('path', 'data/database.db')));
-  ctx.registerComponent('database', db);
+    const db = new SqliteDatabase(path.join(process.cwd(), config.get<string>('path', 'data/database.db')));
+    ctx.registerComponent('database', db);
 }

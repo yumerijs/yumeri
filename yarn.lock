@@ -281,6 +281,7 @@ __metadata:
     chokidar: "npm:^4.0.3"
     js-sha256: "npm:^0.11.0"
     js-yaml: "npm:^4.1.0"
+    path-to-regexp: "npm:^8.2.0"
     typescript: "npm:^5.8.2"
   languageName: unknown
   linkType: soft
@@ -306,7 +307,6 @@ __metadata:
     "@yumerijs/core": "npm:^1.1.0"
     chokidar: "npm:^4.0.3"
     semver: "npm:^7.7.1"
-    ts-node: "npm:^10.9.2"
     typescript: "npm:^5.8.2"
   languageName: unknown
   linkType: soft
@@ -1343,6 +1343,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"mime@npm:^4.0.7":
+  version: 4.0.7
+  resolution: "mime@npm:4.0.7"
+  bin:
+    mime: bin/cli.js
+  checksum: 10c0/2fd22ee2012a3f1dcac7dd06b7dc314dd677ebcefb14355b7c9453f0092af6eabbe9d754d9849d2a1f346ddd53d716a851379be05386f7a6ccb40af4bd61f32b
+  languageName: node
+  linkType: hard
+
 "mimic-response@npm:^3.1.0":
   version: 3.1.0
   resolution: "mimic-response@npm:3.1.0"
@@ -1716,6 +1725,13 @@ __metadata:
     lru-cache: "npm:^10.2.0"
     minipass: "npm:^5.0.0 || ^6.0.2 || ^7.0.0"
   checksum: 10c0/32a13711a2a505616ae1cc1b5076801e453e7aae6ac40ab55b388bb91b9d0547a52f5aaceff710ea400205f18691120d4431e520afbe4266b836fadede15872d
+  languageName: node
+  linkType: hard
+
+"path-to-regexp@npm:^8.2.0":
+  version: 8.2.0
+  resolution: "path-to-regexp@npm:8.2.0"
+  checksum: 10c0/ef7d0a887b603c0a142fad16ccebdcdc42910f0b14830517c724466ad676107476bba2fe9fffd28fd4c141391ccd42ea426f32bb44c2c82ecaefe10c37b90f5a
   languageName: node
   linkType: hard
 
@@ -2424,6 +2440,7 @@ __metadata:
     "@types/js-yaml": "npm:^4.0.9"
     "@types/node": "npm:^22.14.1"
     js-yaml: "npm:^4.1.0"
+    mime: "npm:^4.0.7"
     typescript: "npm:^5.8.2"
     yumeri: "npm:^1.1.0"
     yumeri-plugin-server: "npm:^1.1.0"
