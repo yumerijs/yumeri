@@ -1,2 +1,2 @@
 export * from '@yumerijs/core';
-export * from '@yumerijs/loader';
+export { default as Loader } from '@yumerijs/loader';
