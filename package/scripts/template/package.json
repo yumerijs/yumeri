@@ -1,5 +1,5 @@
 {
-  "name": "{{name}}",
+  "name": "yumeri-plugin-{{name}}",
   "version": "1.0.0",
   "description": "{{description}}",
   "main": "dist/index.js",

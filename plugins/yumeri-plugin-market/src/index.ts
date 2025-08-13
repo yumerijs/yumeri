@@ -91,17 +91,30 @@ export async function apply(ctx: Context, config: Config) {
                 return;
             }
             const packageManager = getPackageManager();
-            const command = packageManager === 'npm' ? `npm install ${packageName}` :
-                packageManager === 'yarn' ? `yarn add ${packageName}` :
-                    packageManager === 'pnpm' ? `pnpm add ${packageName}` : null;
+            const command = packageManager === 'npm' ? `npm install ${packageName} --registry=${config.get('npmregistry', 'https://registry.npmmirror.com')}` :
+                packageManager === 'yarn' ? `yarn add ${packageName} --registry=${config.get('npmregistry', 'https://registry.npmmirror.com')}` :
+                    packageManager === 'pnpm' ? `pnpm add ${packageName} --registry=${config.get('npmregistry', 'https://registry.npmmirror.com')}` : null;
 
             if (command) {
-                exec(command, (error, stdout, stderr) => {
-                    if (error) logger.error(stderr);
-                    else logger.info(stdout);
-                });
+                try {
+                    await new Promise<void>((resolve, reject) => {
+                        exec(command, (error, stdout, stderr) => {
+                            if (error) {
+                                logger.error(`Installation failed: ${stderr}`);
+                                reject(new Error(stderr));
+                            } else {
+                                logger.info(`Installation successful: ${stdout}`);
+                                resolve();
+                            }
+                        });
+                    });
+                    session.body = JSON.stringify({ success: true, message: 'Installation successful' });
+                } catch (e: any) {
+                    session.body = JSON.stringify({ success: false, message: e.message });
+                }
+            } else {
+                session.body = JSON.stringify({ success: false, message: 'Package manager not supported' });
             }
-            session.body = JSON.stringify({ success: true });
         },
         '/versions': async (session: Session, params: URLSearchParams) => {
             const packageName = params.get('name');
@@ -129,12 +142,25 @@ export async function apply(ctx: Context, config: Config) {
                     packageManager === 'pnpm' ? `pnpm remove ${packageName}` : null;
 
             if (command) {
-                exec(command, (error, stdout, stderr) => {
-                    if (error) logger.error(stderr);
-                    else logger.info(stdout);
-                });
+                try {
+                    await new Promise<void>((resolve, reject) => {
+                        exec(command, (error, stdout, stderr) => {
+                            if (error) {
+                                logger.error(`Uninstallation failed: ${stderr}`);
+                                reject(new Error(stderr));
+                            } else {
+                                logger.info(`Uninstallation successful: ${stdout}`);
+                                resolve();
+                            }
+                        });
+                    });
+                    session.body = JSON.stringify({ success: true, message: 'Uninstallation successful' });
+                } catch (e: any) {
+                    session.body = JSON.stringify({ success: false, message: e.message });
+                }
+            } else {
+                session.body = JSON.stringify({ success: false, message: 'Package manager not supported' });
             }
-            session.body = JSON.stringify({ success: true });
         },
         '/currentver': async (session: Session, params: URLSearchParams) => {
             const packageName = params.get('name');
@@ -142,7 +168,8 @@ export async function apply(ctx: Context, config: Config) {
                 session.body = JSON.stringify({ success: false, message: 'Missing package name' });
                 return;
             }
-            session.body = await getSpecificPackageVersion(packageName);
+            const version = await getSpecificPackageVersion(packageName);
+            session.body = JSON.stringify({ version: version });
         }
     };
 

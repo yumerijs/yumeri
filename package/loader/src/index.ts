@@ -101,16 +101,50 @@ class PluginLoader {
                 }
             }
 
-            const url = pathToFileURL(targetPath).href;
-            const importPath = this.isDev ? `${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}` : url;
+            if (this.isDev) {
+                // In development, use require() to leverage esbuild-register
+                // and clear cache for HMR.
+                const resolvedPath = require.resolve(targetPath);
+                
+                // Clean up the cache for the main module and its children
+                if (require.cache[resolvedPath]) {
+                    this.clearRequireCache(resolvedPath, new Set());
+                }
 
-            const module = await import(importPath);
-            return module.default || module;
+                const module = require(resolvedPath);
+                return module.default || module;
+            } else {
+                // In production, use dynamic import.
+                const url = pathToFileURL(targetPath).href;
+                const module = await import(url);
+                return module.default || module;
+            }
         } catch (e) {
             this.logger.error(`Error loading plugin from path ${pluginPath}:`, e);
             throw e;
         }
     }
+
+    private clearRequireCache(moduleId: string, visited: Set<string>) {
+        if (visited.has(moduleId)) {
+            return; // Cycle detected
+        }
+        visited.add(moduleId);
+
+        const module = require.cache[moduleId];
+        if (!module) return;
+
+        // Recursively clear children's cache
+        if (module.children) {
+            for (const child of module.children) {
+                this.clearRequireCache(child.id, visited);
+            }
+        }
+
+        // Delete the module from cache
+        delete require.cache[moduleId];
+    }
+
 
     async unloadPlugin(pluginName: string): Promise<void> {
         if (!this.pluginCache[pluginName]) {

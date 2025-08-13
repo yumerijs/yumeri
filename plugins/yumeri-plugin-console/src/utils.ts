@@ -351,8 +351,11 @@ export class PluginConfigManager {
             // 确保plugins对象存在
             configData.plugins = configData.plugins || {};
 
-            // 检查插件是否存在
+            // 检查插件是否存在（若已为禁用键则视为已禁用）
             if (!(pluginName in configData.plugins)) {
+                if ((`~${pluginName}`) in configData.plugins) {
+                    return true;
+                }
                 logger.error(`Plugin ${pluginName} not found in configuration.`);
                 return false;
             }
@@ -422,8 +425,11 @@ export class PluginConfigManager {
             // 确保plugins对象存在
             configData.plugins = configData.plugins || {};
 
-            // 检查插件是否存在
+            // 检查插件是否存在（若已为禁用键则视为已禁用）
             if (!(pluginName in configData.plugins)) {
+                if ((`~${pluginName}`) in configData.plugins) {
+                    return true;
+                }
                 logger.error(`Plugin ${pluginName} not found in configuration.`);
                 return false;
             }

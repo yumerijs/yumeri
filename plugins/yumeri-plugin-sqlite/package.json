@@ -1,6 +1,6 @@
 {
     "name": "yumeri-plugin-sqlite",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "description": "Sqlite database for Yumeri",
     "main": "dist/index.js",
     "dev": "src/index.ts",
