@@ -58,15 +58,40 @@ export class Core {
   private pluginModules: { [name: string]: any } = {};
   private configPath: string = '';
   private globalMiddlewares: Record<string, Middleware> = {};
+  /**
+   * @deprecated 命令与插件对应关系
+   */
   public cmdtoplu: Record<string, string> = {};
+  /**
+   * 路由与插件对应关系
+   */
   public routetoplu: Record<string, string> = {};
+  /**
+   * 组件与插件对应关系
+   */
   public comtoplu: Record<string, string> = {};
+  /**
+   * 事件监听器与插件对应关系
+   */
   public evttoplu: Record<string, Record<string, ((...args: any[]) => Promise<void>)[]>> = {};
+  /**
+   * 中间件与插件对应关系
+   */
   public mdwtoplu: Record<string, string> = {};
   public plftoplu: Record<string, string> = {};
+  /**
+   * 插件状态
+   */
   public pluginStatus: Record<string, PluginStatus> = {};
+  /**
+   * 插件监听器
+   */
   private pluginWatchers: Record<string, chokidar.FSWatcher> = {};
 
+  /**
+   * 初始化核心
+   * @param pluginLoader 插件加载器
+   */
   constructor(pluginLoader: PluginLoader) {
     this.pluginLoader = pluginLoader;
   }
@@ -147,6 +172,7 @@ export class Core {
 
   /**
    * 加载所有在配置文件中启用的插件
+   * @returns Promise<void>
    */
   async loadPlugins(): Promise<void> {
     if (!this.config || typeof this.config.plugins !== 'object' || this.config.plugins === null) {
@@ -168,6 +194,14 @@ export class Core {
     }
 
     const enabledPlugins = allPluginNames.filter(name => !name.startsWith('~'));
+
+    // 卸载配置中已禁用或移除的已加载插件
+    const currentlyLoaded = Object.keys(this.plugins);
+    for (const loadedName of currentlyLoaded) {
+      if (!enabledPlugins.includes(loadedName)) {
+        await this.unloadPlugin(loadedName);
+      }
+    }
 
     if (enabledPlugins.length === 0) {
       this.logger.info('No enabled plugins found in configuration.');
@@ -204,7 +238,7 @@ export class Core {
   }
 
   /**
-   * 导出的函数：加载单个插件
+   * 加载单个插件
    * @param pluginName 要加载的插件名
    * @param triggerPendingCheck 是否在加载后触发对其他待定插件的检查，默认为 true
    * @returns Promise<boolean> 是否加载成功
@@ -265,11 +299,9 @@ export class Core {
       if (process.env.NODE_ENV === 'development') {
         let pluginPathToWatch: string | null = null;
         try {
-          // Try resolving as a module
-          const pluginEntryPoint = require.resolve(pluginName);
-          pluginPathToWatch = path.dirname(pluginEntryPoint);
+          const pkgJsonPath = require.resolve(`${pluginName}/package.json`);
+          pluginPathToWatch = path.dirname(pkgJsonPath);
         } catch (e) {
-          // Fallback for local plugins relative to CWD
           const localPluginPath = path.resolve(process.cwd(), pluginName);
           const localPluginPathInPlugins = path.resolve(process.cwd(), 'plugins', pluginName);
           if (fs.existsSync(localPluginPath)) {
@@ -295,7 +327,8 @@ export class Core {
   }
 
   /**
-   * 内部函数：尝试加载所有处于 PENDING 状态的插件
+   * 尝试加载所有处于 PENDING 状态的插件
+   * @returns Promise<void>
    */
   private async _loadPendingPlugins(): Promise<void> {
     const pendingPlugins = Object.keys(this.pluginStatus).filter(p => this.pluginStatus[p] === PluginStatus.PENDING);
@@ -349,8 +382,9 @@ export class Core {
   }
 
   /**
-   * 内部函数：执行单个插件的卸载逻辑
+   * 执行单个插件的卸载逻辑
    * @param pluginName 插件名
+   * @param ispending 是否处于 PENDING 状态
    */
   private async _unloadSinglePlugin(pluginName: string, ispending = false): Promise<void> {
     if (this.pluginStatus[pluginName] !== PluginStatus.ENABLED) {
@@ -407,9 +441,9 @@ export class Core {
   }
 
   /**
-   * Watch a single plugin for changes.
-   * @param pluginName The name of the plugin.
-   * @param pluginPath The root path of the plugin to watch.
+   * 监听插件文件变化
+   * @param pluginName 插件名称
+   * @param pluginPath 插件路径
    */
   private watchPlugin(pluginName: string, pluginPath: string): void {
     if (this.pluginWatchers[pluginName]) {
@@ -520,7 +554,7 @@ export class Core {
   }
 
   /**
-   * @deprecated Use route() instead.
+   * @deprecated 已更改为路由
    */
   command(name: string): Command {
     const command = new Command(this, name);
@@ -528,6 +562,11 @@ export class Core {
     return command;
   }
 
+  /**
+   * 注册路由
+   * @param path 路由路径
+   * @returns Route 实例
+   */
   route(path: string): Route {
     const route = new Route(path);
     this.routes[path] = route;
@@ -631,6 +670,13 @@ export class Core {
         delete this.comtoplu[comp];
         delete this.components[comp];
         delete this.providedComponents[comp];
+      });
+
+    // 清理由 provide 声明的组件提供关系
+    Object.keys(this.providedComponents)
+      .filter(prov => this.providedComponents[prov] === pluginname)
+      .forEach(prov => {
+        delete this.providedComponents[prov];
       });
 
     // 清理 event listeners

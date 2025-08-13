@@ -51,14 +51,14 @@ class PluginLoader {
         let pluginPath: string;
         let isLocalPlugin = false;
 
-        const localPluginPath = path.resolve(this.pluginsDir, pluginName);
-        const localPluginPath1 = path.resolve(pluginName);
+        const localPluginPath = path.resolve(process.cwd(), this.pluginsDir, pluginName);
+        const localPluginPathAlt = path.resolve(process.cwd(), pluginName);
 
         if (fs.existsSync(localPluginPath)) {
             pluginPath = localPluginPath;
             isLocalPlugin = true;
-        } else if (fs.existsSync(localPluginPath1)) {
-            pluginPath = localPluginPath1;
+        } else if (fs.existsSync(localPluginPathAlt)) {
+            pluginPath = localPluginPathAlt;
             isLocalPlugin = true;
         } else if (path.isAbsolute(pluginName) || pluginName.startsWith('.')) {
             pluginPath = path.resolve(pluginName);
@@ -93,19 +93,18 @@ class PluginLoader {
                 if (fs.existsSync(jsonPath)) {
                     const jsonContent = fs.readFileSync(jsonPath, 'utf-8');
                     const pkg = JSON.parse(jsonContent);
-                    // Assuming 'dev' field points to the source entry file, e.g., 'src/index.ts'
                     if (pkg.dev) {
                         targetPath = path.join(pluginPath, pkg.dev);
+                    } else if (pkg.main) {
+                        targetPath = path.join(pluginPath, pkg.main);
                     }
                 }
             }
-            
-            // For hot-reloading in dev mode, append a timestamp to bypass import cache
-            const importPath = this.isDev ? `${pathToFileURL(targetPath).href}?t=${Date.now()}` : pathToFileURL(targetPath).href;
-            
+
+            const url = pathToFileURL(targetPath).href;
+            const importPath = this.isDev ? `${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}` : url;
+
             const module = await import(importPath);
-            
-            // Handle both ES modules (default export) and CommonJS modules
             return module.default || module;
         } catch (e) {
             this.logger.error(`Error loading plugin from path ${pluginPath}:`, e);

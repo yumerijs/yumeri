@@ -352,7 +352,7 @@ export class PluginConfigManager {
             configData.plugins = configData.plugins || {};
 
             // 检查插件是否存在
-            if (!configData.plugins[pluginName]) {
+            if (!(pluginName in configData.plugins)) {
                 logger.error(`Plugin ${pluginName} not found in configuration.`);
                 return false;
             }
@@ -383,12 +383,8 @@ export class PluginConfigManager {
 
             // 触发配置变更事件
             if (this.core) {
-                await this.core.emit('config-changed', configData);
-
-                // 卸载插件
                 try {
                     await this.core.unloadPlugin(pluginName);
-                    // logger.info(`Plugin ${pluginName} unloaded after being disabled.`);
                 } catch (unloadError) {
                     logger.error(`Failed to unload plugin ${pluginName} after being disabled:`, unloadError);
                 }
@@ -427,7 +423,7 @@ export class PluginConfigManager {
             configData.plugins = configData.plugins || {};
 
             // 检查插件是否存在
-            if (!configData.plugins[pluginName]) {
+            if (!(pluginName in configData.plugins)) {
                 logger.error(`Plugin ${pluginName} not found in configuration.`);
                 return false;
             }
@@ -458,7 +454,6 @@ export class PluginConfigManager {
 
             // 触发配置变更事件
             if (this.core) {
-                await this.core.emit('config-changed', configData);
                 try {
                     await this.core.loadSinglePlugin(actualPluginName)
                 } catch (loadError) {
@@ -478,7 +473,8 @@ export class PluginConfigManager {
      * @returns 是否被禁用
      */
     getPluginStatus(pluginName: string): string {
-        return this.core?.pluginStatus[pluginName] || "DISABLED";
+        const actualPluginName = pluginName.startsWith('~') ? pluginName.substring(1) : pluginName;
+        return this.core?.pluginStatus[actualPluginName] || "DISABLED";
     }
 
     /**

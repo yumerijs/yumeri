@@ -465,17 +465,16 @@
             // 获取插件状态
             async function getPluginStatus(pluginName) {
                 try {
-                    // 去掉插件名称中的~符号
                     const cleanPluginName = pluginName.replace(/^~/, '');
                     const response = await fetch(`./api/pluginstatus?name=${cleanPluginName}`);
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    const status = await response.text();
-                    return status.trim(); // 返回 PENDING, DISABLED, ENABLED
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    const data = await response.json();
+                    if (typeof data === 'string') return data.trim();
+                    if (data && typeof data.status === 'string') return data.status.trim();
+                    return 'DISABLED';
                 } catch (error) {
                     console.error('Failed to get plugin status:', error);
-                    return 'DISABLED'; // 默认返回禁用状态
+                    return 'DISABLED';
                 }
             }
 

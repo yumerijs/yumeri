@@ -122,7 +122,7 @@ export async function apply(ctx: Context, config: Config) {
     pluginstatus: (params: URLSearchParams) => {
       const pluginName = params.get('name');
       if (!pluginName) return { success: false, message: '缺少插件名称参数' };
-      return configManager.getPluginStatus(pluginName).toUpperCase();
+      return { status: configManager.getPluginStatus(pluginName).toUpperCase() };
     },
     pluginusage: (params: URLSearchParams) => {
       const pluginName = params.get('name');
@@ -158,7 +158,6 @@ export async function apply(ctx: Context, config: Config) {
     }
   }
   ));
-  console.log(aroute.match('/console/config'));
 
   const operateconsole = {
     addconsoleitem: (name: string, icon: string, displayname: string, htmlpath: string, staticpath: string) => {

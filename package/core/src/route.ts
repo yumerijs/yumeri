@@ -1,4 +1,3 @@
-// route.ts
 import { Session } from './session';
 import { Middleware } from './middleware';
 
@@ -56,27 +55,42 @@ export class Route {
   private paramsInfo: ParamInfo[];
   private handler: RouteHandler | null = null;
   public middlewares: Middleware[] = [];
+  public allowedMethods: string[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD'];
 
+  /**
+   * 创建路由
+   * @param path 路由路径
+   */
   constructor(public path: string) {
     const { segments, params } = parsePatternToSegments(path);
     this.segments = segments;
     this.paramsInfo = params;
   }
 
+  /**
+   * 设置路由处理器
+   * @param handler 路由处理器
+   * @returns this
+   */
   action(handler: RouteHandler): this {
     this.handler = handler;
     return this;
   }
 
+  /**
+   * 挂载中间件
+   * @param middleware 中间件
+   * @returns this
+   */
   use(middleware: Middleware): this {
     this.middlewares.push(middleware);
     return this;
   }
 
   /**
-   * match pathname against pattern.
-   * - pathname should be provided without trailing slash, but we normalize anyway.
-   * - returns { params: Record<name,string>, pathParams: string[] } or null
+   * 匹配路由
+   * @param pathname 请求路径
+   * @returns 匹配结果
    */
   match(pathname: string): { params: Record<string, string | undefined>; pathParams: string[] } | null {
     // normalize pathname: remove leading/trailing slashes
@@ -199,6 +213,12 @@ export class Route {
     return { params, pathParams };
   }
 
+  /**
+   * 执行路由处理器
+   * @param session 会话对象
+   * @param params 查询参数
+   * @param pathParams 路由参数
+   */
   async executeHandler(
     session: Session,
     params: URLSearchParams,
@@ -207,5 +227,15 @@ export class Route {
     if (this.handler) {
       await this.handler(session, params, ...pathParams);
     }
+  }
+
+  /**
+   * 设置可用方法
+   * @param methods 可用方法
+   * @returns this
+   */
+  methods(...methods: string[]): Route {
+    this.allowedMethods = methods;
+    return this;
   }
 }
