@@ -15,6 +15,7 @@ import * as chokidar from 'chokidar';
 import { Middleware } from './middleware';
 import { Route } from './route';
 import { Context } from './context';
+import { HookHandler, Hook } from './hook';
 
 interface Plugin {
   apply: (ctx: Context, config: Config) => Promise<void>;
@@ -48,52 +49,48 @@ export class Core {
   public plugins: { [name: string]: Plugin & { depend?: string[]; provide?: string[] } } = {};
   public config: any = null;
   public platforms: Platform[] = [];
-  private eventListeners: { [event: string]: ((...args: any[]) => Promise<void>)[] } = {};
+  public eventListeners: { [event: string]: ((...args: any[]) => Promise<void>)[] } = {};
   public components: { [name: string]: any } = {};
   public commands: Record<string, Command> = {};
   public routes: Record<string, Route> = {};
   public pluginLoader: PluginLoader;
   public logger = new Logger('core');
   public providedComponents: { [name: string]: string } = {};
+  public globalMiddlewares: Record<string, Middleware> = {};
+  public pluginStatus: Record<string, PluginStatus> = {};
+  public hooks: Record<string, Hook> = {};
+  private pluginWatchers: Record<string, chokidar.FSWatcher> = {};
   private pluginModules: { [name: string]: any } = {};
   private configPath: string = '';
-  private globalMiddlewares: Record<string, Middleware> = {};
-  /**
-   * @deprecated 命令与插件对应关系
-   */
-  public cmdtoplu: Record<string, string> = {};
-  /**
-   * 路由与插件对应关系
-   */
-  public routetoplu: Record<string, string> = {};
-  /**
-   * 组件与插件对应关系
-   */
-  public comtoplu: Record<string, string> = {};
-  /**
-   * 事件监听器与插件对应关系
-   */
-  public evttoplu: Record<string, Record<string, ((...args: any[]) => Promise<void>)[]>> = {};
-  /**
-   * 中间件与插件对应关系
-   */
-  public mdwtoplu: Record<string, string> = {};
-  public plftoplu: Record<string, string> = {};
-  /**
-   * 插件状态
-   */
-  public pluginStatus: Record<string, PluginStatus> = {};
-  /**
-   * 插件监听器
-   */
-  private pluginWatchers: Record<string, chokidar.FSWatcher> = {};
 
   /**
-   * 初始化核心
-   * @param pluginLoader 插件加载器
+   * 插件名 -> Context 映射
    */
+  private pluginContexts: Record<string, Context> = {};
+
   constructor(pluginLoader: PluginLoader) {
     this.pluginLoader = pluginLoader;
+  }
+
+  /**
+   * 获取或创建插件对应 Context
+   */
+  getContext(pluginName: string): Context {
+    if (!this.pluginContexts[pluginName]) {
+      this.pluginContexts[pluginName] = new Context(this, pluginName);
+    }
+    return this.pluginContexts[pluginName];
+  }
+
+  /**
+   * 清理指定插件注册的所有内容
+   */
+  unregall(pluginName: string): void {
+    const ctx = this.pluginContexts[pluginName];
+    if (ctx) {
+      ctx.dispose();
+      delete this.pluginContexts[pluginName];
+    }
   }
 
   /**
@@ -274,7 +271,7 @@ export class Core {
 
       if (pluginInstance.apply) {
         this.pluginLoader.logger.info(`Apply plugin "${pluginName}"`);
-        await pluginInstance.apply(new Context(this, pluginName), await this.getPluginConfig(pluginName));
+        await pluginInstance.apply(this.getContext(pluginName), await this.getPluginConfig(pluginName));
       }
 
       // 注册提供的组件
@@ -308,7 +305,7 @@ export class Core {
             pluginPathToWatch = localPluginPath;
           } else if (fs.existsSync(localPluginPathInPlugins)) {
             pluginPathToWatch = localPluginPathInPlugins;
-          }
+        }
         }
 
         if (pluginPathToWatch) {
@@ -394,9 +391,7 @@ export class Core {
     this.logger.info(`Unloading plugin "${pluginName}"...`);
     try {
       const plugin = this.plugins[pluginName];
-      if (plugin && plugin.disable) {
-        await plugin.disable(new Context(this, pluginName));
-      }
+      if (plugin && plugin.disable) await plugin.disable(this.getContext(pluginName));
 
       await this.pluginLoader.unloadPlugin(pluginName);
       this.unregall(pluginName); // 清理该插件注册的所有内容
@@ -510,7 +505,6 @@ export class Core {
   unregisterComponent(name: string): void {
     delete this.components[name];
     delete this.providedComponents[name];
-    delete this.comtoplu[name];
   }
 
   /**
@@ -574,26 +568,53 @@ export class Core {
   }
 
   /**
+   * 注册 Hook 钩子
+   * @param name Hook 点名称
+   * @param hookname 钩子名称
+   * @param callback 钩子函数
+   */
+  hook(name: string, hookname: string, callback: HookHandler): any {
+    if (!this.hooks[name]) {
+      this.hooks[name] = new Hook(name);
+    }
+    this.hooks[name].add(hookname, callback);
+  }
+
+  /**
+   * 消除 Hook 钩子
+   */
+  unhook(name: string, hookname: string): any {
+    if (this.hooks[name]) {
+      this.hooks[name].remove(hookname);
+    }
+  }
+
+  /**
+   * 执行 Hook 钩子
+   * @param name Hook 点名称
+   * @param args 参数
+   * @return Promise<any[]>
+   */
+  async hookExecute(name: string, ...args: any[]): Promise<any[]> {
+    if (this.hooks[name]) {
+      return await this.hooks[name].trigger(...args);
+    }
+    return [];
+  }
+
+  /**
    * 执行命令
    * @deprecated
    */
   async executeCommand(name: string, session: any, ...args: any[]): Promise<Session | null> {
     const command = this.commands[name];
     if (command) {
-      const globalMiddlewareList = Object.values(this.globalMiddlewares || {});
-      const commandMiddlewareList = command.middlewares || [];
-      const middlewares = [...globalMiddlewareList, ...commandMiddlewareList];
-
+      const middlewares = [...Object.values(this.globalMiddlewares), ...(command.middlewares || [])];
       let index = 0;
       const runner = async (): Promise<void> => {
-        if (index < middlewares.length) {
-          const middleware = middlewares[index++];
-          await middleware(session, runner);
-        } else {
-          await command.executeHandler(session, ...args);
-        }
+        if (index < middlewares.length) await middlewares[index++](session, runner);
+        else await command.executeHandler(session, ...args);
       };
-
       await runner();
       return session;
     }
@@ -611,20 +632,12 @@ export class Core {
       const route = this.routes[routePath];
       const result = route.match(pathname);
       if (result) {
-        const globalMiddlewareList = Object.values(this.globalMiddlewares || {});
-        const routeMiddlewareList = route.middlewares || [];
-        const middlewares = [...globalMiddlewareList, ...routeMiddlewareList];
-
+        const middlewares = [...Object.values(this.globalMiddlewares), ...(route.middlewares || [])];
         let index = 0;
         const runner = async (): Promise<void> => {
-          if (index < middlewares.length) {
-            const middleware = middlewares[index++];
-            await middleware(session, runner);
-          } else {
-            await route.executeHandler(session, queryParams, result.pathParams);
-          }
+          if (index < middlewares.length) await middlewares[index++](session, runner);
+          else await route.executeHandler(session, queryParams, result.pathParams);
         };
-
         await runner();
         return true;
       }
@@ -640,63 +653,6 @@ export class Core {
   registerPlatform(platform: Platform): any {
     this.platforms.push(platform);
     return platform.startPlatform(this);
-  }
-
-  /**
-   * 清理指定插件注册的所有内容
-   * @param pluginname 插件名称
-   */
-  unregall(pluginname: string): void {
-    // 清理 commands
-    Object.keys(this.cmdtoplu)
-      .filter(cmd => this.cmdtoplu[cmd] === pluginname)
-      .forEach(cmd => {
-        delete this.cmdtoplu[cmd];
-        delete this.commands[cmd];
-      });
-
-    // 清理 routes
-    Object.keys(this.routetoplu)
-      .filter(path => this.routetoplu[path] === pluginname)
-      .forEach(path => {
-        delete this.routetoplu[path];
-        delete this.routes[path];
-      });
-
-    // 清理 components 和 providedComponents
-    Object.keys(this.comtoplu)
-      .filter(comp => this.comtoplu[comp] === pluginname)
-      .forEach(comp => {
-        delete this.comtoplu[comp];
-        delete this.components[comp];
-        delete this.providedComponents[comp];
-      });
-
-    // 清理由 provide 声明的组件提供关系
-    Object.keys(this.providedComponents)
-      .filter(prov => this.providedComponents[prov] === pluginname)
-      .forEach(prov => {
-        delete this.providedComponents[prov];
-      });
-
-    // 清理 event listeners
-    for (const evt in this.evttoplu) {
-      if (this.evttoplu[evt][pluginname]) {
-        const pluginListeners = this.evttoplu[evt][pluginname] || [];
-        if (this.eventListeners[evt]) {
-          this.eventListeners[evt] = this.eventListeners[evt].filter(l => !pluginListeners.includes(l));
-        }
-        delete this.evttoplu[evt][pluginname];
-      }
-    }
-
-    // 清理 middlewares
-    Object.keys(this.mdwtoplu)
-      .filter(mdw => this.mdwtoplu[mdw] === pluginname)
-      .forEach(mdw => {
-        delete this.mdwtoplu[mdw];
-        delete this.globalMiddlewares[mdw];
-      });
   }
 
   /**
