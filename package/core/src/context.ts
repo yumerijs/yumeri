@@ -1,3 +1,8 @@
+/**
+ * @time: 2025/08/14 09:48
+ * @author: FireGuo
+ * WindyPear-Team All right reserved
+ **/
 import { Core } from './core';
 import { Command } from './command';
 import { Route } from './route';

@@ -1,6 +1,15 @@
 import { cac } from 'cac'
 import * as path from 'path'
-import * as fs from 'fs-extra'
+import { promises as fs } from 'fs'
+
+async function ensureDir(dir: string) {
+  await fs.mkdir(dir, { recursive: true })
+}
+
+async function outputFile(filePath: string, data: string) {
+  await ensureDir(path.dirname(filePath))
+  await fs.writeFile(filePath, data)
+}
 
 function replaceTemplate(content: string, name: string, description: string) {
   return content
@@ -9,7 +18,7 @@ function replaceTemplate(content: string, name: string, description: string) {
 }
 
 async function copyTemplate(templateDir: string, targetDir: string, name: string, description: string) {
-  await fs.ensureDir(targetDir)
+  await ensureDir(targetDir)
   const files = await fs.readdir(templateDir)
   for (const file of files) {
     const srcPath = path.join(templateDir, file)
@@ -20,7 +29,7 @@ async function copyTemplate(templateDir: string, targetDir: string, name: string
     } else {
       let content = await fs.readFile(srcPath, 'utf-8')
       content = replaceTemplate(content, name, description)
-      await fs.outputFile(destPath, content)
+      await outputFile(destPath, content)
     }
   }
 }
@@ -29,7 +38,7 @@ function prompt(question: string): Promise<string> {
   return new Promise((resolve) => {
     process.stdout.write(question)
     process.stdin.resume()
-    process.stdin.setEncoding('utf8') // 一定要设置这个，否则读进来是 Buffer
+    process.stdin.setEncoding('utf8')
     process.stdin.once('data', (data) => {
       process.stdin.pause()
       resolve(data.toString().trim())
@@ -43,7 +52,6 @@ cli
   .command('setup <name>', 'Create a new plugin')
   .action(async (rawName: string) => {
     const description = await prompt('Description: ')
-
     const cwd = process.cwd()
 
     const isScoped = rawName.startsWith('@')
@@ -73,7 +81,6 @@ cli
         else reject(new Error(`yarn exited with code ${code}`))
       })
     })
-
   })
 
 cli.help()

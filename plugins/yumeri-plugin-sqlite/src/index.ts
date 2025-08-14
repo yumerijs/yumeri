@@ -1,7 +1,6 @@
 import { Context, Config, Session, Logger, ConfigSchema } from 'yumeri';
 import { Database as SQLite3Driver } from 'sqlite3';
 import { Database as YumeriDatabase, QueryConditions, TableSchema, ColumnDefinition, ColumnAlteration } from '@yumerijs/types/dist/database';
-// 从 'sqlite' 包装库中导入 open 函数和 Database 类型。
 import { open, Database } from 'sqlite';
 import path from 'path';
 

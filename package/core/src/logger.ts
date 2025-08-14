@@ -1,10 +1,10 @@
 /**
- * @time: 2025/03/25 18:01
+ * @time: 2025/08/14 09:48
  * @author: FireGuo
  * WindyPear-Team All right reserved
- */
+ **/
 
-import pc from 'picocolors'; // 轻量颜色库
+import pc from 'picocolors';
 import { Core } from './core';
 
 export class Logger {
