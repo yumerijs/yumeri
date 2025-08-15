@@ -8,7 +8,7 @@ export async function runMain() {
   try {
     await core.loadConfig('./config.yml')
     await core.loadPlugins()
-
+    await core.runCore()
   } catch (err) {
     console.error('Application failed to start:', err)
     process.exit(1)

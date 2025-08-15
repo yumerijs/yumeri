@@ -1,15 +1,14 @@
 import pkg from 'yumeri';
 const { Core, Loader, Context, Config } = pkg;
-import * as server from 'yumeri-plugin-server';
 const loader = new Loader()
-const core = new Core(loader)
-const ctx = new Context(core, 'MyAPP')
-const serverconfig = new Config('server', {
+const serverconfig = {
     port: 8080,
     host: '0.0.0.0'
-})
+}
+const core = new Core(loader, serverconfig)
+const ctx = new Context(core, 'MyAPP')
 let count = 0
-server.apply(ctx, serverconfig)
+core.runCore()
 ctx.route('/hello/:name/:age/:others+')
     .action(async (session, _, name, age, others) => {
         session.setMime('html')

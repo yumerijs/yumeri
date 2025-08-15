@@ -13,6 +13,7 @@ export const config = {
       type: 'string',
       description: '代理 URL (例如 http://localhost:8080 或 socks5://localhost:1080)',
       required: true,
+      default: "http://localhost:8080"
     }
   } as Record<string, ConfigSchema>
 };

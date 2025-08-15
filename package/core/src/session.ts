@@ -5,7 +5,8 @@
  **/
 
 import crypto from 'crypto';
-import { Platform } from './platform';
+import { Server } from './server';
+import { IncomingMessage, ServerResponse } from 'http';
 
 export class Session {
     public ip: string;
@@ -17,19 +18,24 @@ export class Session {
     public head: Record<string, any> = {};
     public status: number = 200;
     public body: any;
-    public platform: Platform;
     public properties?: Record<string, any> = {};
+    public res = null;
+    public req = null;
+    public server: Server;
+    public protocol: string = 'http';
 
     /*
      *  @ip: string，用户IP
      *  @cookie: string，会话cookie
      *  @query: string，请求字符串
      */
-    constructor(ip: string, cookie: Record<string, string>, platform: Platform, query?: Record<string, string>){
+    constructor(ip: string, cookie: Record<string, string>, server: Server, req?: IncomingMessage, res?: ServerResponse, query?: Record<string, string>){
         this.ip  = ip;
         this.cookie = cookie;
         this.query = query;
-        this.platform = platform;
+        this.server = server;
+        this.req = req;
+        this.res = res;
         this.head['Content-Type'] = 'text/plain';
         if (cookie.sessionid) {
             this.sessionid = cookie.sessionid;
@@ -108,10 +114,10 @@ export class Session {
   }
 
   public send(data: any): any {
-    return this.platform.sendMessage(this, data);
+    return this.res.send(data);
   }
 
   public endsession(message: any): any {
-    return this.platform.terminationSession(this, message);
+    return this.res.end(message);
   }
 }

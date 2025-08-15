@@ -4,7 +4,6 @@
  * WindyPear-Team All right reserved
  **/
 import { Core } from './core';
-import { Command } from './command';
 import { Route } from './route';
 import { HookHandler } from './hook';
 
@@ -33,20 +32,6 @@ export class Context {
   constructor(core: Core, pluginname: string) {
       this.core = core;
       this.pluginname = pluginname;
-  }
-
-  /**
-   * @deprecated Use route() instead.
-   * 尝试注册命令，如果命令已存在则警告
-   */
-  command(name: string) {
-      if (this.core.commands[name]) {
-          this.core.logger.warn(
-              `Plugin "${this.pluginname}" attempt to register command "${name}", but it has already been registered.`
-          );
-          return new Command(this.core, name);
-      }
-      return this.core.command(name);
   }
 
   /**

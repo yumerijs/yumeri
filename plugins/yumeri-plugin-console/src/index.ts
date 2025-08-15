@@ -6,7 +6,6 @@ import { PluginConfigManager, ConsoleItem } from './utils';
 
 export const logger = new Logger("console");
 
-export const depend = ['server'];
 export const provide = ['console'];
 export const usage = `Yumeri 基础控制台插件<br>请勿直接禁用或重载此插件，这会导致插件在此实例内无法开启。<br>可通过控制台操作API对控制台项进行添加。`;
 

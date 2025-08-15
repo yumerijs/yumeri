@@ -5,7 +5,7 @@ import { User } from 'yumeri-plugin-user'
 
 const logger = new Logger("authority");
 
-export const depend = ['server', 'user']; // 需要的服务
+export const depend = ['user']; // 需要的服务
 export const provide = ['authority']; // 提供的服务
 export const usage = `用户登陆验证服务<br>依赖于yumeri-plugin-user（用户模型）`
 

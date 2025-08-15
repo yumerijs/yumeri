@@ -8,14 +8,14 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Config } from './config';
 import { Logger } from './logger';
-import { Command } from './command';
 import { Session } from './session';
-import { Platform } from './platform';
 import * as chokidar from 'chokidar';
 import { Middleware } from './middleware';
 import { Route } from './route';
 import { Context } from './context';
 import { HookHandler, Hook } from './hook';
+import { Server } from 'http';
+import { Server as CoreServer } from './server';
 
 interface Plugin {
   apply: (ctx: Context, config: Config) => Promise<void>;
@@ -33,7 +33,11 @@ interface PluginLoader {
 }
 
 interface CoreOptions {
-  // TODO: Core的配置项
+  port: number;
+  host: string;
+  staticDir: string;
+  enableCors: boolean;
+  enableWs: boolean;
 }
 
 /**
@@ -48,10 +52,8 @@ export const enum PluginStatus {
 export class Core {
   public plugins: { [name: string]: Plugin & { depend?: string[]; provide?: string[] } } = {};
   public config: any = null;
-  public platforms: Platform[] = [];
   public eventListeners: { [event: string]: ((...args: any[]) => Promise<void>)[] } = {};
   public components: { [name: string]: any } = {};
-  public commands: Record<string, Command> = {};
   public routes: Record<string, Route> = {};
   public pluginLoader: PluginLoader;
   public logger = new Logger('core');
@@ -59,6 +61,8 @@ export class Core {
   public globalMiddlewares: Record<string, Middleware> = {};
   public pluginStatus: Record<string, PluginStatus> = {};
   public hooks: Record<string, Hook> = {};
+  public coreConfig: CoreOptions;
+  public server: CoreServer;
   private pluginWatchers: Record<string, chokidar.FSWatcher> = {};
   private pluginModules: { [name: string]: any } = {};
   private configPath: string = '';
@@ -68,7 +72,8 @@ export class Core {
    */
   private pluginContexts: Record<string, Context> = {};
 
-  constructor(pluginLoader: PluginLoader) {
+  constructor(pluginLoader?: PluginLoader, coreConfig?: CoreOptions) {
+    this.coreConfig = coreConfig;
     this.pluginLoader = pluginLoader;
   }
 
@@ -107,10 +112,27 @@ export class Core {
       if (process.env.NODE_ENV === 'development') {
         this.watchConfig(configPath);
       }
+      this.coreConfig = this.config.core || {};
     } catch (e) {
       this.logger.error('Failed to load config:', e);
       throw e;
     }
+  }
+
+  /**
+   * 启动应用
+   * @returns Promise<void>
+   */
+  async runCore(): Promise<void> {
+    this.server = new CoreServer(this, {
+      port: this.coreConfig.port || 14510,
+      host: this.coreConfig.host || '0.0.0.0',
+      enableCors: this.coreConfig.enableCors || false,
+      enableWs: this.coreConfig.enableWs || false,
+      staticDir: this.coreConfig.staticDir || 'public',
+    });
+    await this.server.start();
+    this.logger.info(`Yumeri server started at ${this.coreConfig.host}:${this.coreConfig.port}`);
   }
 
   /**
@@ -548,15 +570,6 @@ export class Core {
   }
 
   /**
-   * @deprecated 已更改为路由
-   */
-  command(name: string): Command {
-    const command = new Command(this, name);
-    this.commands[name] = command;
-    return command;
-  }
-
-  /**
    * 注册路由
    * @param path 路由路径
    * @returns Route 实例
@@ -603,24 +616,6 @@ export class Core {
   }
 
   /**
-   * 执行命令
-   * @deprecated
-   */
-  async executeCommand(name: string, session: any, ...args: any[]): Promise<Session | null> {
-    const command = this.commands[name];
-    if (command) {
-      const middlewares = [...Object.values(this.globalMiddlewares), ...(command.middlewares || [])];
-      let index = 0;
-      const runner = async (): Promise<void> => {
-        if (index < middlewares.length) await middlewares[index++](session, runner);
-        else await command.executeHandler(session, ...args);
-      };
-      await runner();
-      return session;
-    }
-    return null;
-  }
-  /**
    * 执行路由
    * @param pathname 需要匹配的URL
    * @param session 当前会话
@@ -643,25 +638,6 @@ export class Core {
       }
     }
     return false;
-  }
-
-  /**
-   * 注册平台
-   * @param platform 平台实例
-   * @returns 平台启动结果
-   */
-  registerPlatform(platform: Platform): any {
-    this.platforms.push(platform);
-    return platform.startPlatform(this);
-  }
-
-  /**
-   * 获取命令
-   * @param name 命令名称
-   * @returns Command 实例或 null
-   */
-  getCommand(name: string): Command | null {
-    return this.commands[name] || null;
   }
 
   /**

@@ -6,10 +6,8 @@
 
 export * from './core';
 export * from './session';
-export * from './command';
 export * from './route';
 export * from './config';
 export * from './logger';
-export * from './platform';
 export * from './context';
 export * from './hook'
