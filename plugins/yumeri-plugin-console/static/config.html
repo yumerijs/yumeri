@@ -1186,8 +1186,8 @@
                         throw new Error(errorResult.error || `HTTP error! status: ${response.status}`);
                     }
 
-                    const result = await response.json();
-                    showNotification(result.success ? '配置保存成功' : result.message, result.success ? 'success' : 'error');
+                    const result = await response.json(); 
+                    showNotification(result.success ? '配置保存成功' : result.message, result.success ? true : false);
 
                     // 如果保存成功，延迟刷新插件列表
                     if (result.success) {

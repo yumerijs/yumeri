@@ -1,6 +1,6 @@
 {
   "name": "yumeri",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "基于nodejs的API管理平台",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -34,7 +34,7 @@
     "typescript": "^5.8.2"
   },
   "dependencies": {
-    "@yumerijs/core": "^1.2.0",
+    "@yumerijs/core": "^1.3.1",
     "@yumerijs/loader": "^1.2.0",
     "cac": "^6.7.14"
   }

@@ -75,9 +75,14 @@ class PluginLoader {
         }
 
         try {
-            const plugin = await this.loadPluginFromPath(pluginPath, isLocalPlugin);
-            this.pluginCache[pluginName] = plugin;
-            return plugin;
+            if (isLocalPlugin) {
+                const plugin = await this.loadPluginFromPath(pluginPath, isLocalPlugin);
+                this.pluginCache[pluginName] = plugin;
+                return plugin;
+            } else {
+                const plugin = await import(pluginName);
+                return plugin.default || plugin;
+            }
         } catch (e) {
             this.logger.error(`Failed to load plugin from ${pluginPath}:`, e);
             throw e;
@@ -105,7 +110,7 @@ class PluginLoader {
                 // In development, use require() to leverage esbuild-register
                 // and clear cache for HMR.
                 const resolvedPath = require.resolve(targetPath);
-                
+
                 // Clean up the cache for the main module and its children
                 if (require.cache[resolvedPath]) {
                     this.clearRequireCache(resolvedPath, new Set());
@@ -152,11 +157,11 @@ class PluginLoader {
         }
 
         delete this.pluginCache[pluginName];
-        
+
         // With dynamic import, there's no direct equivalent of require.cache to clear.
         // The timestamp query in dev mode handles fresh loading.
         // For production, modules are cached intentionally.
-        
+
         this.core?.unregall(pluginName);
         // this.logger.info(`Plugin unloaded: ${pluginName}`);
     }

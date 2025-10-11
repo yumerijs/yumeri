@@ -15,8 +15,7 @@
     "@yumerijs/scripts": "workspace:^",
     "chokidar": "^4.0.3",
     "yumeri": "workspace:^",
-    "yumeri-plugin-console": "workspace:^",
-    "yumeri-plugin-server": "workspace:^"
+    "yumeri-plugin-console": "workspace:^"
   },
   "devDependencies": {
     "@types/node": "^22.15.19",

@@ -141,7 +141,9 @@ export async function apply(ctx: Context, config: Config) {
     ctx.route(`/${basePath}/api/${routeName}`).action((session, params) => requireLogin(session, async () => {
       session.setMime('json');
       const result = await handler(params);
+      // logger.info(result);
       session.body = JSON.stringify(result);
+      logger.info(session.body);
     }));
   }
   // Dynamic console item routes
