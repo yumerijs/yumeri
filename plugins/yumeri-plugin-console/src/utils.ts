@@ -47,9 +47,20 @@ export class PluginConfigManager {
      */
     async getPluginConfig(pluginName: string): Promise<any> {
         const actualPluginName = pluginName.startsWith('~') ? pluginName.substring(1) : pluginName;
-        this.configCache[actualPluginName] = this.core?.getPluginConfig(actualPluginName) || {};
+        // 从 Core 正确地异步获取并展开配置内容
+        try {
+            const cfg = this.core ? await this.core.getPluginConfig(actualPluginName) : null;
+            this.configCache[actualPluginName] = (cfg && (cfg as any).content) ? (cfg as any).content : {};
+        } catch {
+            this.configCache[actualPluginName] = {};
+        }
         const schema = await this.getPluginSchema(actualPluginName);
         const config = this.configCache[actualPluginName] || {};
+
+        // 若插件未提供 schema，则返回空数组，避免服务端抛错导致响应为空
+        if (!schema) {
+            return [];
+        }
 
         const mergedConfig: any[] = [];
 
@@ -558,7 +569,8 @@ export class PluginConfigManager {
     }
     getPluginUsage(pluginName: string): string {
         const isDev = process.env.NODE_ENV === 'development';
-        if (isDev || !this.schemaCache[pluginName]) {
+        // 依据 usageCache 缓存控制，而不是 schemaCache
+        if (isDev || !this.usageCache[pluginName]) {
             try {
                 if (isDev) {
                     Object.keys(require.cache).forEach(key => {

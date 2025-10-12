@@ -57,7 +57,6 @@ export class Core {
   public routes: Record<string, Route> = {};
   public pluginLoader: PluginLoader;
   public logger = new Logger('core');
-  public providedComponents: { [name: string]: string } = {};
   public globalMiddlewares: Record<string, Middleware> = {};
   public pluginStatus: Record<string, PluginStatus> = {};
   public hooks: Record<string, Hook> = {};
@@ -93,7 +92,7 @@ export class Core {
   unregall(pluginName: string): void {
     const ctx = this.pluginContexts[pluginName];
     if (ctx) {
-      ctx.dispose();
+      ctx.dispose(); 
       delete this.pluginContexts[pluginName];
     }
   }
@@ -281,7 +280,7 @@ export class Core {
       }
 
       const deps = pluginInstance.depend || [];
-      const unmetDependencies = deps.filter(dep => !this.providedComponents[dep]);
+      const unmetDependencies = deps.filter(dep => !this.components[dep]);
 
       if (unmetDependencies.length > 0) {
         // this.logger.info(`Plugin "${pluginName}" has unmet dependencies: [${unmetDependencies.join(', ')}]. Will retry later.`);
@@ -297,15 +296,15 @@ export class Core {
       }
 
       // 注册提供的组件
-      if (pluginInstance.provide) {
-        for (const componentName of pluginInstance.provide) {
-          if (this.providedComponents[componentName]) {
-            this.logger.error(`Component "${componentName}" is provided by multiple plugins: "${this.providedComponents[componentName]}" and "${pluginName}".`);
-          } else {
-            this.providedComponents[componentName] = pluginName;
-          }
-        }
-      }
+      // if (pluginInstance.provide) {
+      //   for (const componentName of pluginInstance.provide) {
+      //     if (this.components[componentName]) {
+      //       this.logger.error(`Component "${componentName}" is provided by multiple plugins: "${this.providedComponents[componentName]}" and "${pluginName}".`);
+      //     } else {
+      //       this.components[componentName] = pluginName;
+      //     }
+      //   }
+      // }
 
       this.pluginStatus[pluginName] = PluginStatus.ENABLED; // 更新状态为已启用
 
@@ -503,10 +502,10 @@ export class Core {
    * @param component 组件实例
    */
   registerComponent(name: string, component: any): void {
-    if (this.components.hasOwnProperty(name)) {
-      this.logger.warn(`Component "${name}" already registered by plugin "${this.providedComponents[name]}".`);
-      return;
-    }
+    // if (this.components.hasOwnProperty(name)) {
+    //   this.logger.warn(`Component "${name}" already registered by plugin "${this.providedComponents[name]}".`);
+    //   return;
+    // }
     this.components[name] = component;
     // this.logger.info(`Component "${name}" registered.`);
   }
@@ -526,7 +525,7 @@ export class Core {
    */
   unregisterComponent(name: string): void {
     delete this.components[name];
-    delete this.providedComponents[name];
+    // delete this.providedComponents[name];
   }
 
   /**

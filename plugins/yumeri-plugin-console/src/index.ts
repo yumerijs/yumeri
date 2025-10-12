@@ -36,12 +36,12 @@ export async function apply(ctx: Context, config: Config) {
   consoleitem['config'] = new ConsoleItem('fa-cog', '配置', path.join(staticDir, 'config.html'), path.join(staticDir, 'files'));
 
   // Middleware for login check
-  const requireLogin = (session: Session, next: () => void) => {
+  const requireLogin = async (session: Session, next: () => Promise<void>) => {
     if (loginstatus[session.sessionid]) {
-      next();
+      await next();
     } else {
       session.setMime('html');
-      session.body = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>请先登录</title></head><body><script>window.onload = function() {alert("请先登录");window.location.href = "/${basePath}/login";};</script><p>正在重定向</p></body></html>`;
+      session.body = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>请先登录</title></head><body><script>window.onload = function() {alert(\"请先登录\");window.location.href = \"/${basePath}/login\";};</script><p>正在重定向</p></body></html>`;
     }
   };
 
@@ -60,7 +60,7 @@ export async function apply(ctx: Context, config: Config) {
     }
   });
 
-  ctx.route(`/${basePath}/home`).action((session) => requireLogin(session, () => {
+  ctx.route(`/${basePath}/home`).action((session) => requireLogin(session, async () => {
     const consoleHtmlPath = path.join(staticDir, 'home.html');
     if (fs.existsSync(consoleHtmlPath)) {
       session.body = fs.readFileSync(consoleHtmlPath, 'utf8');
@@ -138,16 +138,21 @@ export async function apply(ctx: Context, config: Config) {
   };
 
   for (const [routeName, handler] of Object.entries(apiRoutes)) {
-    ctx.route(`/${basePath}/api/${routeName}`).action((session, params) => requireLogin(session, async () => {
-      session.setMime('json');
-      const result = await handler(params);
-      // logger.info(result);
-      session.body = JSON.stringify(result);
-      logger.info(session.body);
-    }));
+    ctx.route(`/${basePath}/api/${routeName}`).action(async (session, params) => {
+      await requireLogin(session, async () => {
+        try {
+          session.setMime('json');
+          const result = await handler(params);
+          session.body = JSON.stringify(result);
+        } catch (err) {
+          session.setMime('json');
+          session.body = JSON.stringify({ success: false, error: String(err) });
+        }
+      });
+    });
   }
   // Dynamic console item routes
-  const aroute = ctx.route(`/${basePath}/:item/:asset*`).action((session, params, item, asset) => requireLogin(session, () => {
+  const aroute = ctx.route(`/${basePath}/:item/:asset*`).action((session, params, item, asset) => requireLogin(session, async () => {
     const consoleItem = consoleitem[item];
     if (consoleItem) {
       const assetPath = asset ? path.join(consoleItem.staticpath, asset) : consoleItem.htmlpath;
