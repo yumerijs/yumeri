@@ -37,6 +37,18 @@ const operateconsole = {
   getloginstatus: (session: Session) => !!loginstatus[session.sessionid]
 };
 
+async function getHook(ctx: Context, hookname: string, originString: string) {
+  const result: string[] = await ctx.executeHook(hookname);
+  let item = '';
+  if (result) {
+    result.forEach((items) => {
+      item = item + items;
+    })
+  }
+  const newString = originString.replace(`{{${hookname}}}`, item);
+  return newString;
+}
+
 export async function apply(ctx: Context, config: Config) {
   const configManager = new PluginConfigManager();
   const core = ctx.getCore();
@@ -46,7 +58,6 @@ export async function apply(ctx: Context, config: Config) {
 
   consoleitem['config'] = new ConsoleItem('fa-cog', '配置', path.join(staticDir, 'config.html'), path.join(staticDir, 'files'));
 
-  // Middleware for login check
   const requireLogin = async (session: Session, next: () => Promise<void>) => {
     if (loginstatus[session.sessionid]) {
       await next();
@@ -56,13 +67,11 @@ export async function apply(ctx: Context, config: Config) {
     }
   };
 
-  // Redirect root to home
   ctx.route(`/${basePath}`).action((session) => {
     session.body = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>重定向</title></head><body><script>window.location.href = "/${basePath}/home";</script><p>正在重定向</p></body></html>`;
     session.setMime('html');
   });
 
-  // Static pages
   ctx.route(`/${basePath}/login`).action((session) => {
     const loginHtmlPath = path.join(staticDir, 'login.html');
     if (fs.existsSync(loginHtmlPath)) {
@@ -74,12 +83,11 @@ export async function apply(ctx: Context, config: Config) {
   ctx.route(`/${basePath}/home`).action((session) => requireLogin(session, async () => {
     const consoleHtmlPath = path.join(staticDir, 'home.html');
     if (fs.existsSync(consoleHtmlPath)) {
-      session.body = fs.readFileSync(consoleHtmlPath, 'utf8');
+      session.body = await getHook(ctx, 'console:home', fs.readFileSync(consoleHtmlPath, 'utf8'));
       session.setMime('html');
     }
   }));
 
-  // API routes
   ctx.route(`/api/console/loginpass`).action(async (session, params) => {
     session.setMime('json');
     const reqst = await session.parseRequestBody();

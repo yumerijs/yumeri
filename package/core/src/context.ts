@@ -80,6 +80,9 @@ export class Context {
      */
     hook(name: string, hookname: string, callback: HookHandler) {
         this.core.hook(name, hookname, callback);
+        if (!this.hooks[name]) {
+            this.hooks[name] = [];
+        }
         this.hooks[name].push(hookname);
     }
 
