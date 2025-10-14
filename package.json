@@ -14,10 +14,12 @@
   "dependencies": {
     "@yumerijs/scripts": "workspace:^",
     "chokidar": "^4.0.3",
+    "fs-extra": "^11.3.2",
     "yumeri": "workspace:^",
     "yumeri-plugin-console": "workspace:^"
   },
   "devDependencies": {
+    "@types/fs-extra": "^11",
     "@types/node": "^22.15.19",
     "cross-env": "^10.0.0",
     "tsconfig-paths": "^4.2.0",
