@@ -1,15 +1,13 @@
 import { Core } from './core';
 import { Logger } from './logger';
-import { Session } from './session';
+import { Session, Client } from './session';
 import http, { IncomingMessage, ServerResponse } from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
 import { URL } from 'url';
 import Ws from 'ws';
-import * as formidable from 'formidable';
 import * as mime from 'mime-types';
 
-type ParsedParams = Record<string, string | string[] | undefined>;
 
 const logger = new Logger('server');
 
@@ -63,39 +61,6 @@ export class Server {
         return xff ? xff.split(',')[0].trim() : req.socket.remoteAddress || '127.0.0.1';
     }
 
-    private async parseRequestBody(req: IncomingMessage): Promise<ParsedParams> {
-        return new Promise((resolve, reject) => {
-            const contentType = (req.headers['content-type'] || '').toLowerCase();
-            if (contentType.includes('application/json') || contentType.includes('application/x-www-form-urlencoded')) {
-                let body = '';
-                req.on('data', chunk => body += chunk.toString());
-                req.on('end', () => {
-                    try {
-                        if (contentType.includes('application/json')) resolve(JSON.parse(body));
-                        else {
-                            const params = new URLSearchParams(body);
-                            const parsed: ParsedParams = {};
-                            params.forEach((v, k) => parsed[k] = v);
-                            resolve(parsed);
-                        }
-                    } catch (e) { reject(e); }
-                });
-            } else if (contentType.includes('multipart/form-data')) {
-                const form = formidable.formidable({});
-                form.parse(req, (err, fields) => {
-                    if (err) return reject(err);
-                    const parsed: ParsedParams = {};
-                    Object.keys(fields).forEach(k => {
-                        const val = fields[k];
-                        parsed[k] = Array.isArray(val) && val.length === 1 ? val[0] : val;
-                    });
-                    resolve(parsed);
-                });
-            } else resolve({});
-            req.on('error', reject);
-        });
-    }
-
     private serveStaticFile(pathname: string, res: ServerResponse) {
         const fullPath = path.join(process.cwd(), this.staticDir, pathname);
         fs.readFile(fullPath, (err, data) => {
@@ -128,21 +93,22 @@ export class Server {
             const ip = this.getClientIP(req);
             const cookies = this.parseCookies(req);
             const session = this.createSession(ip, cookies, res, req, { protocol: 'http', header: req.headers });
+            // session.client.body = this.getReqBody(req);
 
-            if (req.method?.toLowerCase() === 'post') {
-                try {
-                    const body = await this.parseRequestBody(req);
-                    Object.entries(body).forEach(([k, v]) => {
-                        if (typeof v === 'string') queryParams.set(k, v);
-                        else if (Array.isArray(v)) v.forEach(val => queryParams.append(k, val));
-                    });
-                } catch (err) {
-                    res.writeHead(400, { 'Content-Type': 'text/plain' });
-                    res.end('Invalid request body');
-                    logger.error('Request body parse error:', err);
-                    return;
-                }
-            }
+            // if (req.method?.toLowerCase() === 'post') {
+            //     try {
+            //         const body = await this.parseRequestBody(req);
+            //         Object.entries(body).forEach(([k, v]) => {
+            //             if (typeof v === 'string') queryParams.set(k, v);
+            //             else if (Array.isArray(v)) v.forEach(val => queryParams.append(k, val));
+            //         });
+            //     } catch (err) {
+            //         res.writeHead(400, { 'Content-Type': 'text/plain' });
+            //         res.end('Invalid request body');
+            //         logger.error('Request body parse error:', err);
+            //         return;
+            //     }
+            // }
 
             const route = this.core.getRoute(pathname);
             if (route && route.allowedMethods.includes(req.method ?? 'GET')) {

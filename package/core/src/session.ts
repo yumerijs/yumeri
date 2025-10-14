@@ -7,6 +7,15 @@
 import crypto from 'crypto';
 import { Server } from './server';
 import { IncomingMessage, ServerResponse } from 'http';
+import * as formidable from 'formidable';
+type ParsedParams = Record<string, string | string[] | undefined>;
+
+
+export interface Client {
+    req: IncomingMessage;
+    res: ServerResponse;
+    headers?: Record<string, string>;
+}
 
 export class Session {
     public ip: string;
@@ -19,8 +28,7 @@ export class Session {
     public status: number = 200;
     public body: any;
     public properties?: Record<string, any> = {};
-    public res = null;
-    public req = null;
+    public client: Client = null;
     public server: Server;
     public protocol: string = 'http';
 
@@ -34,8 +42,10 @@ export class Session {
         this.cookie = cookie;
         this.query = query;
         this.server = server;
-        this.req = req;
-        this.res = res;
+        this.client = {
+          req: req,
+          res: res
+        }
         this.head['Content-Type'] = 'text/plain';
         if (cookie.sessionid) {
             this.sessionid = cookie.sessionid;
@@ -54,6 +64,56 @@ export class Session {
     private generateId(ip: string, option?: string): string {
         const sessionId = this.md5(ip + Date.now().toString() + Math.random().toString()); // 添加随机性
         return sessionId;
+    }
+
+    /**
+     * 解析请求体
+     * @param client 客户端
+     * @returns Promise<ParsedParams>
+     */
+    public async parseRequestBody(client: Client = this.client): Promise<ParsedParams> {
+        const req = client.req;
+        return new Promise((resolve, reject) => {
+            const contentType = (req.headers['content-type'] || '').toLowerCase();
+            if (contentType.includes('application/json') || contentType.includes('application/x-www-form-urlencoded')) {
+                let body = '';
+                req.on('data', chunk => body += chunk.toString());
+                req.on('end', () => {
+                    try {
+                        if (contentType.includes('application/json')) resolve(JSON.parse(body));
+                        else {
+                            const params = new URLSearchParams(body);
+                            const parsed: ParsedParams = {};
+                            params.forEach((v, k) => parsed[k] = v);
+                            resolve(parsed);
+                        }
+                    } catch (e) { reject(e); }
+                });
+            } else if (contentType.includes('multipart/form-data')) {
+                const form = formidable.formidable({});
+                form.parse(req, (err, fields) => {
+                    if (err) return reject(err);
+                    const parsed: ParsedParams = {};
+                    Object.keys(fields).forEach(k => {
+                        const val = fields[k];
+                        parsed[k] = Array.isArray(val) && val.length === 1 ? val[0] : val;
+                    });
+                    resolve(parsed);
+                });
+            } else resolve({});
+            req.on('error', reject);
+        });
+    }
+
+    /**
+     * 获取请求体
+     * @param req 请求对象
+     * @returns Promise<string>
+     */
+    public async getReqBody(req: IncomingMessage): Promise<string> {
+        let body = ""
+        req.on('data', chunk => body += chunk.toString());
+        return body;
     }
 
     // MD5 加密
@@ -114,10 +174,10 @@ export class Session {
   }
 
   public send(data: any): any {
-    return this.res.send(data);
+    return this.client.res.write(data);
   }
 
   public endsession(message: any): any {
-    return this.res.end(message);
+    return this.client.res.end(message);
   }
 }

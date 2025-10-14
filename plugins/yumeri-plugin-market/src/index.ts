@@ -174,7 +174,7 @@ export async function apply(ctx: Context, config: Config) {
     };
 
     for (const [path, handler] of Object.entries(routes)) {
-        ctx.route(`/market${path}`).action(
+        ctx.route(`/api/market${path}`).action(
             requireLogin(async (sess, params) => {
                 sess.setMime('json');
                 await handler(sess, params);

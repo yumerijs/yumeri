@@ -381,7 +381,6 @@
     <div class="overlay" id="overlay"></div>
     <button class="toggle-sidebar" id="toggle-sidebar">☰</button>
     <aside class="sidebar" id="sidebar">
-        <button class="return-home" id="return-home">返回主页</button>
         <nav>
             <ul id="plugin-list"></ul>
         </nav>
@@ -414,13 +413,8 @@
             const enableButton = document.querySelector('.enable-button');
             const disableButton = document.querySelector('.disable-button');
             const notification = document.getElementById('notification');
-            const returnHomeButton = document.getElementById('return-home');
             const pluginUsage = document.getElementById('plugin-usage');
 
-            // 返回主页
-            returnHomeButton.addEventListener('click', function () {
-                window.location.href = './home';
-            });
             let currentPluginName = null; // 用于存储当前选中的插件名称
             let currentPluginStatus = null; // 用于存储当前插件状态
 
@@ -466,7 +460,7 @@
             async function getPluginStatus(pluginName) {
                 try {
                     const cleanPluginName = pluginName.replace(/^~/, '');
-                    const response = await fetch(`./api/pluginstatus?name=${cleanPluginName}`);
+                    const response = await fetch(`/api/console/pluginstatus?name=${cleanPluginName}`);
                     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                     const data = await response.json();
                     if (typeof data === 'string') return data.trim();
@@ -481,7 +475,7 @@
             // 获取并显示插件列表
             async function fetchPluginList() {
                 try {
-                    const response = await fetch('./api/plugins?includeDisabled=true');
+                    const response = await fetch('/api/console/plugins?includeDisabled=true');
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
@@ -564,8 +558,8 @@
                     currentPluginStatus = pluginStatus;
                     updatePluginStatus();
 
-                    const response = await fetch(`./api/config?name=${pluginName}`);
-                    let usage = await fetch(`./api/pluginusage?name=${pluginName}`);
+                    const response = await fetch(`/api/console/config?name=${pluginName}`);
+                    let usage = await fetch(`/api/console/pluginusage?name=${pluginName}`);
                     if (!usage.ok) {
                         throw new Error(`HTTP error! status: ${usage.status}`);
                     }
@@ -1177,7 +1171,7 @@
                     const jsonContent = JSON.stringify(configData);
                     console.log('Saving configuration:', jsonContent);
                     // 构建保存配置的URL，并确保内容被URIComponent编码
-                    const url = `./api/saveconfig?name=${currentPluginName}&config=${encodeURIComponent(jsonContent)}`;
+                    const url = `/api/console/saveconfig?name=${currentPluginName}&config=${encodeURIComponent(jsonContent)}`;
                     const response = await fetch(url);
 
                     if (!response.ok) {
@@ -1208,7 +1202,7 @@
                 }
 
                 try {
-                    const response = await fetch(`./api/enableplugin?name=${currentPluginName}`);
+                    const response = await fetch(`/api/console/enableplugin?name=${currentPluginName}`);
 
                     if (!response.ok) {
                         const errorResult = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
@@ -1246,7 +1240,7 @@
                 }
 
                 try {
-                    const response = await fetch(`./api/disableplugin?name=${currentPluginName}`);
+                    const response = await fetch(`/api/console/disableplugin?name=${currentPluginName}`);
 
                     if (!response.ok) {
                         const errorResult = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));

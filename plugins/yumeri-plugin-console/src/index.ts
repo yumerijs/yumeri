@@ -25,11 +25,22 @@ export const config = {
 
 let loginstatus: Record<string, string> = {};
 
+let consoleitem: Record<string, ConsoleItem> = {};
+
+const operateconsole = {
+  addconsoleitem: (name: string, icon: string, displayname: string, htmlpath: string, staticpath: string) => {
+    consoleitem[name] = new ConsoleItem(icon, displayname, htmlpath, staticpath);
+  },
+  removeconsoleitem: (name: string) => {
+    delete consoleitem[name];
+  },
+  getloginstatus: (session: Session) => !!loginstatus[session.sessionid]
+};
+
 export async function apply(ctx: Context, config: Config) {
   const configManager = new PluginConfigManager();
   const core = ctx.getCore();
   configManager.setCore(core);
-  let consoleitem: Record<string, ConsoleItem> = {};
   const staticDir = path.join(__dirname, '..', 'static');
   const basePath = config.get<string>('path', 'console');
 
@@ -69,10 +80,11 @@ export async function apply(ctx: Context, config: Config) {
   }));
 
   // API routes
-  ctx.route(`/${basePath}/api/loginpass`).action((session, params) => {
+  ctx.route(`/api/console/loginpass`).action(async (session, params) => {
     session.setMime('json');
-    if (params.get('username') === config.get<string>('adminname', 'admin') && params.get('password') === config.get<string>('adminpassword', 'admin')) {
-      loginstatus[session.sessionid] = params.get('username')!;
+    const reqst = await session.parseRequestBody();
+    if (reqst.username === config.get<string>('adminname', 'admin') && reqst.password === config.get<string>('adminpassword', 'admin')) {
+      loginstatus[session.sessionid] = reqst.username!;
       session.body = JSON.stringify({ success: true });
     } else {
       session.body = JSON.stringify({ success: false, message: '用户名或密码错误' });
@@ -138,7 +150,7 @@ export async function apply(ctx: Context, config: Config) {
   };
 
   for (const [routeName, handler] of Object.entries(apiRoutes)) {
-    ctx.route(`/${basePath}/api/${routeName}`).action(async (session, params) => {
+    ctx.route(`/api/console/${routeName}`).action(async (session, params) => {
       await requireLogin(session, async () => {
         try {
           session.setMime('json');
@@ -165,14 +177,6 @@ export async function apply(ctx: Context, config: Config) {
   }
   ));
 
-  const operateconsole = {
-    addconsoleitem: (name: string, icon: string, displayname: string, htmlpath: string, staticpath: string) => {
-      consoleitem[name] = new ConsoleItem(icon, displayname, htmlpath, staticpath);
-    },
-    removeconsoleitem: (name: string) => {
-      delete consoleitem[name];
-    },
-    getloginstatus: (session: Session) => !!loginstatus[session.sessionid]
-  };
+
   ctx.registerComponent('console', operateconsole);
 }

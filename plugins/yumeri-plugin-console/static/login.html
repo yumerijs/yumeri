@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>登录 | Yumeri Console</title>
+  <title>登录控制台</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     :root {
@@ -124,8 +124,8 @@
 <body>
 
   <div class="login-container">
-    <h2>用户登录</h2>
-    <form id="loginForm" action="./api/loginpass" method="post">
+    <h2>登录控制台</h2>
+    <form id="loginForm" action="/api/console/loginpass" method="post">
       <div class="form-group">
         <label for="username">账号</label>
         <input type="text" id="username" name="username" required>
