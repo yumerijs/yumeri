@@ -31,17 +31,19 @@ export class Session {
     public client: Client = null;
     public server: Server;
     public protocol: string = 'http';
+    public pathname: string;
 
     /*
      *  @ip: string，用户IP
      *  @cookie: string，会话cookie
      *  @query: string，请求字符串
      */
-    constructor(ip: string, cookie: Record<string, string>, server: Server, req?: IncomingMessage, res?: ServerResponse, query?: Record<string, string>){
+    constructor(ip: string, cookie: Record<string, string>, server: Server, req?: IncomingMessage, res?: ServerResponse, pathname?: string, query?: Record<string, string>){
         this.ip  = ip;
         this.cookie = cookie;
         this.query = query;
         this.server = server;
+        this.pathname = pathname;
         this.client = {
           req: req,
           res: res

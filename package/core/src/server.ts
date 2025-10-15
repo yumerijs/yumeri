@@ -38,8 +38,8 @@ export class Server {
         this.enableWs = config.enableWs ?? true;
     }
 
-    private createSession(ip: string, cookies: Record<string, string>, res?: ServerResponse, req?: IncomingMessage, extra: Record<string, any> = {}) {
-        const session = new Session(ip, cookies, this, req, res);
+    private createSession(ip: string, cookies: Record<string, string>, res?: ServerResponse, req?: IncomingMessage, pathname?: string, extra: Record<string, any> = {}) {
+        const session = new Session(ip, cookies, this, req, res, pathname);
         Object.assign(session.properties, extra);
         session.protocol = extra.protocol ?? 'http';
         return session;
@@ -92,7 +92,7 @@ export class Server {
 
             const ip = this.getClientIP(req);
             const cookies = this.parseCookies(req);
-            const session = this.createSession(ip, cookies, res, req, { protocol: 'http', header: req.headers });
+            const session = this.createSession(ip, cookies, res, req, pathname, { protocol: 'http', header: req.headers });
             // session.client.body = this.getReqBody(req);
 
             // if (req.method?.toLowerCase() === 'post') {
@@ -138,7 +138,7 @@ export class Server {
 
                 const ip = this.getClientIP(req);
                 const cookies = this.parseCookies(req);
-                const session = this.createSession(ip, cookies, undefined, req, { ws, protocol: 'ws' });
+                const session = this.createSession(ip, cookies, undefined, req, undefined, { ws, protocol: 'ws' });
 
                 ws.on('message', async msg => {
                     try {
