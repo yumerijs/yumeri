@@ -83,7 +83,9 @@ export async function apply(ctx: Context, config: Config) {
   ctx.route(`/${basePath}/home`).action((session) => requireLogin(session, async () => {
     const consoleHtmlPath = path.join(staticDir, 'home.html');
     if (fs.existsSync(consoleHtmlPath)) {
-      session.body = await getHook(ctx, 'console:home', fs.readFileSync(consoleHtmlPath, 'utf8'));
+      const parseone = await getHook(ctx, 'console:home', fs.readFileSync(consoleHtmlPath, 'utf8'));
+      const parsetwo = await getHook(ctx, 'console:homejs', parseone);
+      session.body = parsetwo;
       session.setMime('html');
     }
   }));
