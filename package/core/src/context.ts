@@ -6,6 +6,7 @@
 import { Core } from './core';
 import { Route } from './route';
 import { HookHandler } from './hook';
+import { Middleware } from './middleware';
 
 /**
  * 插件上下文对象
@@ -67,9 +68,9 @@ export class Context {
      * @param name 中间件名称
      * @param callback 中间件回调函数
      */
-    use(name: string, callback: Function) {
+    use(name: string, callback: Middleware) {
         this.middlewares.push(name);
-        this.core.use(name, async (...args: any[]) => callback(...args));
+        this.core.use(name, callback);
     }
 
     /**
@@ -169,7 +170,7 @@ export class Context {
 
         // 删除钩子
         for (const hook in this.hooks) {
-            this.hooks.hook.forEach((hookname) => {
+            this.hooks[hook].forEach((hookname) => {
                 this.core.unhook(hook, hookname);
             })
         }

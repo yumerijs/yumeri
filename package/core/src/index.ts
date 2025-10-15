@@ -11,3 +11,4 @@ export * from './config';
 export * from './logger';
 export * from './context';
 export * from './hook'
+export * from './middleware'
