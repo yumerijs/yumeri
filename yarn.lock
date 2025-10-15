@@ -2633,6 +2633,7 @@ __metadata:
   resolution: "yumeri-plugin-analyse@workspace:plugins/yumeri-plugin-analyse"
   dependencies:
     "@types/node": "npm:^22.14.1"
+    "@yumerijs/types": "npm:^1.0.0"
     typescript: "npm:^5.8.2"
     yumeri: "npm:^1.1.0"
   languageName: unknown

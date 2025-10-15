@@ -1,6 +1,8 @@
 import { Context, Config, Session, Logger, ConfigSchema } from 'yumeri';
 import { getSpecificPackageVersion, getPackageManager, PackageManager } from './util';
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
+import * as fs from 'fs';
+import { promises as fsp } from 'fs';
 import path from 'path';
 
 const logger = new Logger("market");
@@ -86,34 +88,38 @@ export async function apply(ctx: Context, config: Config) {
         },
         '/install': async (session: Session, params: URLSearchParams) => {
             const packageName = params.get('name');
+            const version = params.get('version');
             if (!packageName || !packageName.includes('yumeri')) {
                 session.body = JSON.stringify({ success: false, message: 'Invalid package name' });
                 return;
             }
-            const packageManager = getPackageManager();
-            const command = packageManager === 'npm' ? `npm install ${packageName} --registry=${config.get('npmregistry', 'https://registry.npmmirror.com')}` :
-                packageManager === 'yarn' ? `yarn add ${packageName} --registry=${config.get('npmregistry', 'https://registry.npmmirror.com')}` :
-                    packageManager === 'pnpm' ? `pnpm add ${packageName} --registry=${config.get('npmregistry', 'https://registry.npmmirror.com')}` : null;
 
-            if (command) {
-                try {
-                    await new Promise<void>((resolve, reject) => {
-                        exec(command, (error, stdout, stderr) => {
-                            if (error) {
-                                logger.error(`Installation failed: ${stderr}`);
-                                reject(new Error(stderr));
-                            } else {
-                                logger.info(`Installation successful: ${stdout}`);
-                                resolve();
-                            }
-                        });
+            const packageJsonPath = path.resolve(process.cwd(), 'package.json');
+            try {
+                // 读取 package.json
+                const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+                pkg.dependencies ||= {};
+                pkg.dependencies[packageName] = version;
+
+                // 写回 package.json
+                await fsp.writeFile(packageJsonPath, JSON.stringify(pkg, null, 2) + '\n');
+
+                // 执行 yarn install
+                await new Promise<void>((resolve, reject) => {
+                    const child = spawn('yarn', ['install', `--registry=${config.get('npmregistry', 'https://registry.npmmirror.com')}`], { cwd: process.cwd() });
+                    let stderr = '';
+                    child.stdout.on('data', data => logger.info(data.toString()));
+                    child.stderr.on('data', data => { logger.error(data.toString()); stderr += data.toString(); });
+                    child.on('close', code => {
+                        if (code !== 0) reject(new Error(stderr || 'Unknown error'));
+                        else resolve();
                     });
-                    session.body = JSON.stringify({ success: true, message: 'Installation successful' });
-                } catch (e: any) {
-                    session.body = JSON.stringify({ success: false, message: e.message });
-                }
-            } else {
-                session.body = JSON.stringify({ success: false, message: 'Package manager not supported' });
+                    child.on('error', err => reject(err));
+                });
+
+                session.body = JSON.stringify({ success: true, message: 'Installation successful' });
+            } catch (e: any) {
+                session.body = JSON.stringify({ success: false, message: e.message });
             }
         },
         '/versions': async (session: Session, params: URLSearchParams) => {
@@ -136,30 +142,26 @@ export async function apply(ctx: Context, config: Config) {
                 session.body = JSON.stringify({ success: false, message: 'Invalid package name' });
                 return;
             }
-            const packageManager = getPackageManager();
-            const command = packageManager === 'npm' ? `npm uninstall ${packageName}` :
-                packageManager === 'yarn' ? `yarn remove ${packageName}` :
-                    packageManager === 'pnpm' ? `pnpm remove ${packageName}` : null;
 
-            if (command) {
-                try {
-                    await new Promise<void>((resolve, reject) => {
-                        exec(command, (error, stdout, stderr) => {
-                            if (error) {
-                                logger.error(`Uninstallation failed: ${stderr}`);
-                                reject(new Error(stderr));
-                            } else {
-                                logger.info(`Uninstallation successful: ${stdout}`);
-                                resolve();
-                            }
-                        });
+            try {
+                await new Promise<void>((resolve, reject) => {
+                    const child = spawn('yarn', ['remove', packageName], { cwd: process.cwd() });
+                    let stderr = '';
+
+                    child.stdout.on('data', data => logger.info(data.toString()));
+                    child.stderr.on('data', data => { logger.error(data.toString()); stderr += data.toString(); });
+
+                    child.on('close', code => {
+                        if (code !== 0) reject(new Error(stderr || 'Unknown error'));
+                        else resolve();
                     });
-                    session.body = JSON.stringify({ success: true, message: 'Uninstallation successful' });
-                } catch (e: any) {
-                    session.body = JSON.stringify({ success: false, message: e.message });
-                }
-            } else {
-                session.body = JSON.stringify({ success: false, message: 'Package manager not supported' });
+
+                    child.on('error', err => reject(err));
+                });
+
+                session.body = JSON.stringify({ success: true, message: 'Uninstallation successful' });
+            } catch (e: any) {
+                session.body = JSON.stringify({ success: false, message: e.message });
             }
         },
         '/currentver': async (session: Session, params: URLSearchParams) => {
