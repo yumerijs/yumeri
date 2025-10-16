@@ -1,7 +1,8 @@
-import { Context, Config, Session, Middleware, Logger, ConfigSchema } from 'yumeri';
+import { Context, Config, Logger, ConfigSchema } from 'yumeri';
+import { Database } from '@yumerijs/types';
+import './types';
 
 const logger = new Logger("analyse");
-import { Database } from '@yumerijs/types/dist/database'
 
 export const depend = ['database'];
 
@@ -15,6 +16,7 @@ export const config = {
   } as Record<string, ConfigSchema>
 };
 
+// HTML and JS for the console page remain the same
 const analyseHtml = `<div class="module-section">
     <h3 class="module-title">访问统计</h3>
     <div class="grid" id="statsGrid">
@@ -34,7 +36,7 @@ const analyseHtml = `<div class="module-section">
             <p class="stat-value" id="monthViews">加载中</p>
         </div>
     </div>
-</div>`
+</div>`;
 
 const analyseJs = `async function loadStats() {
     const totalEl = document.getElementById('totalViews');
@@ -66,85 +68,71 @@ const analyseJs = `async function loadStats() {
     }
 }
 
-loadStats();`
+loadStats();`;
 
 export async function apply(ctx: Context, config: Config) {
   const db = ctx.getComponent('database') as Database
-  if (!await db.tableExists('analyse')) {
-    await db.createTable('analyse', {
-      day: { type: 'number', primaryKey: true },
-      times: { type: 'number', default: 0 }
-    })
-  }
-  ctx.hook('console:home', 'analyse', async () => {
-    return analyseHtml;
-  })
-  ctx.hook('console:homejs', 'analyse', async () => {
-    return analyseJs;
-  })
+
+  await db.extend('analyse', {
+    day: 'unsigned', // Use a more specific type
+    times: 'unsigned',
+  }, { primary: 'day' });
+
+  ctx.hook('console:home', 'analyse', async () => analyseHtml);
+  ctx.hook('console:homejs', 'analyse', async () => analyseJs);
+
   const getStartWith = (pathname: string) => {
-    const paths = config.get<string[]>('paths', [])
-    for (const path of paths) {
-      if (pathname.startsWith('/' + path)) {
-        return false
-      }
-    }
-    return true
-  }
+    const paths = config.get<string[]>('paths', []);
+    return !paths.some(path => pathname.startsWith('/' + path));
+  };
+
   ctx.use('analyse:mdw', async (session, next) => {
     await next();
     if (getStartWith(session.pathname) && session.head['Content-Type'] === 'text/html') {
-      // 统计浏览次数
-      const day = (new Date().getDate()) + 100 * (new Date().getMonth()) + 10000 * (new Date().getFullYear())
-      const analyse = await db.findOne('analyse', { day })
-      if (analyse) {
-        await db.update('analyse', { times: analyse.times + 1 }, { day })
-      } else {
-        await db.insert('analyse', { day, times: 1 })
-      }
+      const day = (new Date().getDate()) + 100 * (new Date().getMonth() + 1) + 10000 * (new Date().getFullYear());
+      
+      // Use a single atomic SQL statement to prevent race conditions.
+      const sql = `INSERT INTO analyse (day, times) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET times = times + 1`;
+      await db.run(sql, [day]);
     }
-  })
-  ctx.route('/api/analyse/:range')
-    .action(async (session, _, range) => {
-      try {
-        const ranges = parseInt(range) - 1
-        const day = (new Date().getDate()) + 100 * (new Date().getMonth()) + 10000 * (new Date().getFullYear())
-        const year = parseInt(day.toString().slice(0, 4), 10);
-        const month = parseInt(day.toString().slice(4, 6), 10) - 1; // 月份从0开始
-        const date = parseInt(day.toString().slice(6, 8), 10);
+  });
 
-        // 创建日期对象并减去 range 天
-        const currentDate = new Date(year, month, date);
-        currentDate.setDate(currentDate.getDate() - ranges);
+  ctx.route('/api/analyse/:range').action(async (session, _, range) => {
+    try {
+      const ranges = parseInt(range, 10) - 1;
+      const today = new Date();
+      const pastDate = new Date(today);
+      pastDate.setDate(today.getDate() - ranges);
 
-        // 重新拼成 YYYYMMDD 格式
-        const foreDate =
-          currentDate.getFullYear().toString() +
-          String(currentDate.getMonth() + 1).padStart(2, '0') +
-          String(currentDate.getDate()).padStart(2, '0');
-        const analyse = await db.all(`SELECT * FROM analyse WHERE day >= ${foreDate} AND day <= ${day}`)
-        const total = analyse.reduce((total, current) => total + current.times, 0)
-        session.setMime('json')
-        session.body = JSON.stringify({ total })
-      } catch (error) {
-        logger.error(error)
-        session.status = 500
-      }
+      const formatDate = (date: Date) => (date.getDate()) + 100 * (date.getMonth() + 1) + 10000 * (date.getFullYear());
 
-    })
+      const dayEnd = formatDate(today);
+      const dayStart = formatDate(pastDate);
 
-  // 总浏览量
-  ctx.route('/api/analyse-total')
-    .action(async (session) => {
-      try {
-        const analyse = await db.find('analyse')
-        // 计算总浏览数
-        const total = analyse.reduce((total, current) => total + current.times, 0)
-        session.setMime('json')
-        session.body = JSON.stringify({ total })
-      } catch (error) {
-        logger.error(error)
-        session.status = 500
-      }
-    })
+      // Use select() with query operators for cleaner, safer queries
+      const analyses = await db.select('analyse', {
+        day: { $gte: dayStart, $lte: dayEnd }
+      });
+
+      const total = analyses.reduce((sum, current) => sum + current.times, 0);
+      session.setMime('json');
+      session.body = JSON.stringify({ total });
+    } catch (error) {
+      logger.error(error);
+      session.status = 500;
+    }
+  });
+
+  ctx.route('/api/analyse-total').action(async (session) => {
+    try {
+      // Use select() to get all records
+      const analyses = await db.select('analyse', {});
+      const total = analyses.reduce((sum, current) => sum + current.times, 0);
+      session.setMime('json');
+      session.body = JSON.stringify({ total });
+    } catch (error) {
+      logger.error(error);
+      session.status = 500;
+    }
+  });
 }
