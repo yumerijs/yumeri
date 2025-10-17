@@ -5,6 +5,7 @@
  **/
 import { Session } from './session';
 import { Middleware } from './middleware';
+import { WebSocketServer } from 'ws';
 
 export type RouteHandler = (
   session: Session,
@@ -61,6 +62,8 @@ export class Route {
   private handler: RouteHandler | null = null;
   public middlewares: Middleware[] = [];
   public allowedMethods: string[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD'];
+  public ws: WebSocketServer = null;
+
 
   /**
    * 创建路由
@@ -241,6 +244,16 @@ export class Route {
    */
   methods(...methods: string[]): Route {
     this.allowedMethods = methods;
+    return this;
+  }
+
+  /**
+    * 注册Ws处理器
+    * @param handler 处理器
+    */
+  wsOn(event: string, handler: (...args: any[]) => void) {
+    if (!this.ws) this.ws = new WebSocketServer( { noServer: true });
+    this.ws.on(event, handler);
     return this;
   }
 }
