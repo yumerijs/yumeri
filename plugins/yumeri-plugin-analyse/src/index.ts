@@ -89,11 +89,15 @@ export async function apply(ctx: Context, config: Config) {
   ctx.use('analyse:mdw', async (session, next) => {
     await next();
     if (getStartWith(session.pathname) && session.head['Content-Type'] === 'text/html') {
-      const day = (new Date().getDate()) + 100 * (new Date().getMonth() + 1) + 10000 * (new Date().getFullYear());
+      const day = (new Date().getDate()) + 100 * (new Date().getMonth()) + 10000 * (new Date().getFullYear());
       
-      // Use a single atomic SQL statement to prevent race conditions.
-      const sql = `INSERT INTO analyse (day, times) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET times = times + 1`;
-      await db.run(sql, [day]);
+      // Use the new type-safe API
+      const record = await db.selectOne('analyse', { day });
+      if (record) {
+        await db.update('analyse', { day }, { times: record.times + 1 });
+      } else {
+        await db.create('analyse', { day, times: 1 });
+      }
     }
   });
 

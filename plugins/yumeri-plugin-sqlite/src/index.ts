@@ -5,7 +5,8 @@ import { open, Database as SQLiteDriver } from 'sqlite';
 import { Database as SQLite3 } from 'sqlite3';
 import * as path from 'path';
 
-const logger = new Logger("database-sqlite");
+const logger = new Logger("sqlite");
+export const provide = ['database']
 
 // --- Query Builder --- 
 
@@ -140,8 +141,11 @@ class SqliteDatabase implements YumeriDatabase {
     }
 
     async selectOne<K extends keyof Tables, F extends keyof Tables[K]>(table: K, query: Query<Tables[K]>, fields?: F[]): Promise<Pick<Tables[K], F> | undefined> {
-        const results = await this.select(table, { ...query, $limit: 1 } as any, fields);
-        return results[0];
+        const tableName = table as string;
+        const { sql: whereSql, params } = buildWhereClause(query);
+        const selectFields = fields ? fields.map(f => `\"${f as string}\"`).join(', ') : '*';
+        const sql = `SELECT ${selectFields} FROM \"${tableName}\"${whereSql ? ` WHERE ${whereSql}` : ''} LIMIT 1`;
+        return this.get(sql, params);
     }
 
     async update<K extends keyof Tables>(table: K, query: Query<Tables[K]>, data: Partial<Tables[K]>): Promise<number> {
