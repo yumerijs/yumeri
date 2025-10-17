@@ -2673,6 +2673,17 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"yumeri-plugin-logger@workspace:plugins/yumeri-plugin-logger":
+  version: 0.0.0-use.local
+  resolution: "yumeri-plugin-logger@workspace:plugins/yumeri-plugin-logger"
+  dependencies:
+    "@types/node": "npm:^22.14.1"
+    typescript: "npm:^5.8.2"
+    ws: "npm:^8.18.3"
+    yumeri: "npm:^1.1.0"
+  languageName: unknown
+  linkType: soft
+
 "yumeri-plugin-market@workspace:plugins/yumeri-plugin-market":
   version: 0.0.0-use.local
   resolution: "yumeri-plugin-market@workspace:plugins/yumeri-plugin-market"

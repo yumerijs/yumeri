@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>日志</title>
+<style>
+  body {
+    margin: 0;
+    padding: 10px;
+    background: #0f172a;
+    color: #e6eef8;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace;
+    white-space: pre-wrap;
+    overflow-y: scroll;
+  }
+  .E { color: #ff6b6b; }  /* Error 红 */
+  .W { color: #f6c85f; }  /* Warning 黄 */
+  .I { color: #66d9ef; }  /* Info 蓝 */
+  .log-line {
+    margin-bottom: 4px;
+  }
+</style>
+</head>
+<body>
+<script>
+(async () => {
+  const API_PATH = '/api/logger';
+  const body = document.body;
+
+  // 每次新日志追加后立刻滚到底部
+  function scrollToBottom() {
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'auto' });
+  }
+
+  function addLog(log) {
+    if (!log) return;
+    const level = log.level || 'I';
+    const msg = log.message || '';
+    const time = log.timestamp
+      ? new Date(log.timestamp).toLocaleString()
+      : '';
+    const div = document.createElement('div');
+    div.className = 'log-line ' + level;
+    div.textContent = `[${time}] [${level}] ${msg}`;
+    body.appendChild(div);
+    scrollToBottom();
+  }
+
+  function normalize(item) {
+    if (typeof item === 'string') {
+      try { return JSON.parse(item); } catch { return { level: 'I', message: item, timestamp: Date.now() }; }
+    }
+    return item;
+  }
+
+  // 获取历史日志
+  try {
+    const res = await fetch(API_PATH);
+    const data = await res.json();
+    (Array.isArray(data) ? data : []).forEach(i => addLog(normalize(i)));
+  } catch (e) {
+    addLog({ level: 'E', message: '加载历史日志失败: ' + e });
+  }
+
+  // 建立 WebSocket
+  const wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + API_PATH;
+  let ws = new WebSocket(wsUrl);
+
+  ws.onmessage = ev => {
+    try {
+      const data = JSON.parse(ev.data);
+      if (Array.isArray(data)) data.forEach(i => addLog(normalize(i)));
+      else addLog(normalize(data));
+    } catch {
+      addLog({ level: 'I', message: ev.data });
+    }
+  };
+
+  ws.onclose = () => addLog({ level: 'W', message: '连接已关闭' });
+  ws.onerror = () => addLog({ level: 'E', message: '连接错误' });
+})();
+</script>
+</body>
+</html>

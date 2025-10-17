@@ -127,7 +127,7 @@ export class Server {
                     socket.destroy()
                 } else {
                     route.ws.handleUpgrade(req, socket, head, (ws) => {
-                        route.ws.emit('connection', ws, req);
+                        route.ws.emit('connection', ws, req, session);
                     })
                 }
             } else {

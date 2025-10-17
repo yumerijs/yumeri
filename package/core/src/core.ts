@@ -71,9 +71,10 @@ export class Core {
    */
   private pluginContexts: Record<string, Context> = {};
 
-  constructor(pluginLoader?: PluginLoader, coreConfig?: CoreOptions) {
+  constructor(pluginLoader?: PluginLoader, coreConfig?: CoreOptions, setCore = true) {
     this.coreConfig = coreConfig;
     this.pluginLoader = pluginLoader;
+    if (setCore) Logger.setCore(this);
   }
 
   /**
