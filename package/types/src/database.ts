@@ -1,13 +1,7 @@
+
 /**
  * A mapping from table names to their data types for type inference.
  * Extend this interface via declaration merging in your plugins.
- * 
- * @example
- * declare module '@yumerijs/types' {
- *   interface Tables {
- *     schedule: Schedule
- *   }
- * }
  */
 export interface Tables { }
 
@@ -18,6 +12,9 @@ export type FieldType = 'string' | 'text' | 'json' | 'integer' | 'unsigned' | 'b
 export interface FieldDefinition {
   type: FieldType;
   length?: number;
+  precision?: number;
+  scale?: number;
+  autoIncrement?: boolean;
   initial?: any;
   nullable?: boolean;
   legacy?: string[];
@@ -36,7 +33,7 @@ export interface IndexDefinition<T> {
   foreign?: { [K in keyof T]?: [keyof Tables, string] };
 }
 
-// --- Query Definition ---
+// --- Query & Update Definition ---
 
 export type Scalar = string | number | boolean | Date | null;
 
@@ -58,86 +55,38 @@ export type Query<T = any> = {
   $and?: Query<T>[];
 };
 
+export type UpdateData<T> = {
+  [K in keyof T]?: T[K] | { $inc: number };
+};
+
 // --- Main Database Interface ---
 
 export interface Database {
-  /**
-   * Extends the database schema with a new table or new fields.
-   * @param table The name of the table to extend.
-   * @param schema The schema definition for the fields.
-   * @param indexes Optional index definitions for the table.
-   */
   extend<K extends keyof Tables>(table: K, schema: Schema<Partial<Tables[K]>>, indexes?: IndexDefinition<Tables[K]>): Promise<void>;
 
-  /**
-   * Creates a new record in the table.
-   * @param table The name of the table.
-   * @param data The data for the new record.
-   */
   create<K extends keyof Tables>(table: K, data: Partial<Tables[K]>): Promise<Tables[K]>;
 
-  /**
-   * Retrieves records from the table.
-   * @param table The name of the table.
-   * @param query The query conditions.
-   * @param fields An optional array of fields to select.
-   */
   select<K extends keyof Tables, F extends keyof Tables[K]>(table: K, query: Query<Tables[K]>, fields?: F[]): Promise<Pick<Tables[K], F>[]>;
 
-  /**
-   * Retrieves a single record from the table.
-   * @param table The name of the table.
-   * @param query The query conditions.
-   * @param fields An optional array of fields to select.
-   */
   selectOne<K extends keyof Tables, F extends keyof Tables[K]>(table: K, query: Query<Tables[K]>, fields?: F[]): Promise<Pick<Tables[K], F> | undefined>;
 
-  /**
-   * Updates records in the table.
-   * @param table The name of the table.
-   * @param query The query conditions to select records for update.
-   * @param data The data to update.
-   */
-  update<K extends keyof Tables>(table: K, query: Query<Tables[K]>, data: Partial<Tables[K]>): Promise<number>;
+  update<K extends keyof Tables>(table: K, query: Query<Tables[K]>, data: UpdateData<Partial<Tables[K]>>): Promise<number>;
 
-  /**
-   * Removes records from the table.
-   * @param table The name of the table.
-   * @param query The query conditions to select records for removal.
-   */
   remove<K extends keyof Tables>(table: K, query: Query<Tables[K]>): Promise<number>;
 
   /**
    * Creates or updates records in the table.
    * @param table The name of the table.
-   * @param data An array of records to upsert.
+   * @param data The data to be inserted or used for updates.
    * @param key The field(s) to use as the unique key for conflict resolution.
+   * @param update The update logic to apply on conflict. If not provided, it updates using the `data` payload.
    */
-  upsert<K extends keyof Tables>(table: K, data: Partial<Tables[K]>[], key: keyof Tables[K] | (keyof Tables[K])[]): Promise<void>;
+  upsert<K extends keyof Tables>(table: K, data: Partial<Tables[K]>[], key: keyof Tables[K] | (keyof Tables[K])[], update?: UpdateData<Partial<Tables[K]>>): Promise<void>;
 
-  /**
-   * Drops a table from the database.
-   * @param table The name of the table to drop.
-   */
   drop<K extends keyof Tables>(table: K): Promise<void>;
 
-  /**
-   * Executes a raw SQL command (INSERT, UPDATE, DELETE).
-   */
   run(sql: string, params?: any[]): Promise<any>;
-
-  /**
-   * Executes a raw SQL query and returns a single row.
-   */
   get(sql: string, params?: any[]): Promise<any>;
-
-  /**
-   * Executes a raw SQL query and returns all rows.
-   */
   all(sql: string, params?: any[]): Promise<any[]>;
-
-  /**
-   * Closes the database connection.
-   */
   close(): Promise<void>;
 }

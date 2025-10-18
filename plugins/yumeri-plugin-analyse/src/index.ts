@@ -108,7 +108,7 @@ export async function apply(ctx: Context, config: Config) {
       const pastDate = new Date(today);
       pastDate.setDate(today.getDate() - ranges);
 
-      const formatDate = (date: Date) => (date.getDate()) + 100 * (date.getMonth() + 1) + 10000 * (date.getFullYear());
+      const formatDate = (date: Date) => (date.getDate()) + 100 * (date.getMonth()) + 10000 * (date.getFullYear());
 
       const dayEnd = formatDate(today);
       const dayStart = formatDate(pastDate);
