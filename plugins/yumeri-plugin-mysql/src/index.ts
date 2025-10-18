@@ -245,13 +245,13 @@ class MysqlDatabase implements YumeriDatabase {
 
 export const config = {
     schema: {
-        host: { type: 'string', default: 'localhost' },
-        port: { type: 'number', default: 3306 },
-        user: { type: 'string', required: true },
-        password: { type: 'string', required: true, description: 'use secret' },
-        database: { type: 'string', required: true },
-        connectionLimit: { type: 'number', default: 10 },
-        charset: { type: 'string', default: 'utf8mb4' },
+        host: { type: 'string', default: 'localhost', description: 'MySQL 主机名' },
+        port: { type: 'number', default: 3306, description: 'MySQL 端口' },
+        user: { type: 'string', required: true, description: '用户名' },
+        password: { type: 'string', required: true, description: '密码' },
+        database: { type: 'string', required: true, description: '数据库名' },
+        connectionLimit: { type: 'number', default: 10, description: '连接池大小' },
+        charset: { type: 'string', default: 'utf8mb4', description: '字符集', enum: ['utf8', 'utf8mb4'] },
     } as Record<string, ConfigSchema>
 };
 
