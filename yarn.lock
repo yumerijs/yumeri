@@ -2736,6 +2736,16 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"yumeri-plugin-pages@workspace:plugins/yumeri-plugin-pages":
+  version: 0.0.0-use.local
+  resolution: "yumeri-plugin-pages@workspace:plugins/yumeri-plugin-pages"
+  dependencies:
+    "@types/node": "npm:^22.14.1"
+    typescript: "npm:^5.8.2"
+    yumeri: "npm:^1.1.0"
+  languageName: unknown
+  linkType: soft
+
 "yumeri-plugin-permission@workspace:plugins/yumeri-plugin-permission":
   version: 0.0.0-use.local
   resolution: "yumeri-plugin-permission@workspace:plugins/yumeri-plugin-permission"
