@@ -1,6 +1,6 @@
 {
     "name": "yumeri-plugin-mysql",
-    "version": "1.0.2",
+    "version": "1.1.0",
     "description": "MySQL database for Yumeri",
     "main": "dist/index.js",
     "dev": "src/index.ts",
@@ -32,7 +32,9 @@
         "typescript": "^5.8.2"
     },
     "dependencies": {
-        "mysql2": "^3.14.1",
-        "yumeri": "^1.1.0"
+        "mysql2": "^3.14.1"
+    },
+    "peerDependencies": {
+        "yumeri": "^2.0.0"
     }
 }

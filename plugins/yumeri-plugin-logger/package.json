@@ -23,7 +23,9 @@
     "typescript": "^5.8.2"
   },
   "dependencies": {
-    "ws": "^8.18.3",
-    "yumeri": "^1.1.0"
+    "ws": "^8.18.3"
+  },
+  "peerDependencies": {
+    "yumeri": "^2.0.0"
   }
 }

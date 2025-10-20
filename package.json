@@ -16,8 +16,7 @@
     "chokidar": "^4.0.3",
     "fs-extra": "^11.3.2",
     "yumeri": "workspace:^",
-    "yumeri-plugin-console": "workspace:^",
-    "yumeri-plugin-todo": "1.0.0"
+    "yumeri-plugin-console": "workspace:^"
   },
   "devDependencies": {
     "@types/fs-extra": "^11",

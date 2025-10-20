@@ -1,6 +1,6 @@
 {
   "name": "@yumerijs/loader",
-  "version": "1.2.2",
+  "version": "2.0.0",
   "description": "Module loader for yumeri",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -31,7 +31,7 @@
     "typescript": "^5.8.2"
   },
   "dependencies": {
-    "@yumerijs/core": "^1.2.0",
+    "@yumerijs/core": "^2.0.0",
     "chokidar": "^4.0.3"
   }
 }
