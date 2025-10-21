@@ -90,8 +90,22 @@ export class Server {
             const cookies = this.parseCookies(req);
             const session = this.createSession(ip, cookies, res, req, pathname, { protocol: 'http', header: req.headers });
             const route = this.core.getRoute(pathname);
+            const rootroute = this.core.getRoute('root');
             if (route && route.allowedMethods.includes(req.method ?? 'GET')) {
                 const matched = await this.core.executeRoute(pathname, session, queryParams);
+                if (!matched) {
+                    this.serveStaticFile(pathname, res);
+                } else {
+                    let head = session.head;
+                    head['Set-Cookie'] = Object.entries(session.newCookie).map(([k, v]) => `${k}=${v}`);
+                    if (this.enableCors) {
+                        head['Access-Control-Allow-Origin'] = '*';
+                    }
+                    res.writeHead(session.status ?? 200, head);
+                    res.end(session.body)
+                }
+            } else if (rootroute && rootroute.allowedMethods.includes(req.method ?? 'GET')) {
+                const matched = await this.core.executeRoute('root', session, queryParams);
                 if (!matched) {
                     this.serveStaticFile(pathname, res);
                 } else {
