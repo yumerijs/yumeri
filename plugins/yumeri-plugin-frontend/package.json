@@ -1,0 +1,34 @@
+{
+  "name": "yumeri-plugin-frontend",
+  "version": "1.0.0",
+  "description": "Yumeri 基础前端模板服务",
+  "main": "dist/index.js",
+  "dev": "src/index.ts",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "yarn build"
+  },
+  "keywords": [
+    "yumeri",
+    "api",
+    "webserver"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/fs-extra": "^11",
+    "@types/node": "^22.14.1",
+    "@yumerijs/types": "^2.0.0",
+    "typescript": "^5.8.2"
+  },
+  "peerDependencies": {
+    "yumeri": "^2.0.0"
+  },
+  "dependencies": {
+    "fs-extra": "^11.3.2",
+    "yumeri-plugin-pages": "^1.0.0"
+  }
+}

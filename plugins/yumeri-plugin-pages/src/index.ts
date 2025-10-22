@@ -38,76 +38,95 @@ export const config = {} as Record<string, ConfigSchema>
 
 export class PagesComponent {
   constructor(private db: Database) {}
+
   async get(condition: Record<string, any>) {
     const page = await this.db.select('pages', condition);
-    if (!page) {
-      return null;
-    }
-    return page;
+    return page || null;
   }
+
   async getType(id: number) {
     const page = await this.db.selectOne('pages', { id });
-    if (!page) {
-      return null;
-    }
-    return page.type;
+    return page ? page.type : null;
   }
+
   async getMetadatas(id: number) {
     const meta = await this.db.select('pagesmeta', { page_id: id });
-    if (!meta) {
-      return null;
-    }
-    return meta;
+    return meta || null;
   }
+
   async selectMetadata(id: number, key: string) {
     const meta = await this.db.selectOne('pagesmeta', { page_id: id, meta_key: key });
-    if (!meta) {
-      return null;
-    }
-    return meta;
+    return meta || null;
   }
-  async insert(page: Pages) {
-    const id = await this.db.create('pages', page);
+
+  async insert(page: Partial<Pages>) {
+    const now = new Date();
+
+    // 自动补时间字段
+    const data: Partial<Pages> = {
+      created_at: now,
+      updated_at: now,
+      status: 'published', 
+      comment_status: 'open',
+      ...page,
+    };
+
+    const id = await this.db.create('pages', data);
     return id;
   }
-  async update(id: number, page: Pages) {
-    const result = await this.db.update('pages', { id }, page);
+
+  async update(id: number, page: Partial<Pages>) {
+    const now = new Date();
+    const data: Partial<Pages> = {
+      ...page,
+      updated_at: now, // 自动更新时间
+    };
+    const result = await this.db.update('pages', { id }, data);
+    logger.info(`更新页面 #${id}`);
     return result;
   }
+
   async getTypes() {
     const types = await this.db.select('pages', {});
-    if (!types) {
-      return null;
-    }
-    return types.map((page) => page.type);
+    return types ? types.map((page) => page.type) : null;
   }
 }
 
 export async function apply(ctx: Context, config: Config) {
   const db = ctx.getComponent('database') as Database;
-  db.extend('pages', {
-    id: 'unsigned',
-    name: 'string',
-    description: 'string',
-    type: 'string',
-    content: 'text',
-    created_at: 'date',
-    updated_at: 'date',
-    author_id: 'unsigned',
-    status: 'string',
-    comment_status: 'string',
-  }, {
-    primary: 'id'
-  }
+  db.extend(
+    'pages',
+    {
+      id: 'unsigned',
+      name: 'string',
+      description: 'string',
+      type: 'string',
+      content: 'text',
+      created_at: 'date',
+      updated_at: 'date',
+      author_id: 'unsigned',
+      status: 'string',
+      comment_status: 'string',
+    },
+    {
+      primary: 'id',
+      autoInc: true,
+    }
   );
-  db.extend('pagesmeta', {
-    id: 'unsigned',
-    page_id: 'unsigned',
-    meta_key: 'string',
-    meta_value: 'string',
-  }, {
-    primary: 'id'
-  }
+
+  db.extend(
+    'pagesmeta',
+    {
+      id: 'unsigned',
+      page_id: 'unsigned',
+      meta_key: 'string',
+      meta_value: 'string',
+    },
+    {
+      primary: 'id',
+      autoInc: true,
+    }
   );
+
   ctx.registerComponent('pages', new PagesComponent(db));
 }

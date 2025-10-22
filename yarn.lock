@@ -2713,9 +2713,12 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "yumeri-plugin-frontend@workspace:plugins/yumeri-plugin-frontend"
   dependencies:
+    "@types/fs-extra": "npm:^11"
     "@types/node": "npm:^22.14.1"
     "@yumerijs/types": "npm:^2.0.0"
+    fs-extra: "npm:^11.3.2"
     typescript: "npm:^5.8.2"
+    yumeri-plugin-pages: "npm:^1.0.0"
   peerDependencies:
     yumeri: ^2.0.0
   languageName: unknown
@@ -2756,7 +2759,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"yumeri-plugin-pages@workspace:plugins/yumeri-plugin-pages":
+"yumeri-plugin-pages@npm:^1.0.0, yumeri-plugin-pages@workspace:plugins/yumeri-plugin-pages":
   version: 0.0.0-use.local
   resolution: "yumeri-plugin-pages@workspace:plugins/yumeri-plugin-pages"
   dependencies:
