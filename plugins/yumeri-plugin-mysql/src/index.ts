@@ -14,7 +14,7 @@ function buildWhereClause(query: Query<any>): { sql: string, params: any[] } {
     for (const key in query) {
         if (key === '$or' || key === '$and') {
             const subQueries = query[key] as Query<any>[];
-            const subResults = subQueries.map(buildWhereClause);
+            const subResults = subQueries.map(buildWhereClause).filter(r => r.sql);
             if (subResults.length > 0) {
                 const operator = key === '$or' ? ' OR ' : ' AND ';
                 conditions.push(`(${subResults.map(r => r.sql).join(operator)})`);
@@ -24,10 +24,15 @@ function buildWhereClause(query: Query<any>): { sql: string, params: any[] } {
         }
 
         const value = query[key];
-        if (typeof value === 'object' && value !== null && !Array.isArray(value) && Object.keys(value).some(k => k.startsWith('$'))) {
+
+        if (value === undefined || value === null) continue;
+
+        if (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).some(k => k.startsWith('$'))) {
             const operatorKeys = Object.keys(value) as (keyof Operator<any>)[];
             for (const op of operatorKeys) {
                 const opValue = value[op];
+                if (opValue === undefined || opValue === null) continue; // 同样跳过
+
                 switch (op) {
                     case '$eq': conditions.push(`\`${key}\` = ?`); params.push(opValue); break;
                     case '$ne': conditions.push(`\`${key}\` != ?`); params.push(opValue); break;
@@ -39,12 +44,10 @@ function buildWhereClause(query: Query<any>): { sql: string, params: any[] } {
                         if (Array.isArray(opValue) && opValue.length > 0) {
                             conditions.push(`\`${key}\` IN (${opValue.map(() => '?').join(',')})`);
                             params.push(...opValue);
-                        } else {
-                            conditions.push('0=1');
                         }
                         break;
                     case '$nin':
-                         if (Array.isArray(opValue) && opValue.length > 0) {
+                        if (Array.isArray(opValue) && opValue.length > 0) {
                             conditions.push(`\`${key}\` NOT IN (${opValue.map(() => '?').join(',')})`);
                             params.push(...opValue);
                         }
@@ -107,35 +110,106 @@ class MysqlDatabase implements YumeriDatabase {
         return sql;
     }
 
-    async extend<K extends keyof Tables>(table: K, schema: Schema<Partial<Tables[K]>>, indexes?: IndexDefinition<Tables[K]>): Promise<void> {
+    async extend<K extends keyof Tables>(
+        table: K,
+        schema: Schema<Partial<Tables[K]>>,
+        indexes?: IndexDefinition<Tables[K]>
+    ): Promise<void> {
         const tableName = table as string;
         const [rows] = await this.pool.query('SHOW TABLES LIKE ?', [tableName]);
         const tableExists = (rows as any[]).length > 0;
 
         if (!tableExists) {
+            // 表不存在，直接创建
             const fields = Object.keys(schema);
             const columns = fields.map(field => this.buildColumnSql(field, this.getFieldDef(schema[field])));
+
+            // 主键
             if (indexes?.primary) {
                 const primaryKeys = (Array.isArray(indexes.primary) ? indexes.primary : [indexes.primary]) as string[];
                 columns.push(`PRIMARY KEY (${primaryKeys.map(k => `\`${k}\``).join(', ')})`);
             }
+
+            // 唯一索引
             if (indexes?.unique) {
-                indexes.unique.forEach(uniqueKey => {
-                    const keys = (Array.isArray(uniqueKey) ? uniqueKey : [uniqueKey]) as string[];
+                const uniqueKeys = Array.isArray(indexes.unique[0])
+                    ? indexes.unique as string[][]
+                    : (indexes.unique as string[][]).map(k => Array.isArray(k) ? k : [k]);
+
+                uniqueKeys.forEach(keys => {
                     columns.push(`UNIQUE KEY (${keys.map(k => `\`${k}\``).join(', ')})`);
                 });
             }
-            const sql = `CREATE TABLE ${tableName} (${columns.join(', ')}) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`;
+
+            const sql = `CREATE TABLE \`${tableName}\` (${columns.join(', ')}) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`;
             logger.info(`Creating table "${tableName}"`);
             await this.run(sql);
         } else {
+            // 表存在，检查字段和索引
             const [existingCols] = await this.pool.query(`DESCRIBE \`${tableName}\``);
             const existingColNames = (existingCols as any[]).map(c => c.Field);
-            const newFields = Object.keys(schema).filter(field => !existingColNames.includes(field));
-            if (newFields.length > 0) {
-                const alterStatements = newFields.map(field => `ADD COLUMN ${this.buildColumnSql(field, this.getFieldDef(schema[field]))}`);
-                logger.info(`Altering table "${tableName}" to add new columns: ${newFields.join(', ')}`);
-                await this.run(`ALTER TABLE ${tableName} ${alterStatements.join(', ')}`);
+
+            const alterClauses: string[] = [];
+
+            // 新字段或类型修改
+            for (const field of Object.keys(schema)) {
+                const def = this.getFieldDef(schema[field]);
+                if (!existingColNames.includes(field)) {
+                    alterClauses.push(`ADD COLUMN ${this.buildColumnSql(field, def)}`);
+                } else {
+                    // 字段已存在，检查类型/默认值是否一致
+                    const col = (existingCols as any[]).find(c => c.Field === field);
+                    const newColSql = this.buildColumnSql(field, def);
+                    if (!newColSql.includes(col.Type)) {
+                        alterClauses.push(`MODIFY COLUMN ${newColSql}`);
+                    }
+                }
+            }
+
+            if (alterClauses.length > 0) {
+                await this.run(`ALTER TABLE \`${tableName}\` ${alterClauses.join(', ')}`);
+            }
+
+            // 索引更新
+            if (indexes) {
+                const [existingIndexes] = await this.pool.query(`SHOW INDEX FROM \`${tableName}\``);
+                const indexMap: Record<string, any> = {};
+                (existingIndexes as any[]).forEach(idx => {
+                    if (idx.Key_name !== 'PRIMARY') {
+                        if (!indexMap[idx.Key_name]) indexMap[idx.Key_name] = [];
+                        indexMap[idx.Key_name].push(idx.Column_name);
+                    }
+                });
+
+                // 主键
+                if (indexes.primary) {
+                    const primaryKeys = (Array.isArray(indexes.primary) ? indexes.primary : [indexes.primary]) as string[];
+                    const [pkCheck] = await this.pool.query(`SHOW KEYS FROM \`${tableName}\` WHERE Key_name = 'PRIMARY'`);
+                    const existingPk = (pkCheck as any[]).map(p => p.Column_name);
+                    if (primaryKeys.join(',') !== existingPk.join(',')) {
+                        logger.info(`Altering table "${tableName}" primary key`);
+                        await this.run(`ALTER TABLE \`${tableName}\` DROP PRIMARY KEY, ADD PRIMARY KEY (${primaryKeys.map(k => `\`${k}\``).join(',')})`);
+                    }
+                }
+
+                // 唯一索引
+                if (indexes.unique) {
+                    const uniqueKeys = Array.isArray(indexes.unique[0])
+                        ? indexes.unique as string[][]
+                        : (indexes.unique as string[][]).map(k => Array.isArray(k) ? k : [k]);
+
+                    for (const keys of uniqueKeys) {
+                        const name = keys.join('_') + '_uniq';
+                        const existing = indexMap[name] || [];
+                        if (existing.join(',') !== keys.join(',')) {
+                            // 删除旧索引再建新索引
+                            if (existing.length) {
+                                await this.run(`ALTER TABLE \`${tableName}\` DROP INDEX \`${name}\``);
+                            }
+                            await this.run(`ALTER TABLE \`${tableName}\` ADD UNIQUE INDEX \`${name}\` (${keys.map(k => `\`${k}\``).join(',')})`);
+                        }
+                    }
+                }
             }
         }
     }

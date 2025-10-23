@@ -4,7 +4,7 @@ import fse from 'fs-extra';
 import { PagesComponent } from 'yumeri-plugin-pages'; // 仅类型引用
 
 const logger = new Logger('frontend');
-const depend = ['pages'];
+export const depend = ['pages'];
 
 // 获取模板目录
 function getTemplates(): string[] {
@@ -25,8 +25,8 @@ export const config = {
     urlStyle: {
       type: 'string',
       default: 'pretty',
-      enum: ['query', 'prefix'],
-      description: 'URL 风格（query: ?page=title, prefix: /page/title）',
+      enum: ['query', 'prefix', 'id'],
+      description: 'URL 风格（query: ?page=title, prefix: /page/title），id: /page/1',
     },
     postPrefix: {
       type: 'string',
@@ -59,6 +59,7 @@ function getTemplateConfig(template: string) {
 interface ParsedRoute {
   type: 'home' | 'query' | 'post' | 'page' | 'auto';
   slug?: string;
+  id?: number;
   templatePath?: string;
 }
 
@@ -74,6 +75,10 @@ function parseRoute(pathname: string, config: Config): ParsedRoute {
   const segments = clean.split('/').filter(Boolean);
 
   switch (urlStyle) {
+    case 'id':
+      if (segments[0] === 'post') return { type: 'post', id: parseInt(segments[1], 10) };
+      if (segments[0] === 'page') return { type: 'page', id: parseInt(segments[1], 10) };
+      return { type: 'auto', slug: segments[0] ?? 'index' };
     case 'prefix':
       if (segments[0] === postPrefix) return { type: 'post', slug: segments[1] ?? 'index' };
       if (segments[0] === pagePrefix) return { type: 'page', slug: segments[1] ?? 'index' };
@@ -128,7 +133,7 @@ export async function apply(ctx: Context, config: Config) {
   try {
     const pages = ctx.getComponent('pages') as PagesComponent | undefined;
     if (pages) {
-      await pages.insert({
+      const id = await pages.insert({
         name: 'Hello World',
         description: '这是自动插入的测试文章，用于 frontend 渲染测试。',
         type: 'post',
@@ -203,24 +208,17 @@ export async function apply(ctx: Context, config: Config) {
       // 读取模板内容（字符串）
       let content = fse.readFileSync(filePath, 'utf-8');
 
-      // 获取 pages 组件并读取页面数据（如果适用）
       const pages = ctx.getComponent('pages') as PagesComponent | undefined;
       let pageData: any = null;
       if (pages && parsed.type !== 'home') {
         try {
-          const condition =
-            parsed.type === 'post'
-              ? { type: 'post', name: parsed.slug }
-              : parsed.type === 'page'
-                ? { type: 'page', name: parsed.slug }
-                : { name: parsed.slug };
+          const condition = { type: parsed.type, name: parsed.slug, id: parsed.id};
           const found = await pages.get(condition);
           pageData = Array.isArray(found) ? found[0] : found;
         } catch (err) {
           logger.warn(`从 pages 组件获取内容失败: ${err}`);
         }
       }
-
       // 默认 internal 数据（hook 的 internal:* 可以覆盖这些）
       const defaultInternal: Record<string, string> = {
         'internal:title': pageData?.name ?? '默认标题',

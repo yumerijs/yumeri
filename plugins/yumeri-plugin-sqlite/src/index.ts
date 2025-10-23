@@ -17,7 +17,7 @@ function buildWhereClause(query: Query<any>): { sql: string, params: any[] } {
     for (const key in query) {
         if (key === '$or' || key === '$and') {
             const subQueries = query[key] as Query<any>[];
-            const subResults = subQueries.map(buildWhereClause);
+            const subResults = subQueries.map(buildWhereClause).filter(r => r.sql);
             if (subResults.length > 0) {
                 const operator = key === '$or' ? ' OR ' : ' AND ';
                 conditions.push(`(${subResults.map(r => r.sql).join(operator)})`);
@@ -27,10 +27,16 @@ function buildWhereClause(query: Query<any>): { sql: string, params: any[] } {
         }
 
         const value = query[key];
-        if (typeof value === 'object' && value !== null && !Array.isArray(value) && Object.keys(value).some(k => k.startsWith('$'))) {
+
+        // 💡 新增：跳过 undefined / null 的字段
+        if (value === undefined || value === null) continue;
+
+        if (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).some(k => k.startsWith('$'))) {
             const operatorKeys = Object.keys(value) as (keyof Operator<any>)[];
             for (const op of operatorKeys) {
                 const opValue = value[op];
+                if (opValue === undefined || opValue === null) continue; // 同样过滤空值
+
                 switch (op) {
                     case '$eq': conditions.push(`"${key}" = ?`); params.push(opValue); break;
                     case '$ne': conditions.push(`"${key}" != ?`); params.push(opValue); break;
@@ -42,16 +48,12 @@ function buildWhereClause(query: Query<any>): { sql: string, params: any[] } {
                         if (Array.isArray(opValue) && opValue.length > 0) {
                             conditions.push(`"${key}" IN (${opValue.map(() => '?').join(',')})`);
                             params.push(...opValue);
-                        } else {
-                            conditions.push('0=1'); // Always false for empty IN clause
                         }
                         break;
                     case '$nin':
-                         if (Array.isArray(opValue) && opValue.length > 0) {
+                        if (Array.isArray(opValue) && opValue.length > 0) {
                             conditions.push(`"${key}" NOT IN (${opValue.map(() => '?').join(',')})`);
                             params.push(...opValue);
-                        } else {
-                            // Always true for empty NOT IN clause, so we add nothing
                         }
                         break;
                 }
@@ -95,30 +97,33 @@ class SqliteDatabase implements YumeriDatabase {
         let sql = `"${field}" ${this.mapTypeToSql(def.type)}`;
         if (def.nullable === false) sql += ' NOT NULL';
         if (def.initial !== undefined) sql += ` DEFAULT ${JSON.stringify(def.initial)}`;
+        if (def.autoIncrement) sql += ' PRIMARY KEY AUTOINCREMENT'; // SQLite 自增
         return sql;
     }
 
-    async extend<K extends keyof Tables>(table: K, schema: Schema<Partial<Tables[K]>>, indexes?: IndexDefinition<Tables[K]>): Promise<void> {
+    async extend<K extends keyof Tables>(
+        table: K,
+        schema: Schema<Partial<Tables[K]>>,
+        indexes?: IndexDefinition<Tables[K]>
+    ): Promise<void> {
         const tableName = table as string;
         const existingCols = await this.driver.all(`PRAGMA table_info("${tableName}")`).catch(() => []);
 
         if (existingCols.length === 0) {
+            // 表不存在，创建
             const fields = Object.keys(schema);
             const columns = fields.map(field => this.buildColumnSql(field, this.getFieldDef(schema[field])));
-            let sql = `CREATE TABLE "${tableName}" (${columns.join(', ')}`;
-            if (indexes?.primary) {
-                const primaryKeys = (Array.isArray(indexes.primary) ? indexes.primary : [indexes.primary]) as string[];
-                sql += `, PRIMARY KEY (${primaryKeys.map(k => `"${k}"`).join(', ')})`;
-            }
-            sql += ')';
+            let sql = `CREATE TABLE "${tableName}" (${columns.join(', ')})`;
             logger.info(`Creating table "${tableName}"`);
             await this.run(sql);
         } else {
-            const newFields = Object.keys(schema).filter(field => !existingCols.some(col => col.name === field));
-            for (const field of newFields) {
-                const colSql = this.buildColumnSql(field, this.getFieldDef(schema[field]));
-                logger.info(`Adding column "${tableName}"."${field}"`);
-                await this.run(`ALTER TABLE "${tableName}" ADD COLUMN ${colSql}`);
+            // 表存在，检查新增字段
+            for (const field of Object.keys(schema)) {
+                if (!existingCols.some(col => col.name === field)) {
+                    const colSql = this.buildColumnSql(field, this.getFieldDef(schema[field]));
+                    logger.info(`Adding column "${tableName}"."${field}"`);
+                    await this.run(`ALTER TABLE "${tableName}" ADD COLUMN ${colSql}`);
+                }
             }
         }
     }
@@ -137,6 +142,7 @@ class SqliteDatabase implements YumeriDatabase {
         const { sql: whereSql, params } = buildWhereClause(query);
         const selectFields = fields ? fields.map(f => `"${f as string}"`).join(', ') : '*';
         const sql = `SELECT ${selectFields} FROM "${tableName}"${whereSql ? ` WHERE ${whereSql}` : ''}`;
+        logger.info(sql, params)
         return this.all(sql, params);
     }
 

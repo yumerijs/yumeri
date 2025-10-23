@@ -39,7 +39,7 @@ export const config = {} as Record<string, ConfigSchema>
 export class PagesComponent {
   constructor(private db: Database) {}
 
-  async get(condition: Record<string, any>) {
+  async get(condition: Partial<Pages>) {
     const page = await this.db.select('pages', condition);
     return page || null;
   }
@@ -82,7 +82,6 @@ export class PagesComponent {
       updated_at: now, // 自动更新时间
     };
     const result = await this.db.update('pages', { id }, data);
-    logger.info(`更新页面 #${id}`);
     return result;
   }
 
@@ -97,7 +96,7 @@ export async function apply(ctx: Context, config: Config) {
   db.extend(
     'pages',
     {
-      id: 'unsigned',
+      id: { type: 'unsigned', autoIncrement: true },
       name: 'string',
       description: 'string',
       type: 'string',
