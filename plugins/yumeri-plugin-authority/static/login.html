@@ -6,203 +6,19 @@
   <title>登录</title>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
-  <style>
-    :root {
-      --md-sys-color-primary: #6750A4;
-      --md-sys-color-on-primary: #FFFFFF;
-      --md-sys-color-primary-container: #EADDFF;
-      --md-sys-color-on-primary-container: #21005D;
-      --md-sys-color-secondary: #625B71;
-      --md-sys-color-on-secondary: #FFFFFF;
-      --md-sys-color-secondary-container: #E8DEF8;
-      --md-sys-color-on-secondary-container: #1D192B;
-      --md-sys-color-tertiary: #7D5260;
-      --md-sys-color-on-tertiary: #FFFFFF;
-      --md-sys-color-tertiary-container: #FFD8E4;
-      --md-sys-color-on-tertiary-container: #31111D;
-      --md-sys-color-error: #BA1A1A;
-      --md-sys-color-on-error: #FFFFFF;
-      --md-sys-color-error-container: #FFDAD6;
-      --md-sys-color-on-error-container: #410002;
-      --md-sys-color-background: #FFFBFE;
-      --md-sys-color-on-background: #1C1B1F;
-      --md-sys-color-surface: #FFFBFE;
-      --md-sys-color-on-surface: #1C1B1F;
-      --md-sys-color-surface-variant: #E7E0EC;
-      --md-sys-color-on-surface-variant: #49454F;
-      --md-sys-color-outline: #79747E;
-      --md-sys-color-outline-variant: #CAC4D0;
-      --md-sys-color-shadow: #000000;
-      --md-sys-color-scrim: #000000;
-      --md-sys-color-inverse-surface: #313033;
-      --md-sys-color-inverse-on-surface: #F4EFF4;
-      --md-sys-color-inverse-primary: #D0BCFF;
-      --md-sys-color-surface1: #e9e3ed;
-      --md-sys-color-surface2: #e3dced;
-      --md-sys-color-surface3: #ded6ec;
-      --md-sys-color-surface4: #d6cfec;
-
-      --md-sys-spacing-unit: 8px;
-      --md-sys-shape-corner-small: 4px;
-      --md-sys-shape-corner-medium: 8px;
-      --md-sys-shape-corner-large: 12px;
-    }
-
-    body {
-      margin: 0;
-      font-family: 'Roboto', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-      background: var(--md-sys-color-background);
-      color: var(--md-sys-color-on-background);
-    }
-    .container {
-      max-width: 480px;
-      margin: 0 auto;
-      padding: 40px 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 24px;
-    }
-    .header h1 {
-      margin: 0;
-      font-weight: 600;
-      font-size: 28px;
-      color: var(--md-sys-color-on-surface);
-    }
-    .form-wrapper {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-    .input-group {
-      margin-bottom: 8px;
-    }
-    .forgot-password-link {
-      display: inline-block;
-      margin: 8px 0 0;
-      color: var(--md-sys-color-primary);
-      text-decoration: none;
-      font-size: 14px;
-    }
-    .forgot-password-link:hover {
-      text-decoration: underline;
-    }
-    .button.filled {
-      margin-top: 12px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      height: 40px;
-      padding: 0 16px;
-      border: none;
-      border-radius: var(--md-sys-shape-corner-medium);
-      background: var(--md-sys-color-primary);
-      color: var(--md-sys-color-on-primary);
-      cursor: pointer;
-      font-weight: 600;
-    }
-    .button.filled:hover {
-      filter: brightness(0.95);
-    }
-    .auxiliary-link {
-      font-size: 14px;
-      color: var(--md-sys-color-on-surface-variant);
-    }
-    .auxiliary-link a {
-      color: var(--md-sys-color-primary);
-      text-decoration: none;
-    }
-    .auxiliary-link a:hover {
-      text-decoration: underline;
-    }
-
-    /* 浮动标签文本框样式（保持光标垂直居中） */
-    .text-field {
-      position: relative;
-      display: inline-flex;
-      align-items: center;
-      width: 100%;
-      max-width: 420px;
-      height: 56px;
-      color: var(--md-sys-color-on-surface);
-    }
-    .text-field.outlined {
-      border: 1px solid var(--md-sys-color-outline);
-      border-radius: var(--md-sys-shape-corner-medium);
-      background: var(--md-sys-color-surface);
-    }
-    .text-field input {
-      position: absolute;
-      inset: 0;
-      /* 上下等距的内边距，保证输入内容和光标居中 */
-      padding: 18px 44px 18px 12px;
-      width: 100%;
-      height: 100%;
-      border: none;
-      outline: none;
-      background: transparent;
-      color: var(--md-sys-color-on-surface);
-      font-size: 16px;
-      line-height: 24px;
-      box-sizing: border-box;
-    }
-    /* 初始标签居中 */
-    .text-field label {
-      position: absolute;
-      left: 12px;
-      top: 50%;
-      transform: translateY(-50%);
-      background: transparent;
-      color: var(--md-sys-color-on-surface-variant);
-      pointer-events: none;
-      transition: 0.2s ease;
-      padding: 0 4px;
-      font-size: 16px;
-      line-height: 16px;
-    }
-    /* 上浮到左上角且缩小 */
-    .text-field input:focus + label,
-    .text-field input:not(:placeholder-shown) + label {
-      top: 6px;
-      transform: none;
-      font-size: 12px;
-      color: var(--md-sys-color-primary);
-      background: var(--md-sys-color-surface);
-    }
-    /* 聚焦高亮边框 */
-    .text-field.outlined:has(input:focus) {
-      border-color: var(--md-sys-color-primary);
-      box-shadow: 0 0 0 1px var(--md-sys-color-primary) inset;
-    }
-    /* 密码可见性图标 */
-    .text-field .password-toggle {
-      position: absolute;
-      right: 10px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--md-sys-color-on-surface-variant);
-      cursor: pointer;
-      user-select: none;
-      font-size: 22px;
-    }
-    /* 兼容不支持 :has 的浏览器 */
-    @supports not (selector(:has(*))) {
-      .text-field.outlined:focus-within {
-        border-color: var(--md-sys-color-primary);
-        box-shadow: 0 0 0 1px var(--md-sys-color-primary) inset;
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
+  {{authority:htmlheader}}
 </head>
 <body>
   <div class="container">
     <header class="header">
       <h1>欢迎回来</h1>
     </header>
+    {{authority:preloginform}}
 
     <main class="form-wrapper">
       <form id="loginForm">
+        {{authority:loginform}}
         <div class="input-group">
           <div class="text-field outlined">
             <input type="text" id="identifier" name="login-identifier" placeholder=" " required>
@@ -218,6 +34,8 @@
           </div>
         </div>
 
+        {{authority:postloginform}}
+
         <a href="#" class="forgot-password-link">忘记密码？</a>
 
         <button type="submit" class="button filled">登录</button>
@@ -229,27 +47,8 @@
     </main>
   </div>
 
-  <script>
-    // 切换密码可见性
-    const pwdInput = document.getElementById('password');
-    const pwdToggle = document.getElementById('pwdToggle');
-    if (pwdToggle && pwdInput) {
-      pwdToggle.addEventListener('click', () => {
-        const isPwd = pwdInput.type === 'password';
-        pwdInput.type = isPwd ? 'text' : 'password';
-        pwdToggle.textContent = isPwd ? 'visibility' : 'visibility_off';
-      });
-    }
-
-    // 按需处理表单提交
-    const loginForm = document.getElementById('loginForm');
-    if (loginForm) {
-      loginForm.addEventListener('submit', (e) => {
-        // e.preventDefault();
-        // 处理提交
-      });
-    }
-  </script>
   <script src="script.js"></script>
 </body>
+<footer>
+{{authority:htmlfooter}}</footer>
 </html>

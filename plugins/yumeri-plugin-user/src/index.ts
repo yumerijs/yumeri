@@ -89,7 +89,12 @@ export class UserComponent {
       createAt: new Date(),
       updateAt: new Date()
     }
-    return this.db.create('user', data)
+    try {
+      const result = this.db.create('user', data)
+      return result
+    } catch (error) {
+      return false
+    }
   }
 
   async login(username: string, password: string): Promise<boolean> {
@@ -103,7 +108,7 @@ export async function apply(ctx: Context, config: Config) {
   const db = ctx.getComponent('database') as Database
 
   const schema: Record<string, any> = {
-    id: 'unsigned',
+    id: { type: 'unsigned', autoIncrement: true },
     username: 'string',
     password: 'string',
     createAt: 'date',

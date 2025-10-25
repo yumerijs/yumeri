@@ -2658,7 +2658,22 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"yumeri-plugin-authority@workspace:plugins/yumeri-plugin-authority":
+"yumeri-plugin-author-center@workspace:plugins/yumeri-plugin-author-center":
+  version: 0.0.0-use.local
+  resolution: "yumeri-plugin-author-center@workspace:plugins/yumeri-plugin-author-center"
+  dependencies:
+    "@types/node": "npm:^22.14.1"
+    typescript: "npm:^5.8.2"
+    yumeri-plugin-authority: "npm:^1.2.0"
+    yumeri-plugin-pages: "npm:^1.0.0"
+    yumeri-plugin-permission: "workspace:^"
+    yumeri-plugin-user: "npm:^1.1.0"
+  peerDependencies:
+    yumeri: ^2.0.0
+  languageName: unknown
+  linkType: soft
+
+"yumeri-plugin-authority@npm:^1.2.0, yumeri-plugin-authority@workspace:plugins/yumeri-plugin-authority":
   version: 0.0.0-use.local
   resolution: "yumeri-plugin-authority@workspace:plugins/yumeri-plugin-authority"
   dependencies:
@@ -2773,7 +2788,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"yumeri-plugin-permission@workspace:plugins/yumeri-plugin-permission":
+"yumeri-plugin-permission@workspace:^, yumeri-plugin-permission@workspace:plugins/yumeri-plugin-permission":
   version: 0.0.0-use.local
   resolution: "yumeri-plugin-permission@workspace:plugins/yumeri-plugin-permission"
   dependencies:

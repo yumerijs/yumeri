@@ -1,122 +1,73 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>注册 - Material You</title>
-    <!-- 引入 Google Fonts 的 Roboto 字体，Material You 推荐使用的字体 -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap">
-    <!-- 引入 Material Symbols 或者 Material Icons 字体图标 -->
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
-    <link rel="stylesheet" href="style.css">
-
-    <style>
-        /* 这里放置一些内联的或者Material You主题相关的CSS变量默认值 */
-        /* 实际项目中，这些变量会通过JS动态生成或从后端获取 */
-        :root {
-            --md-sys-color-primary: #6750A4; /* 示例主色 */
-            --md-sys-color-on-primary: #FFFFFF;
-            --md-sys-color-primary-container: #EADDFF;
-            --md-sys-color-on-primary-container: #21005D;
-            --md-sys-color-secondary: #625B71;
-            --md-sys-color-on-secondary: #FFFFFF;
-            --md-sys-color-secondary-container: #E8DEF8;
-            --md-sys-color-on-secondary-container: #1D192B;
-            --md-sys-color-tertiary: #7D5260;
-            --md-sys-color-on-tertiary: #FFFFFF;
-            --md-sys-color-tertiary-container: #FFD8E4;
-            --md-sys-color-on-tertiary-container: #31111D;
-            --md-sys-color-error: #BA1A1A;
-            --md-sys-color-on-error: #FFFFFF;
-            --md-sys-color-error-container: #FFDAD6;
-            --md-sys-color-on-error-container: #410002;
-            --md-sys-color-background: #FFFBFE;
-            --md-sys-color-on-background: #1C1B1F;
-            --md-sys-color-surface: #FFFBFE;
-            --md-sys-color-on-surface: #1C1B1F;
-            --md-sys-color-surface-variant: #E7E0EC;
-            --md-sys-color-on-surface-variant: #49454F;
-            --md-sys-color-outline: #79747E;
-            --md-sys-color-outline-variant: #CAC4D0;
-            --md-sys-color-shadow: #000000;
-            --md-sys-color-scrim: #000000;
-            --md-sys-color-inverse-surface: #313033;
-            --md-sys-color-inverse-on-surface: #F4EFF4;
-            --md-sys-color-inverse-primary: #D0BCFF; /* 示例反色 */
-            --md-sys-color-surface1: #e9e3ed;
-            --md-sys-color-surface2: #e3dced;
-            --md-sys-color-surface3: #ded6ec;
-            --md-sys-color-surface4: #d6cfec;
-
-            /* 间距和圆角 */
-            --md-sys-spacing-unit: 8px; /* 定义基础间距单位 */
-            --md-sys-shape-corner-small: 4px;
-            --md-sys-shape-corner-medium: 8px;
-            --md-sys-shape-corner-large: 12px; /* 按钮、卡片推荐 */
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>注册</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
+  {{authority:htmlheader}}
 </head>
 <body>
-    <div class="container">
-        <header class="header">
-            <h1>创建你的账户</h1>
-        </header>
+  <div class="container">
+    <header class="header">
+      <h1>创建你的账户</h1>
+    </header>
 
-        <main class="form-wrapper">
-            <form id="registerForm">
-                <div class="input-group">
-                    <div class="text-field outlined">
-                        <label for="username">用户名</label>
-                        <input type="text" id="username" name="username" required>
-                    </div>
-                </div>
+    {{authority:preregisterform}}
+    <main class="form-wrapper">
+      <form id="registerForm">
+        {{authority:registerform}}
+        <div class="input-group">
+          <div class="text-field outlined">
+            <input type="text" id="username" name="username" placeholder=" " required>
+            <label for="username">用户名</label>
+          </div>
+        </div>
 
-                <div class="input-group">
-                    <div class="text-field outlined">
-                        <label for="email">电子邮件</label>
-                        <input type="email" id="email" name="email" required>
-                    </div>
-                </div>
+        <div class="input-group">
+          <div class="text-field outlined">
+            <input type="email" id="email" name="email" placeholder=" " required>
+            <label for="email">电子邮件</label>
+          </div>
+        </div>
 
-                <div class="input-group">
-                    <div class="text-field outlined">
-                        <label for="password">密码</label>
-                        <input type="password" id="password" name="password" required>
-                        <span class="material-symbols-outlined password-toggle">visibility_off</span>
-                    </div>
-                </div>
+        <div class="input-group">
+          <div class="text-field outlined">
+            <input type="password" id="password" name="password" placeholder=" " required>
+            <label for="password">密码</label>
+            <span class="material-symbols-outlined password-toggle">visibility_off</span>
+          </div>
+        </div>
 
-                <div class="input-group">
-                    <div class="text-field outlined">
-                        <label for="confirm-password">确认密码</label>
-                        <input type="password" id="confirm-password" name="confirm-password" required>
-                        <span class="material-symbols-outlined password-toggle">visibility_off</span>
-                    </div>
-                </div>
+        <div class="input-group">
+          <div class="text-field outlined">
+            <input type="password" id="confirm-password" name="confirm-password" placeholder=" " required>
+            <label for="confirm-password">确认密码</label>
+            <span class="material-symbols-outlined password-toggle">visibility_off</span>
+          </div>
+        </div>
 
-                <div class="checkbox-group">
-                    <input type="checkbox" id="terms" name="terms" required>
-                    <label for="terms">我同意 <a href="#">条款和隐私政策</a></label>
-                </div>
+        {{authority:postregisterform}}
 
-                <button type="submit" class="button filled">注册</button>
-            </form>
+        <div class="checkbox-group">
+  <input type="checkbox" id="terms" name="terms" required>
+  <label for="terms">我同意 <a href="#">条款和隐私政策</a></label>
+</div>
 
-            <p class="auxiliary-link">
-                已有账户？<a href="./login">去登录</a>
-            </p>
-        </main>
+        <button type="submit" class="button filled">注册</button>
+      </form>
 
-        <!-- 大屏幕下的品牌/宣传区（可选） -->
-        <aside class="branding-area">
-            <!-- 在这里可以放置 Logo, Slogan, 或者宣传图片 -->
-            <img src="https://via.placeholder.com/200x200?text=Your+Logo" alt="公司Logo" class="logo-large-screen">
-            <h2>开始你的数字之旅</h2>
-            <p>享受我们的独家服务和个性化体验。</p>
-        </aside>
-    </div>
+      <p class="auxiliary-link">
+        已有账户？<a href="./login">去登录</a>
+      </p>
+    </main>
+  </div>
 
-    <script src="script.js"></script>
+  <script src="script.js"></script>
 </body>
+<footer>
+    {{authority:htmlfooter}}
+</footer>
 </html>

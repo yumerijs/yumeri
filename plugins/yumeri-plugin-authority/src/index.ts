@@ -38,32 +38,26 @@ export function resolvePath(inputPath: string, currentFileDirectory: string): st
   }
 }
 
+async function getHook(ctx: Context, hookname: string, originString: string) {
+  const result: string[] = await ctx.executeHook(hookname);
+  let item = '';
+  if (result) {
+    result.forEach((items) => {
+      item = item + items;
+    })
+  }
+  const newString = originString.replace(`{{${hookname}}}`, item);
+  return newString;
+}
+
 export interface Authority {
-  hooklogin(name: string, action: (param: Record<string, any>) => boolean): void
-  delhooklogin(name: string): void
-  hookregister(name: string, action: (param: Record<string, any>) => boolean): void
-  delhookregister(name: string): void
   getLoginstatus(sessionid: string): boolean
   getUserinfo(sessionid: string): Promise<Record<string, any>> | false
 }
 
 export async function apply(ctx: Context, config: Config) {
-  let hookslogin: Record<string, (param: Record<string, any>) => boolean> = {};
-  let hooksregister: Record<string, (param: Record<string, any>) => boolean> = {};
   let logins: Record<string, number> = {};
   ctx.registerComponent('authority', {
-    hooklogin(name: string, action: (param: Record<string, any>) => boolean) {
-      hookslogin[name] = action;
-    },
-    delhooklogin(name: string) {
-      delete hookslogin[name];
-    },
-    hookregister(name: string, action: (param: Record<string, any>) => boolean) {
-      hooksregister[name] = action;
-    },
-    delhookregister(name: string) {
-      delete hooksregister[name];
-    },
     getLoginstatus(sessionid: string) {
       if (logins[sessionid]) {
         return true
@@ -82,53 +76,83 @@ export async function apply(ctx: Context, config: Config) {
   const user = ctx.getComponent('user') as User;
 
   // HTML Pages
-  ctx.route('/auth/login').action((session) => {
+  ctx.route('/auth/login').action(async (session) => {
     const loginPath = resolvePath(config.get<string>('template.loginpath', '../static/login.html'), __dirname);
-    if (fs.existsSync(loginPath)) {
-      session.body = fs.readFileSync(loginPath, 'utf-8');
-      session.setMime('html');
+    if (!fs.existsSync(loginPath)) return;
+
+    let html = fs.readFileSync(loginPath, 'utf-8');
+
+    // 登录页 HTML hook 点位
+    const loginHooks = [
+      'authority:htmlheader',   // header 外部
+      'authority:preloginform',  // form 前
+      'authority:loginform',     // form 内
+      'authority:postloginform', // form 后
+      'authority:htmlfooter',    // footer 外部
+    ];
+
+    for (const hook of loginHooks) {
+      html = await getHook(ctx, hook, html);
     }
+
+    session.body = html;
+    session.setMime('html');
   });
 
-  ctx.route('/auth/register').action((session) => {
+  ctx.route('/auth/register').action(async (session) => {
     const regPath = resolvePath(config.get<string>('template.regpath', '../static/reg.html'), __dirname);
-    if (fs.existsSync(regPath)) {
-      session.body = fs.readFileSync(regPath, 'utf-8');
-      session.setMime('html');
+    if (!fs.existsSync(regPath)) return;
+
+    let html = fs.readFileSync(regPath, 'utf-8');
+
+    // 注册页 HTML hook 点位
+    const registerHooks = [
+      'authority:htmlheader',      // header 外部
+      'authority:preregisterform',  // form 前
+      'authority:registerform',     // form 内
+      'authority:postregisterform', // form 后
+      'authority:htmlfooter',       // footer 外部
+    ];
+
+    for (const hook of registerHooks) {
+      html = await getHook(ctx, hook, html);
     }
+
+    session.body = html;
+    session.setMime('html');
   });
 
   // Static Assets
-  ctx.route('/auth/style.css').action((session) => {
+  ctx.route('/auth/style.css').action(async (session) => {
     const stylePath = resolvePath('../static/style.css', __dirname);
     if (fs.existsSync(stylePath)) {
-      session.body = fs.readFileSync(stylePath, 'utf-8');
+      session.body = await getHook(ctx, 'authority:css', fs.readFileSync(stylePath, 'utf-8'));
       session.setMime('text/css');
     }
   });
 
-  ctx.route('/auth/script.js').action((session) => {
+  ctx.route('/auth/script.js').action(async (session) => {
     const scriptPath = resolvePath('../static/script.js', __dirname);
     if (fs.existsSync(scriptPath)) {
-      session.body = fs.readFileSync(scriptPath, 'utf-8');
+      session.body = await getHook(ctx, 'authority:js', fs.readFileSync(scriptPath, 'utf-8'));
       session.setMime('text/javascript');
     }
   });
 
   // API routes
   ctx.route('/auth/api/login').action(async (session, params) => {
-    const username = params.get('username');
-    const password = params.get('password');
-    
+    const body = await session.parseRequestBody();
+    const username = body.username as string;
+    const password = body.password as string;
+
     let fine = true;
     const paramObj = Object.fromEntries(params.entries());
-    for (const hook in hookslogin) {
-      if (!hookslogin[hook](paramObj)) {
+    const result: boolean[] = await ctx.executeHook('authority:login', paramObj)
+    result.forEach((r) => {
+      if (!r) {
         fine = false;
-        session.body = JSON.stringify({ code: 1, message: '登录失败' });
-        break;
       }
-    }
+    })
 
     if (fine && username && password) {
       const result = await user.login(username, password);
@@ -142,23 +166,23 @@ export async function apply(ctx: Context, config: Config) {
       }
       session.body = JSON.stringify({ code: 0, message: '登录成功' });
     } else if (fine) {
-        session.body = JSON.stringify({ code: 1, message: '缺少用户名或密码' });
+      session.body = JSON.stringify({ code: 1, message: '缺少用户名或密码' });
     }
   });
 
   ctx.route('/auth/api/register').action(async (session, params) => {
-    const username = params.get('username');
-    const password = params.get('password');
+    const body = await session.parseRequestBody();
+    const username = body.username as string;
+    const password = body.password as string;
 
     let fine = true;
     const paramObj = Object.fromEntries(params.entries());
-    for (const hook in hooksregister) {
-      if (!hooksregister[hook](paramObj)) {
+    const result: boolean[] = await ctx.executeHook('authority:register', paramObj)
+    result.forEach((r) => {
+      if (!r) {
         fine = false;
-        session.body = JSON.stringify({ code: 1, message: '注册失败' });
-        break;
       }
-    }
+    })
 
     if (fine && username && password) {
       const result = await user.register(username, password);
@@ -168,7 +192,7 @@ export async function apply(ctx: Context, config: Config) {
       }
       session.body = JSON.stringify({ code: 0, message: '注册成功' });
     } else if (fine) {
-        session.body = JSON.stringify({ code: 1, message: '缺少用户名或密码' });
+      session.body = JSON.stringify({ code: 1, message: '缺少用户名或密码' });
     }
   });
 }
