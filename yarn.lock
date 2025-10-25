@@ -2809,6 +2809,17 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"yumeri-plugin-tinytools@workspace:plugins/yumeri-plugin-tinytools":
+  version: 0.0.0-use.local
+  resolution: "yumeri-plugin-tinytools@workspace:plugins/yumeri-plugin-tinytools"
+  dependencies:
+    "@types/node": "npm:^22.14.1"
+    typescript: "npm:^5.8.2"
+  peerDependencies:
+    yumeri: ^2.0.0
+  languageName: unknown
+  linkType: soft
+
 "yumeri-plugin-user@npm:^1.1.0, yumeri-plugin-user@workspace:plugins/yumeri-plugin-user":
   version: 0.0.0-use.local
   resolution: "yumeri-plugin-user@workspace:plugins/yumeri-plugin-user"

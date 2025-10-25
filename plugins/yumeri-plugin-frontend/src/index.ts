@@ -5,6 +5,7 @@ import { PagesComponent } from 'yumeri-plugin-pages' // 仅类型引用
 
 const logger = new Logger('frontend')
 export const depend = ['pages']
+export const provide = ['frontend']
 
 function getTemplates(): string[] {
   const dir = path.join(process.cwd(), 'data/templates')

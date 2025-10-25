@@ -1,0 +1,31 @@
+{
+  "name": "yumeri-plugin-tinytools",
+  "version": "1.0.0",
+  "description": "Yumeri 小组件合集",
+  "main": "dist/index.js",
+  "dev": "src/index.ts",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "yarn build"
+  },
+  "keywords": [
+    "yumeri",
+    "api",
+    "webserver"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.14.1",
+    "typescript": "^5.8.2"
+  },
+  "peerDependencies": {
+    "yumeri": "^2.0.0"
+  },
+  "dependencies": {
+    "yumeri-plugin-frontend": "^1.0.0"
+  }
+}
