@@ -2,6 +2,7 @@ import { Logger, Core, Context, ConfigSchema } from 'yumeri'
 import { fileURLToPath } from 'url';
 import * as yaml from 'js-yaml';
 import * as fs from 'fs'; // 引入同步 fs 模块
+import fse from 'fs-extra';
 import * as path from 'path';
 
 const logger = new Logger('console');
@@ -20,6 +21,7 @@ export class PluginConfigManager {
     private configCache: Record<string, any> = {};
     private schemaCache: Record<string, Record<string, PluginConfigSchema>> = {};
     private usageCache: Record<string, string> = {};
+    private metaCache: Record<string, any> = {};
     private core: Core | null = null;
     private configPath: string = path.join(process.cwd(), 'config.yml');
 
@@ -198,6 +200,56 @@ export class PluginConfigManager {
         }
 
         return mergedConfig;
+    }
+
+    async addPluginToConfig(pluginName: string): Promise<void> {
+        const name = pluginName.startsWith('~') ? pluginName : `~${pluginName}`;
+        try {
+            // 读取 YAML 配置文件
+            const fileContent = await fse.readFile(this.configPath, 'utf-8');
+            const configFile = yaml.load(fileContent) as any;
+
+            if (!configFile.plugins) configFile.plugins = {};
+
+            // 检查是否已存在
+            if (configFile.plugins[name] || configFile.plugins[pluginName] || configFile.plugins[name.replace(/^~/, '')]) {
+                return;
+            }
+
+            // 添加到 plugins 对象末尾，默认值为 null
+            configFile.plugins[name] = null;
+
+            // 写回 YAML 文件
+            const yamlStr = yaml.dump(configFile);
+            await fse.writeFile(this.configPath, yamlStr, 'utf-8');
+
+        } catch (err) {
+            throw err;
+        }
+    }
+    async getUnregisteredPlugins(): Promise<string[]> {
+        const nodeModulesPath = path.resolve('node_modules');
+        let installedPlugins: string[] = [];
+
+        try {
+            const dirs = await fse.readdir(nodeModulesPath);
+            installedPlugins = dirs.filter(name => name.startsWith('yumeri-plugin-'));
+        } catch (err) {
+            return [];
+        }
+
+        // 读取 YAML 配置文件
+        let declaredPlugins: string[] = [];
+        try {
+            const fileContent = await fse.readFile(this.configPath, 'utf-8');
+            const configFile = yaml.load(fileContent) as any;
+            declaredPlugins = Object.keys(configFile.plugins || {}).map(name => name.replace(/^~/, ''));
+        } catch (err) {
+        }
+
+        // 过滤未声明的插件
+        const unregistered = installedPlugins.filter(p => !declaredPlugins.includes(p));
+        return unregistered;
     }
 
     /**
@@ -600,6 +652,50 @@ export class PluginConfigManager {
             }
         }
         return this.usageCache[pluginName];
+    }
+    getMetadata(pluginName: string) {
+        const isDev = process.env.NODE_ENV === 'development';
+        if (isDev || !this.metaCache?.[pluginName]) {
+            try {
+                if (isDev) {
+                    Object.keys(require.cache).forEach(key => {
+                        if (key.includes(pluginName)) {
+                            delete require.cache[key];
+                        }
+                    });
+                }
+
+                let pluginModule: any;
+                if (isDev) {
+                    try {
+                        pluginModule = require(pluginName);
+                    } catch {
+                        const pluginPath = path.join(process.cwd(), 'plugins', pluginName);
+                        if (!fs.existsSync(pluginPath)) return {};
+                        pluginModule = require(pluginPath);
+                    }
+                } else {
+                    pluginModule = require(pluginName);
+                }
+
+                const usage = pluginModule?.usage ?? undefined;
+                const provide = Array.isArray(pluginModule?.provide)
+                    ? pluginModule.provide
+                    : undefined;
+                const depend = Array.isArray(pluginModule?.depend)
+                    ? pluginModule.depend
+                    : undefined;
+
+                this.metaCache ??= {};
+                this.metaCache[pluginName] = { usage, provide, depend };
+
+            } catch (err) {
+                this.metaCache ??= {};
+                this.metaCache[pluginName] = {};
+            }
+        }
+
+        return this.metaCache[pluginName];
     }
 }
 

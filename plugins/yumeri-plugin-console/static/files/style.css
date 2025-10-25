@@ -106,7 +106,7 @@
  .sidebar li {
      display: flex;
      align-items: center;
-     justify-content: space-between;
+     justify-content: flex-start;
      padding: 12px 10px;
      border-radius: 8px;
      margin-bottom: 8px;
@@ -230,18 +230,24 @@
      border-bottom: 1px solid #eee;
  }
 
- /* 新增样式 - 对象容器 */
  .object-container {
-     margin-left: 20px;
-     padding: 10px 0 10px 15px;
-     border-left: 2px solid #ddd;
-     margin-bottom: 15px;
+     border: 1px solid #ccc;
+     border-radius: 8px;
+     padding: 10px 14px;
+     margin: 8px 0 12px 0;
+     background-color: #fafafa;
  }
 
  .object-header {
      font-weight: bold;
-     margin-bottom: 10px;
+     margin-bottom: 6px;
      color: #333;
+     padding-left: 2px;
+ }
+
+ .config-item .object-container {
+     margin-left: 16px;
+     background-color: #fdfdfd;
  }
 
  /* 新增样式 - 数组容器 */
@@ -364,5 +370,93 @@
 
      .main-content {
          padding: 80px 20px 20px;
+     }
+
+     .meta-box {
+         display: inline-block;
+         margin: 4px 6px;
+         padding: 6px 10px;
+         border-radius: 10px;
+         background-color: #e6ffe6;
+         border: 1px solid #7fd97f;
+         color: #2a662a;
+         font-size: 14px;
+     }
+
+     .meta-box.provide {
+         background-color: #e6f5ff;
+         border-color: #6fb9f5;
+         color: #285f8f;
+     }
+
+     .add-plugin-btn {
+         display: block;
+         width: 90%;
+         margin: 10px auto;
+         padding: 6px 10px;
+         background: #3b82f6;
+         color: white;
+         border: none;
+         border-radius: 6px;
+         cursor: pointer;
+         font-size: 14px;
+     }
+
+     .add-plugin-btn:hover {
+         background: #2563eb;
+     }
+
+     /* 模态框整体背景 */
+     .modal {
+         position: fixed;
+         top: 0;
+         left: 0;
+         width: 100%;
+         height: 100%;
+         background-color: rgba(0, 0, 0, 0.4);
+         display: flex;
+         justify-content: center;
+         align-items: center;
+         z-index: 999;
+         opacity: 0;
+         pointer-events: none;
+         transition: opacity 0.3s ease;
+     }
+
+     /* 当显示模态框时加上 display:block 或 display:flex */
+     .modal[style*="display: block"] {
+         opacity: 1;
+         pointer-events: auto;
+     }
+
+     /* 模态框内容 */
+     .modal-content {
+         background: white;
+         padding: 20px;
+         border-radius: 10px;
+         width: 320px;
+         max-height: 70vh;
+         overflow-y: auto;
+         transform: translateY(-30px);
+         transition: transform 0.3s ease, opacity 0.3s ease;
+         opacity: 0;
+     }
+
+     /* 当父元素显示时，内容动画出现 */
+     .modal[style*="display: block"] .modal-content {
+         transform: translateY(0);
+         opacity: 1;
+     }
+
+     /* 可点击插件列表 */
+     .clickable-plugin {
+         padding: 5px 10px;
+         border-radius: 6px;
+         cursor: pointer;
+         transition: background 0.2s;
+     }
+
+     .clickable-plugin:hover {
+         background: #f0f0f0;
      }
  }

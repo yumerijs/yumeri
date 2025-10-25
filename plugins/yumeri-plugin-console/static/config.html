@@ -12,14 +12,21 @@
 <body>
     <div class="overlay" id="overlay"></div>
     <button class="toggle-sidebar" id="toggle-sidebar">☰</button>
+
     <aside class="sidebar" id="sidebar">
+        <div class="sidebar-top">
+            <button id="add-plugin-btn" class="add-plugin-btn">添加插件</button>
+        </div>
+
         <nav>
             <ul id="plugin-list"></ul>
         </nav>
     </aside>
+
     <main class="main-content">
         <h2 id="plugin-title">请选择插件</h2>
         <p id="plugin-usage"></p><br>
+        <div id="plugin-meta"></div>
         <div id="plugin-status"></div>
         <div id="configuration-area">
             <p>请从左侧选择一个插件进行配置。</p>
@@ -30,8 +37,18 @@
             <button class="disable-button">禁用插件</button>
         </div>
     </main>
+
     <div id="notification" class="notification"></div>
+
+    <div id="add-plugin-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>可添加的插件</h3>
+            <ul id="available-plugin-list"></ul>
+            <div class="modal-buttons">
+                <button id="close-modal-btn">关闭</button>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>
-

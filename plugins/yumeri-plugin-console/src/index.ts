@@ -150,6 +150,37 @@ export async function apply(ctx: Context, config: Config) {
       if (!pluginName) return { usage: '' };
       return { usage: configManager.getPluginUsage(pluginName) || '' };
     },
+    pluginmetadata: (params: URLSearchParams) => {
+      const pluginName = params.get('name');
+      if (!pluginName) return { usage: '', provide: [], depend: [] };
+      const meta = configManager.getMetadata(pluginName) || {};
+      return {
+        usage: meta.usage || '',
+        provide: meta.provide || [],
+        depend: meta.depend || []
+      };
+    },
+    // 新建插件
+    addplugin: async (params: URLSearchParams) => {
+      const pluginName = params.get('name');
+      if (!pluginName) return { success: false, message: '缺少插件名称参数' };
+      try {
+        await configManager.addPluginToConfig(pluginName);
+        return { success: true, message: `插件 ${pluginName} 已成功添加` };
+      } catch (error) {
+        return { success: false, message: `添加插件失败: ${error}` };
+      }
+    },
+
+    // 获取未在配置文件声明的已安装插件
+    unregistered: async () => {
+      try {
+        const unregistered = await configManager.getUnregisteredPlugins();
+        return { success: true, plugins: unregistered };
+      } catch (error) {
+        return { success: false, message: `获取未注册插件失败: ${error}` };
+      }
+    },
     consoleitem: () => {
       return Object.entries(consoleitem).map(([key, item]) => ({
         item: item.icon,
@@ -173,8 +204,7 @@ export async function apply(ctx: Context, config: Config) {
       });
     });
   }
-  // Dynamic console item routes
-  const aroute = ctx.route(`/${basePath}/:item/:asset*`).action((session, params, item, asset) => requireLogin(session, async () => {
+  ctx.route(`/${basePath}/:item/:asset*`).action((session, params, item, asset) => requireLogin(session, async () => {
     const consoleItem = consoleitem[item];
     if (consoleItem) {
       const assetPath = asset ? path.join(consoleItem.staticpath, asset) : consoleItem.htmlpath;

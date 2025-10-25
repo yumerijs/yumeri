@@ -11,13 +11,54 @@ document.addEventListener('DOMContentLoaded', function () {
     const disableButton = document.querySelector('.disable-button');
     const notification = document.getElementById('notification');
     const pluginUsage = document.getElementById('plugin-usage');
+    const addPluginBtn = document.getElementById('add-plugin-btn');
+    const addPluginModal = document.getElementById('add-plugin-modal');
+    const availablePluginList = document.getElementById('available-plugin-list');
+    const closeModalBtn = document.getElementById('close-modal-btn');
 
-    let currentPluginName = null; // 用于存储当前选中的插件名称
+    addPluginBtn.addEventListener('click', async () => {
+        addPluginModal.style.display = 'block';
+        availablePluginList.innerHTML = '<li>加载中...</li>';
+
+        try {
+            const res = await fetch('/api/console/unregistered');
+            const data = await res.json();
+
+            if (data.success && data.plugins.length > 0) {
+                availablePluginList.innerHTML = '';
+                data.plugins.forEach(name => {
+                    const li = document.createElement('li');
+                    li.textContent = name;
+                    li.className = 'clickable-plugin';
+                    li.style.cursor = 'pointer';
+                    li.addEventListener('click', async () => {
+                        if (!confirm(`确认添加插件 ${name} 吗？`)) return;
+                        const resp = await fetch(`/api/console/addplugin?name=${encodeURIComponent(name)}`);
+                        const result = await resp.json();
+                        alert(result.message);
+                        if (result.success) location.reload();
+                    });
+                    availablePluginList.appendChild(li);
+                });
+            } else {
+                availablePluginList.innerHTML = '<li>没有可添加的插件</li>';
+            }
+        } catch (err) {
+            availablePluginList.innerHTML = `<li>加载失败：${err}</li>`;
+        }
+    });
+
+    closeModalBtn.addEventListener('click', () => {
+        addPluginModal.style.display = 'none';
+    });
+
+    let currentPluginName = null; // 显示用短名，例如 "pages"
     let currentPluginStatus = null; // 用于存储当前插件状态
 
     // 初始隐藏启用/禁用按钮
     enableButton.style.display = 'none';
     disableButton.style.display = 'none';
+    saveButton.style.display = 'none';
 
     // Toggle sidebar
     toggleSidebarButton.addEventListener('click', function () {
@@ -53,11 +94,37 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 3000);
     }
 
-    // 获取插件状态
-    async function getPluginStatus(pluginName) {
+    // ---- 工具函数：处理前缀和 ~ ----
+    // 去掉开头的 ~（如果有）
+    function stripLeadingTilde(name) {
+        return name.replace(/^~/, '');
+    }
+
+    // 去掉 yumeri-plugin- 前缀（同时也会去掉前面的 ~）
+    function stripPluginPrefix(name) {
+        const noTilde = stripLeadingTilde(name);
+        return noTilde.replace(/^yumeri-plugin-/, '');
+    }
+
+    // 给短名补回 yumeri-plugin- 前缀（用于向后端请求），并确保没有开头的 ~
+    function addPluginPrefix(name) {
+        const noTilde = name.replace(/^~/, '');
+        return noTilde.startsWith('yumeri-plugin-') ? noTilde : `yumeri-plugin-${noTilde}`;
+    }
+
+    // 尝试把一个输入（可能是短名、可能是 full name、可能带 ~）返回后端能接受的 full name（不带 ~）
+    function normalizeToApiFullName(inputName) {
+        // 去掉开头的 ~，若已经是 full name（以 yumeri-plugin- 开头）就返回，否则加前缀
+        const noTilde = stripLeadingTilde(inputName);
+        return noTilde.startsWith('yumeri-plugin-') ? noTilde : `yumeri-plugin-${noTilde}`;
+    }
+    // ------------------------------------
+
+    // 获取插件状态（接受短名或 full name 或带 ~ 的名字）
+    async function getPluginStatus(pluginNameInput) {
         try {
-            const cleanPluginName = pluginName.replace(/^~/, '');
-            const response = await fetch(`/api/console/pluginstatus?name=${cleanPluginName}`);
+            const fullName = normalizeToApiFullName(pluginNameInput);
+            const response = await fetch(`/api/console/pluginstatus?name=${encodeURIComponent(fullName)}`);
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const data = await response.json();
             if (typeof data === 'string') return data.trim();
@@ -81,22 +148,23 @@ document.addEventListener('DOMContentLoaded', function () {
             pluginList.innerHTML = ''; // 清空现有列表
 
             // 为每个插件获取状态并创建列表项
-            for (const pluginName of plugins) {
+            for (const pluginRawName of plugins) {
                 const listItem = document.createElement('li');
 
                 // 创建状态指示器
                 const statusIndicator = document.createElement('span');
                 statusIndicator.className = 'plugin-status';
 
-                // 创建插件名称元素
+                // 处理可能带 ~ 的名字，得到 rawFullName（不带 ~，可能含 yumeri-plugin-）
+                const rawFullName = stripLeadingTilde(pluginRawName);
+                // 显示名：去掉 yumeri-plugin- 前缀
+                const displayName = stripPluginPrefix(rawFullName);
+
                 const nameSpan = document.createElement('span');
+                nameSpan.textContent = displayName;
 
-                // 去掉~符号显示名称
-                const cleanPluginName = pluginName.replace(/^~/, '');
-                nameSpan.textContent = cleanPluginName;
-
-                // 获取插件状态
-                const status = await getPluginStatus(pluginName);
+                // 获取插件状态（传 rawFullName 或 displayName 都可以，getPluginStatus 会 normalize）
+                const status = await getPluginStatus(rawFullName);
 
                 // 根据状态设置圆点颜色
                 if (status === 'ENABLED') {
@@ -109,7 +177,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 listItem.appendChild(statusIndicator);
                 listItem.appendChild(nameSpan);
-                listItem.dataset.plugin = cleanPluginName; // 存储清理后的插件名
+                // 存储显示用短名（dataset.plugin）和原始后端full name（dataset.fullname）
+                listItem.dataset.plugin = displayName; // "pages"
+                listItem.dataset.fullname = rawFullName; // "yumeri-plugin-pages"
                 listItem.dataset.status = status; // 存储插件状态
 
                 listItem.addEventListener('click', function () {
@@ -148,28 +218,46 @@ document.addEventListener('DOMContentLoaded', function () {
         return target;
     }
 
-    // 加载插件配置
+    // 加载插件配置（pluginName 是短名，例如 "pages"）
     async function loadPluginConfiguration(pluginName, pluginStatus) {
         try {
             currentPluginName = pluginName;
             currentPluginStatus = pluginStatus;
             updatePluginStatus();
 
-            const response = await fetch(`/api/console/config?name=${pluginName}`);
-            let usage = await fetch(`/api/console/pluginusage?name=${pluginName}`);
-            if (!usage.ok) {
-                throw new Error(`HTTP error! status: ${usage.status}`);
-            }
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
+            // 构建后端需要的 full name
+            const fullName = addPluginPrefix(pluginName);
 
-            const config = await response.json();
-            pluginUsage.innerHTML = '';
-            usage = await usage.json();
-            configurationArea.innerHTML = '';
+            // 同时请求配置和元信息
+            const [configRes, metaRes] = await Promise.all([
+                fetch(`/api/console/config?name=${encodeURIComponent(fullName)}`),
+                fetch(`/api/console/pluginmetadata?name=${encodeURIComponent(fullName)}`)
+            ]);
+
+            if (!configRes.ok) throw new Error(`HTTP error! status: ${configRes.status}`);
+            if (!metaRes.ok) throw new Error(`HTTP error! status: ${metaRes.status}`);
+
+            const config = await configRes.json();
+            const meta = await metaRes.json();
+
+            // 更新 usage
+            pluginUsage.innerHTML = meta.usage || '';
+
+            // 更新依赖与提供服务
+            const metaArea = document.getElementById('plugin-meta');
+            metaArea.innerHTML = '';
+
+            const dependList = meta.depend && meta.depend.length
+                ? `<div class="meta-box depend">依赖服务：${meta.depend.join('，')}</div>`
+                : '';
+            const provideList = meta.provide && meta.provide.length
+                ? `<div class="meta-box provide">提供服务：${meta.provide.join('，')}</div>`
+                : '';
+
+            metaArea.innerHTML = dependList + provideList;
 
             // 渲染配置项
+            configurationArea.innerHTML = '';
             if (Array.isArray(config)) {
                 renderConfigItems(config);
             } else if (config.error) {
@@ -178,7 +266,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 console.warn('Invalid configuration format received:', config);
                 configurationArea.innerHTML = '<p>Received invalid configuration format from server.</p>';
             }
-            if (usage.usage) { pluginUsage.innerHTML = usage.usage; }
+
             pluginTitle.textContent = `${pluginName} 配置`;
 
             // 绑定事件监听器
@@ -189,7 +277,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // 渲染配置项
+    // --- 以下渲染函数与原来一致（我只在上方做了必要改动） ---
     function renderConfigItems(configItems) {
         configItems.forEach(item => {
             const configItemDiv = document.createElement('div');
@@ -226,7 +314,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // 渲染文本输入框
     function renderTextInput(container, item) {
         const label = document.createElement('label');
         label.textContent = item.description || item.key;
@@ -242,7 +329,6 @@ document.addEventListener('DOMContentLoaded', function () {
         container.appendChild(input);
     }
 
-    // 渲染数字输入框
     function renderNumberInput(container, item) {
         const label = document.createElement('label');
         label.textContent = item.description || item.key;
@@ -258,7 +344,6 @@ document.addEventListener('DOMContentLoaded', function () {
         container.appendChild(input);
     }
 
-    // 渲染布尔输入框
     function renderBooleanInput(container, item) {
         const label = document.createElement('label');
         label.textContent = item.description || item.key;
@@ -282,7 +367,6 @@ document.addEventListener('DOMContentLoaded', function () {
         container.appendChild(switchLabel);
     }
 
-    // 渲染选择框
     function renderSelectInput(container, item) {
         const label = document.createElement('label');
         label.textContent = item.description || item.key;
@@ -308,7 +392,6 @@ document.addEventListener('DOMContentLoaded', function () {
         container.appendChild(select);
     }
 
-    // 渲染基本数组输入
     function renderArrayInput(container, item) {
         const header = document.createElement('div');
         header.className = 'array-header';
@@ -321,7 +404,6 @@ document.addEventListener('DOMContentLoaded', function () {
         arrayContainer.dataset.type = 'array';
         arrayContainer.dataset.itemType = item.itemType || 'string';
 
-        // 渲染现有数组项
         if (Array.isArray(item.value)) {
             item.value.forEach(value => {
                 const arrayItem = createArrayItem(value, item.itemType || 'string');
@@ -329,7 +411,6 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         }
 
-        // 添加新项按钮
         const addButton = document.createElement('button');
         addButton.className = 'add-array-item';
         addButton.textContent = '添加项';
@@ -344,7 +425,6 @@ document.addEventListener('DOMContentLoaded', function () {
         container.appendChild(controls);
     }
 
-    // 创建数组项
     function createArrayItem(value, itemType) {
         const arrayItem = document.createElement('div');
         arrayItem.className = 'array-item';
@@ -396,7 +476,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return arrayItem;
     }
 
-    // 渲染复杂数组输入（数组项为对象或嵌套数组）
     function renderComplexArrayInput(container, item) {
         const header = document.createElement('div');
         header.className = 'array-header';
@@ -410,7 +489,6 @@ document.addEventListener('DOMContentLoaded', function () {
         arrayContainer.dataset.itemType = item.itemType;
         arrayContainer.dataset.itemSchema = JSON.stringify(item.itemSchema);
 
-        // 渲染现有数组项
         if (Array.isArray(item.value)) {
             item.value.forEach((value, index) => {
                 const complexItem = createComplexArrayItem(item.key, index, value, item.itemSchema);
@@ -418,7 +496,6 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         }
 
-        // 添加新项按钮
         const addButton = document.createElement('button');
         addButton.className = 'add-array-item';
         addButton.textContent = '添加项';
@@ -433,7 +510,6 @@ document.addEventListener('DOMContentLoaded', function () {
         container.appendChild(controls);
     }
 
-    // 创建复杂数组项
     function createComplexArrayItem(arrayKey, index, value, itemSchema) {
         const complexItem = document.createElement('div');
         complexItem.className = 'complex-array-item';
@@ -458,9 +534,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const content = document.createElement('div');
         content.className = 'complex-array-item-content';
 
-        // 根据itemSchema类型渲染内容
         if (itemSchema.type === 'object' && itemSchema.properties) {
-            // 对象类型，渲染其属性
             Object.entries(itemSchema.properties).forEach(([propKey, propSchema]) => {
                 const propValue = value && typeof value === 'object' ? value[propKey] : undefined;
                 const finalValue = propValue !== undefined ? propValue :
@@ -501,7 +575,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 content.appendChild(propDiv);
             });
         } else if (itemSchema.type === 'array' && itemSchema.items) {
-            // 数组类型，递归渲染
             const arrayItem = {
                 key: `${arrayKey}[${index}]`,
                 value: Array.isArray(value) ? value : [],
@@ -512,7 +585,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
             renderArrayInput(content, arrayItem);
         } else {
-            // 基本类型，渲染单个输入框
             const basicItem = {
                 key: `${arrayKey}[${index}]`,
                 value: value,
@@ -537,7 +609,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return complexItem;
     }
 
-    // 渲染对象头部
     function renderObjectHeader(container, item) {
         const header = document.createElement('div');
         header.className = 'object-header';
@@ -548,13 +619,51 @@ document.addEventListener('DOMContentLoaded', function () {
         objectContainer.dataset.key = item.key;
         objectContainer.dataset.type = 'object';
 
+        if (item.properties && typeof item.properties === 'object') {
+            Object.entries(item.properties).forEach(([propKey, propSchema]) => {
+                const propValue = item.value && typeof item.value === 'object' ? item.value[propKey] : undefined;
+                const propItem = {
+                    key: `${item.key}.${propKey}`,
+                    value: propValue !== undefined ? propValue :
+                        (propSchema.default !== undefined ? propSchema.default : ''),
+                    description: propSchema.description || propKey,
+                    type: propSchema.enum ? 'select' : propSchema.type,
+                    options: propSchema.enum
+                };
+
+                const propDiv = document.createElement('div');
+                propDiv.className = 'config-item';
+                propDiv.dataset.key = propItem.key;
+
+                switch (propItem.type) {
+                    case 'number':
+                        renderNumberInput(propDiv, propItem);
+                        break;
+                    case 'boolean':
+                        renderBooleanInput(propDiv, propItem);
+                        break;
+                    case 'select':
+                        renderSelectInput(propDiv, propItem);
+                        break;
+                    case 'object':
+                        renderObjectHeader(propDiv, propItem);
+                        break;
+                    case 'array':
+                        renderArrayInput(propDiv, propItem);
+                        break;
+                    default:
+                        renderTextInput(propDiv, propItem);
+                }
+
+                objectContainer.appendChild(propDiv);
+            });
+        }
+
         container.appendChild(header);
         container.appendChild(objectContainer);
     }
 
-    // 绑定事件监听器
     function bindEventListeners() {
-        // 添加数组项按钮
         document.querySelectorAll('[data-action="add-array-item"]').forEach(button => {
             button.addEventListener('click', function () {
                 const targetKey = this.dataset.target;
@@ -566,7 +675,6 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
 
-        // 添加复杂数组项按钮
         document.querySelectorAll('[data-action="add-complex-array-item"]').forEach(button => {
             button.addEventListener('click', function () {
                 const targetKey = this.dataset.target;
@@ -575,7 +683,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 const currentItems = arrayContainer.querySelectorAll('.complex-array-item');
                 const newIndex = currentItems.length;
 
-                // 创建默认值
                 let defaultValue;
                 if (itemSchema.type === 'object') {
                     defaultValue = {};
@@ -595,12 +702,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 const newItem = createComplexArrayItem(targetKey, newIndex, defaultValue, itemSchema);
                 arrayContainer.appendChild(newItem);
 
-                // 重新绑定事件
                 bindEventListeners();
             });
         });
 
-        // 使用事件委托处理删除按钮
         document.addEventListener('click', function (e) {
             if (e.target.dataset.action === 'remove-array-item') {
                 e.target.closest('.array-item').remove();
@@ -610,11 +715,9 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // 收集配置数据
     function collectConfigData() {
         const configData = {};
 
-        // 处理基本输入字段
         document.querySelectorAll('#configuration-area input[data-key], #configuration-area select[data-key]').forEach(el => {
             if (!el.closest('.array-container') && !el.closest('.complex-array-item')) {
                 const key = el.dataset.key;
@@ -634,7 +737,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        // 处理基本数组
         document.querySelectorAll('.array-container[data-type="array"]').forEach(container => {
             const key = container.dataset.key;
             const itemType = container.dataset.itemType;
@@ -658,7 +760,6 @@ document.addEventListener('DOMContentLoaded', function () {
             deepMergeObject(configData, key, items);
         });
 
-        // 处理复杂数组
         document.querySelectorAll('.array-container[data-type="complex-array"]').forEach(container => {
             const key = container.dataset.key;
             const items = [];
@@ -667,10 +768,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 const index = complexItem.dataset.index;
                 let itemData = {};
 
-                // 收集复杂项中的所有输入
                 complexItem.querySelectorAll('input[data-key], select[data-key]').forEach(input => {
                     const inputKey = input.dataset.key;
-                    // 从inputKey中提取属性名
                     const match = inputKey.match(new RegExp(`${key}\\[(\\d+)\\]\\.(.+)`));
 
                     if (match) {
@@ -687,7 +786,6 @@ document.addEventListener('DOMContentLoaded', function () {
                             value = input.value;
                         }
 
-                        // 处理嵌套属性
                         if (propKey.includes('.')) {
                             deepMergeObject(itemData, propKey, value);
                         } else {
@@ -696,10 +794,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 });
 
-                // 处理嵌套数组
                 complexItem.querySelectorAll('.array-container').forEach(nestedArray => {
                     const nestedKey = nestedArray.dataset.key;
-                    // 从nestedKey中提取属性名
                     const match = nestedKey.match(new RegExp(`${key}\\[(\\d+)\\](.+)`));
 
                     if (match) {
@@ -721,7 +817,6 @@ document.addEventListener('DOMContentLoaded', function () {
                             }
                         });
 
-                        // 处理嵌套路径
                         if (propPath.startsWith('.')) {
                             deepMergeObject(itemData, propPath.substring(1), nestedItems);
                         } else {
@@ -739,7 +834,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return configData;
     }
 
-    // 更新插件状态UI
     function updatePluginStatus() {
         if (currentPluginStatus === 'DISABLED') {
             pluginStatus.innerHTML = '<p style="color: #ccc;">当前状态: 未启用</p>';
@@ -749,14 +843,15 @@ document.addEventListener('DOMContentLoaded', function () {
             pluginStatus.innerHTML = '<p style="color: #f44336;">当前状态: 依赖未满足</p>';
             enableButton.style.display = 'none';
             disableButton.style.display = 'inline-block';
-        } else { // ENABLE
+        } else { // ENABLED
             pluginStatus.innerHTML = '<p style="color: #4CAF50;">当前状态: 已启用</p>';
             enableButton.style.display = 'none';
             disableButton.style.display = 'inline-block';
         }
+        saveButton.style.display = 'inline-block';
     }
 
-    // 保存配置按钮事件
+    // 保存配置按钮事件（向后端发送 fullName，不带 ~）
     saveButton.addEventListener('click', async function () {
         if (!currentPluginName) {
             showNotification('请先选择一个插件', 'error');
@@ -767,12 +862,12 @@ document.addEventListener('DOMContentLoaded', function () {
             const configData = collectConfigData();
             const jsonContent = JSON.stringify(configData);
             console.log('Saving configuration:', jsonContent);
-            // 构建保存配置的URL，并确保内容被URIComponent编码
-            const url = `/api/console/saveconfig?name=${currentPluginName}&config=${encodeURIComponent(jsonContent)}`;
+
+            const fullName = addPluginPrefix(currentPluginName); // e.g. yumeri-plugin-pages
+            const url = `/api/console/saveconfig?name=${encodeURIComponent(fullName)}&config=${encodeURIComponent(jsonContent)}`;
             const response = await fetch(url);
 
             if (!response.ok) {
-                // 如果HTTP响应不成功，尝试解析错误信息
                 const errorResult = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
                 throw new Error(errorResult.error || `HTTP error! status: ${response.status}`);
             }
@@ -780,18 +875,16 @@ document.addEventListener('DOMContentLoaded', function () {
             const result = await response.json();
             showNotification(result.success ? '配置保存成功' : result.message, result.success ? true : false);
 
-            // 如果保存成功，延迟刷新插件列表
             if (result.success) {
                 setTimeout(fetchPluginList, 1000);
             }
-
         } catch (error) {
             console.error('Failed to save configuration:', error);
             showNotification(`保存配置失败: ${error.message}`, 'error');
         }
     });
 
-    // 启用插件按钮事件
+    // 启用插件（向后端发送 fullName，不带 ~）
     enableButton.addEventListener('click', async function () {
         if (!currentPluginName || currentPluginStatus !== 'DISABLED') {
             showNotification('当前插件不需要启用', 'error');
@@ -799,7 +892,8 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         try {
-            const response = await fetch(`/api/console/enableplugin?name=${currentPluginName}`);
+            const fullName = addPluginPrefix(currentPluginName);
+            const response = await fetch(`/api/console/enableplugin?name=${encodeURIComponent(fullName)}`);
 
             if (!response.ok) {
                 const errorResult = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
@@ -811,14 +905,10 @@ document.addEventListener('DOMContentLoaded', function () {
             if (result.success) {
                 showNotification('插件启用成功', 'success');
 
-                // 更新当前插件状态
                 currentPluginStatus = 'ENABLED';
                 updatePluginStatus();
 
-                // 刷新插件列表
                 setTimeout(fetchPluginList, 1000);
-
-                // 重新加载插件配置
                 setTimeout(() => loadPluginConfiguration(currentPluginName, currentPluginStatus), 1500);
             } else {
                 showNotification(result.message || '插件启用失败', 'error');
@@ -829,7 +919,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // 禁用插件按钮事件
+    // 禁用插件（向后端发送 fullName，不带 ~）
     disableButton.addEventListener('click', async function () {
         if (!currentPluginName || currentPluginStatus === 'DISABLED') {
             showNotification('当前插件不需要禁用', 'error');
@@ -837,7 +927,8 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         try {
-            const response = await fetch(`/api/console/disableplugin?name=${currentPluginName}`);
+            const fullName = addPluginPrefix(currentPluginName);
+            const response = await fetch(`/api/console/disableplugin?name=${encodeURIComponent(fullName)}`);
 
             if (!response.ok) {
                 const errorResult = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
@@ -849,11 +940,9 @@ document.addEventListener('DOMContentLoaded', function () {
             if (result.success) {
                 showNotification('插件禁用成功', 'success');
 
-                // 更新当前插件状态
                 currentPluginStatus = 'DISABLED';
                 updatePluginStatus();
 
-                // 刷新插件列表
                 setTimeout(fetchPluginList, 1000);
             } else {
                 showNotification(result.message || '插件禁用失败', 'error');
