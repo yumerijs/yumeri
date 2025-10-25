@@ -11,7 +11,39 @@ const tools = {
     const limit = parseInt(info.args?.[0], 10) || 5;
     const pagesList = await pages.get({ type: 'post', status: 'publish' }) as any[];
     const sliced = (pagesList || []).slice(0, limit);
-    return `<ul>${sliced.map(p => `<li>${p.name}</li>`).join('')}</ul>`;
+
+    // 返回 HTML
+    return `
+      <style>
+        .tinytools-postlist {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          padding: 0;
+          list-style: none;
+        }
+        .tinytools-postlist li {
+          background: #fff;
+          border-radius: 8px;
+          box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+          padding: 12px 16px;
+          transition: transform 0.2s, box-shadow 0.2s;
+          cursor: pointer;
+        }
+        .tinytools-postlist li:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .tinytools-postlist li a {
+          text-decoration: none;
+          color: #333;
+          font-weight: 500;
+        }
+      </style>
+      <ul class="tinytools-postlist">
+        ${sliced.map(p => `<li><a href="/post/${p.id}">${p.name}</a></li>`).join('')}
+      </ul>
+    `;
   }
 }
 

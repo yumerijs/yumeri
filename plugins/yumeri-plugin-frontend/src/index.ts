@@ -21,23 +21,6 @@ export const config = {
       description: '前端模板风格',
       enum: getTemplates(),
     },
-    urlStyle: {
-      type: 'string',
-      default: 'pretty',
-      enum: ['query', 'prefix', 'id'],
-      description: 'URL 风格（query: ?post=slug, prefix: /post/slug, id: /post/1）',
-    },
-    pageUrlStyle: {
-      type: 'string',
-      default: 'pretty',
-      enum: ['slug', 'slugHtml'],
-      description: '页面 URL 风格（slug: /about, slugHtml: /about.html）',
-    },
-    postPrefix: {
-      type: 'string',
-      default: 'post',
-      description: '文章路径前缀',
-    },
   } as Record<string, ConfigSchema>,
 }
 
@@ -61,43 +44,16 @@ interface ParsedRoute {
 }
 
 function parseRoute(pathname: string, config: Config): ParsedRoute {
-  const urlStyle = config.get<string>('urlStyle')
-  const pageUrlStyle = config.get<string>('pageUrlStyle')
-  const postPrefix = config.get<string>('postPrefix')
-
   if (!pathname || pathname === '/') return { type: 'home' }
-
   const clean = pathname.replace(/^\/|\/$/g, '')
   const segments = clean.split('/').filter(Boolean)
-
-  // 页面特殊处理
-  if (pageUrlStyle === 'slugHtml' && /\.html$/.test(clean)) {
-    const slug = clean.replace(/\.html$/, '')
-    return { type: 'page', slug }
+  if (segments.length === 1) return { type: 'page', slug: segments[0] }
+  if (segments[0]) {
+    const id = segments[1];
+    if (!/^\d+$/.test(id)) return { type: '404' };
+    return { type: segments[0], id: parseInt(id, 10) };
   }
-  if (pageUrlStyle === 'slug') {
-    if (segments.length === 1) return { type: 'page', slug: segments[0] }
-  }
-
-  // 文章模式
-  switch (urlStyle) {
-    case 'id': {
-      if (segments[0] === postPrefix) {
-        const id = segments[1];
-        if (!/^\d+$/.test(id)) return { type: '404' };
-        return { type: 'post', id: parseInt(id, 10) };
-      }
-      return { type: 'auto', slug: segments[0] ?? 'index' };
-    }
-
-    case 'prefix':
-      if (segments[0] === postPrefix)
-        return { type: 'post', slug: segments[1] ?? 'index' };
-      return { type: 'auto', slug: segments[0] ?? 'index' };
-
-    default:
-      return { type: 'auto', slug: segments[0] ?? 'index' };
-  }
+  return { type: 'auto', slug: segments[0] ?? 'index' };
 }
 
 function mergeHookResults(raw: any): Record<string, string> {
