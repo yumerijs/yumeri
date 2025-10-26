@@ -1,6 +1,6 @@
 
 export interface Permission {
-  username: string;
+  id: number;
   permit: number;
 }
 

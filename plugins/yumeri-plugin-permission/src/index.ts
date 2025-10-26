@@ -21,7 +21,7 @@ export const config = {
 };
 
 export interface Permit {
-  getPermit(username: string): Promise<number>;
+  getPermit(id: number): Promise<number>;
 }
 
 export async function apply(ctx: Context, config: Config) {
@@ -29,20 +29,20 @@ export async function apply(ctx: Context, config: Config) {
 
   // Use extend() to define the table schema. This is idempotent.
   await db.extend('permission', {
-    username: { type: 'string', nullable: false },
+    id: { type: 'unsigned', nullable: false },
     permit: { type: 'unsigned', initial: config.get('defaultpermit', 1) }
-  }, { primary: 'username' });
+  }, { primary: 'id' });
 
   ctx.registerComponent('permission', {
-    async getPermit(username: string): Promise<number> {
-      const result = await db.selectOne('permission', { username });
+    async getPermit(id: number): Promise<number> {
+      const result = await db.selectOne('permission', { id });
       if (result) {
         return result.permit;
       } else {
         // Although the table has a default, a record might not exist yet for a new user.
         // Creating it here ensures consistency.
         await db.create('permission', { 
-          username, 
+          id, 
           permit: config.get('defaultpermit', 1) 
         });
         return config.get('defaultpermit', 1);

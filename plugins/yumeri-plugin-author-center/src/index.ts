@@ -37,7 +37,8 @@ export async function apply(ctx: Context, config: Config) {
   ) => {
     return async (session: Session, params: URLSearchParams) => {
       if (authority.getLoginstatus(session.sessionid)) {
-        if ((await permit.getPermit(((await authority.getUserinfo(session.sessionid) as any)).username)) >= config.get<number>('permit')) {
+        const userid = ((await authority.getUserinfo(session.sessionid)) as any).id;
+        if (await permit.getPermit(userid) >= config.get<number>('permit')) {
           await handler(session, params);
         } else {
           session.setMime('json');
