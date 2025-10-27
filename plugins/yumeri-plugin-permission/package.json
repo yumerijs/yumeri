@@ -32,12 +32,11 @@
   "devDependencies": {
     "@types/node": "^22.14.1",
     "@yumerijs/types": "^2.0.0",
-    "typescript": "^5.8.2"
-  },
-  "dependencies": {
+    "typescript": "^5.8.2",
     "yumeri-plugin-user": "^1.1.0"
   },
   "peerDependencies": {
-    "yumeri": "^2.0.0"
+    "yumeri": "^2.0.0",
+    "yumeri-plugin-user": "^1.1.0"
   }
 }

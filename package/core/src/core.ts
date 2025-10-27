@@ -14,7 +14,6 @@ import { Middleware } from './middleware';
 import { Route } from './route';
 import { Context } from './context';
 import { HookHandler, Hook } from './hook';
-import { Server } from 'http';
 import { Server as CoreServer } from './server';
 import { I18n } from './i18n';
 

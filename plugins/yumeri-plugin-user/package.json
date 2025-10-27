@@ -32,11 +32,6 @@
         "@yumerijs/types": "^2.0.0",
         "typescript": "^5.8.2"
     },
-    "dependencies": {
-        "chalk": "^5.4.1",
-        "sqlite": "^5.1.1",
-        "sqlite3": "^5.1.7"
-    },
     "peerDependencies": {
         "yumeri": "^2.0.0"
     }

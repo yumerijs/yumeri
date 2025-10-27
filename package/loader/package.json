@@ -31,7 +31,6 @@
     "typescript": "^5.8.2"
   },
   "dependencies": {
-    "@yumerijs/core": "^2.0.0",
-    "chokidar": "^4.0.3"
+    "@yumerijs/core": "^2.0.0"
   }
 }

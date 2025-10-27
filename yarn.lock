@@ -381,6 +381,21 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@yumerijs/core@npm:^1.2.0, @yumerijs/core@npm:^1.3.1":
+  version: 1.3.3
+  resolution: "@yumerijs/core@npm:1.3.3"
+  dependencies:
+    "@yumerijs/loader": "npm:^1.2.0"
+    chokidar: "npm:^4.0.3"
+    formidable: "npm:^3.5.4"
+    js-yaml: "npm:^4.1.0"
+    mime-types: "npm:^3.0.1"
+    picocolors: "npm:^1.1.1"
+    ws: "npm:^8.18.3"
+  checksum: 10c0/792864b93355247ed07ce17c271a9a7adef11136e9a0f4e45c06e16517cc6fabba2860624ecff819f3e878c7451487eef2dd4b52318edcd8c17ab1af7a79d1e2
+  languageName: node
+  linkType: hard
+
 "@yumerijs/core@npm:^2.0.0, @yumerijs/core@workspace:package/core":
   version: 0.0.0-use.local
   resolution: "@yumerijs/core@workspace:package/core"
@@ -400,6 +415,16 @@ __metadata:
     ws: "npm:^8.18.3"
   languageName: unknown
   linkType: soft
+
+"@yumerijs/loader@npm:^1.2.0":
+  version: 1.2.2
+  resolution: "@yumerijs/loader@npm:1.2.2"
+  dependencies:
+    "@yumerijs/core": "npm:^1.2.0"
+    chokidar: "npm:^4.0.3"
+  checksum: 10c0/477defac3119aa8e1c5941011fc648393c86fd7072694345d7b9003fa9cb4c849b56d029b2ad0ced30b6c9020d18d9cdabdd13fc014bdd56e5ae6de97a6641ee
+  languageName: node
+  linkType: hard
 
 "@yumerijs/loader@npm:^2.0.0, @yumerijs/loader@workspace:package/loader":
   version: 0.0.0-use.local
@@ -684,10 +709,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"chalk@npm:^5.4.1":
-  version: 5.5.0
-  resolution: "chalk@npm:5.5.0"
-  checksum: 10c0/23063b544f7c2fe57d25ff814807de561f8adfff72e4f0051051eaa606f772586470507ccd38d89166300eeaadb0164acde8bb8a0716a0f2d56ccdf3761d5e4f
+"chalk@npm:latest":
+  version: 5.6.2
+  resolution: "chalk@npm:5.6.2"
+  checksum: 10c0/99a4b0f0e7991796b1e7e3f52dceb9137cae2a9dfc8fc0784a550dc4c558e15ab32ed70b14b21b52beb2679b4892b41a0aa44249bcb996f01e125d58477c6976
   languageName: node
   linkType: hard
 
@@ -1106,7 +1131,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"formidable@npm:^3.5.4":
+"formidable@npm:^3.5.4, formidable@npm:latest":
   version: 3.5.4
   resolution: "formidable@npm:3.5.4"
   dependencies:
@@ -1540,7 +1565,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"mime-types@npm:^3.0.1":
+"mime-types@npm:^3.0.1, mime-types@npm:latest":
   version: 3.0.1
   resolution: "mime-types@npm:3.0.1"
   dependencies:
@@ -2600,7 +2625,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ws@npm:^8.18.3":
+"ws@npm:^8.18.3, ws@npm:latest":
   version: 8.18.3
   resolution: "ws@npm:8.18.3"
   peerDependencies:
@@ -2636,12 +2661,16 @@ __metadata:
     "@types/fs-extra": "npm:^11"
     "@types/node": "npm:^22.15.19"
     "@yumerijs/scripts": "workspace:^"
+    chalk: "npm:latest"
     chokidar: "npm:^4.0.3"
     cross-env: "npm:^10.0.0"
+    formidable: "npm:latest"
     fs-extra: "npm:^11.3.2"
+    mime-types: "npm:latest"
     tsconfig-paths: "npm:^4.2.0"
     typescript: "npm:^5.8.3"
-    yumeri: "workspace:^"
+    ws: "npm:latest"
+    yumeri: "npm:latest"
     yumeri-plugin-console: "workspace:^"
   languageName: unknown
   linkType: soft
@@ -2666,7 +2695,7 @@ __metadata:
     typescript: "npm:^5.8.2"
     yumeri-plugin-authority: "npm:^1.2.0"
     yumeri-plugin-pages: "npm:^1.0.0"
-    yumeri-plugin-permission: "workspace:^"
+    yumeri-plugin-permission: "npm:^1.0.3"
     yumeri-plugin-user: "npm:^1.1.0"
   peerDependencies:
     yumeri: ^2.0.0
@@ -2788,7 +2817,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"yumeri-plugin-permission@workspace:^, yumeri-plugin-permission@workspace:plugins/yumeri-plugin-permission":
+"yumeri-plugin-permission@npm:^1.0.3, yumeri-plugin-permission@workspace:plugins/yumeri-plugin-permission":
   version: 0.0.0-use.local
   resolution: "yumeri-plugin-permission@workspace:plugins/yumeri-plugin-permission"
   dependencies:
@@ -2844,16 +2873,13 @@ __metadata:
   dependencies:
     "@types/node": "npm:^22.14.1"
     "@yumerijs/types": "npm:^2.0.0"
-    chalk: "npm:^5.4.1"
-    sqlite: "npm:^5.1.1"
-    sqlite3: "npm:^5.1.7"
     typescript: "npm:^5.8.2"
   peerDependencies:
     yumeri: ^2.0.0
   languageName: unknown
   linkType: soft
 
-"yumeri@npm:^2.0.0, yumeri@workspace:^, yumeri@workspace:package/yumeri":
+"yumeri@npm:^2.0.0, yumeri@workspace:package/yumeri":
   version: 0.0.0-use.local
   resolution: "yumeri@workspace:package/yumeri"
   dependencies:
@@ -2867,3 +2893,16 @@ __metadata:
     yumeri: bin.js
   languageName: unknown
   linkType: soft
+
+"yumeri@npm:latest":
+  version: 1.3.1
+  resolution: "yumeri@npm:1.3.1"
+  dependencies:
+    "@yumerijs/core": "npm:^1.3.1"
+    "@yumerijs/loader": "npm:^1.2.0"
+    cac: "npm:^6.7.14"
+  bin:
+    yumeri: bin.js
+  checksum: 10c0/8ba1b8df69a0c9d535dd11e174f6768967a5f959cfd1f2892293112bb602a4d7e970c83d18d2e8a04c77f68e277b4613a4a49208fb55ed4071e049d5ea96497c
+  languageName: node
+  linkType: hard

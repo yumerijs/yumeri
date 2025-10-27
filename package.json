@@ -13,9 +13,13 @@
   },
   "dependencies": {
     "@yumerijs/scripts": "workspace:^",
+    "chalk": "latest",
     "chokidar": "^4.0.3",
+    "formidable": "latest",
     "fs-extra": "^11.3.2",
-    "yumeri": "workspace:^",
+    "mime-types": "latest",
+    "ws": "latest",
+    "yumeri": "latest",
     "yumeri-plugin-console": "workspace:^"
   },
   "devDependencies": {

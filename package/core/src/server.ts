@@ -1,11 +1,10 @@
 import { Core } from './core';
 import { Logger } from './logger';
-import { Session, Client } from './session';
+import { Session } from './session';
 import http, { IncomingMessage, ServerResponse } from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
 import { URL } from 'url';
-import Ws from 'ws';
 import * as mime from 'mime-types';
 
 
