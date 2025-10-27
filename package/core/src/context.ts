@@ -9,6 +9,7 @@ import { Route } from './route';
 import { HookHandler } from './hook';
 import { Middleware } from './middleware';
 import { Config } from './config';
+import { I18n } from './i18n';
 
 interface Plugin {
     apply: (ctx: Context, config: Config) => Promise<void>;
@@ -30,6 +31,7 @@ export class Context {
     private hooks: Record<string, string[]> = {};
     private childContexts: Context[] = [];
     private childPlugins: Map<Context, Plugin> = new Map();
+    private i18ns: string[] = [];
 
     /** 插件名称 */
     public pluginname: string;
@@ -167,6 +169,40 @@ export class Context {
     }
 
     /**
+     * 注册 i18n
+     * @param content 内容（可以是嵌套对象或单个key）
+     * @param locale 可选的语言映射
+     */
+    public i18n(content: string | Record<string, any>, locale?: Record<string, string>) {
+        if (!this.i18ns) this.i18ns = []
+
+        const isLangObject = (obj: any) =>
+            typeof obj === 'object' && Object.values(obj).every(v => typeof v === 'string')
+
+        const flatten = (obj: Record<string, any>, prefix = ''): Record<string, Record<string, string>> => {
+            const result: Record<string, Record<string, string>> = {}
+            for (const [key, value] of Object.entries(obj)) {
+                const fullKey = prefix ? `${prefix}.${key}` : key
+                if (isLangObject(value)) {
+                    result[fullKey] = value
+                } else if (typeof value === 'object') {
+                    Object.assign(result, flatten(value, fullKey))
+                }
+            }
+            return result
+        }
+
+        if (typeof content === 'string' && locale) {
+            this.core.i18n.register(content, locale)
+            this.i18ns.push(content)
+        } else if (typeof content === 'object') {
+            const flat = flatten(content)
+            this.core.i18n.register(flat)
+            this.i18ns.push(...Object.keys(flat))
+        }
+    }
+
+    /**
      * 卸载插件时清理注册的所有资源
      */
     async dispose() {
@@ -203,6 +239,14 @@ export class Context {
         this.childContexts.forEach((ctx) => {
             if (ctx?.dispose) ctx.dispose();
         });
+
+        // 删除i18n
+        if (this.i18ns?.length) {
+            for (const key of this.i18ns) {
+                this.core.i18n.delete(key)
+            }
+            this.i18ns.length = 0
+        }
 
         // 清空内部记录
         this.components = [];
