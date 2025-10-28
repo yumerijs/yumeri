@@ -19,7 +19,7 @@ export interface ServerConfig {
 }
 
 export class Server {
-    private core: Core;
+    public core: Core;
     private port: number;
     private host: string;
     private enableCors: boolean;

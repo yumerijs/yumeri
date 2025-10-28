@@ -1,5 +1,5 @@
 /**
- * @time: 2025/10/27 23:05
+ * @time: 2025/10/28 22:13
  * @author: FireGuo
  * WindyPear-Team All right reserved
  **/
@@ -47,10 +47,20 @@ export class I18n {
     delete this.data[key]
   }
 
-  get(key: string, lang: string): string {
+  /**
+   * 获取指定key的翻译
+   * @param key 文本点
+   * @param langs 用户的语言优先级数组
+   */
+  get(key: string, langs?: string[]): string {
     const entry = this.data[key]
     if (!entry) return key
-    if (entry[lang]) return entry[lang]
+
+    if (langs && langs.length) {
+      for (const l of langs) {
+        if (entry[l]) return entry[l]
+      }
+    }
 
     for (const fb of this.fallback) {
       if (entry[fb]) return entry[fb]
@@ -59,8 +69,12 @@ export class I18n {
     return key
   }
 
-  replaceAll(input: string, lang: string): string {
-    return input.replace(/\{\{(.*?)\}\}/g, (_, key) => this.get(key.trim(), lang))
+  /**
+   * 替换模板字符串中的文本点
+   * e.g. "Hello {{app.title}}" -> "Hello 世界"
+   */
+  replaceAll(input: string, langs?: string[]): string {
+    return input.replace(/\{\{(.*?)\}\}/g, (_, key) => this.get(key.trim(), langs))
   }
 
   all() {
