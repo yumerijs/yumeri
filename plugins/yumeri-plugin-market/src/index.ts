@@ -1,6 +1,8 @@
 import { Context, Config, Session, Logger, ConfigSchema } from 'yumeri';
 import { getSpecificPackageVersion, getPackageManager, PackageManager } from './util';
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
+import * as fs from 'fs';
+import { promises as fsp } from 'fs';
 import path from 'path';
 
 const logger = new Logger("market");
@@ -86,34 +88,69 @@ export async function apply(ctx: Context, config: Config) {
         },
         '/install': async (session: Session, params: URLSearchParams) => {
             const packageName = params.get('name');
-            if (!packageName || !packageName.includes('yumeri')) {
-                session.body = JSON.stringify({ success: false, message: 'Invalid package name' });
+            const version = params.get('version') || 'latest';
+            if (!packageName || !packageName.startsWith('yumeri-plugin-')) {
+                session.body = JSON.stringify({ success: false, message: '只允许安装 yumeri-plugin- 开头的依赖' });
                 return;
             }
-            const packageManager = getPackageManager();
-            const command = packageManager === 'npm' ? `npm install ${packageName} --registry=${config.get('npmregistry', 'https://registry.npmmirror.com')}` :
-                packageManager === 'yarn' ? `yarn add ${packageName} --registry=${config.get('npmregistry', 'https://registry.npmmirror.com')}` :
-                    packageManager === 'pnpm' ? `pnpm add ${packageName} --registry=${config.get('npmregistry', 'https://registry.npmmirror.com')}` : null;
 
-            if (command) {
-                try {
-                    await new Promise<void>((resolve, reject) => {
-                        exec(command, (error, stdout, stderr) => {
-                            if (error) {
-                                logger.error(`Installation failed: ${stderr}`);
-                                reject(new Error(stderr));
-                            } else {
-                                logger.info(`Installation successful: ${stdout}`);
-                                resolve();
-                            }
-                        });
-                    });
-                    session.body = JSON.stringify({ success: true, message: 'Installation successful' });
-                } catch (e: any) {
-                    session.body = JSON.stringify({ success: false, message: e.message });
+            const packageJsonPath = path.resolve(process.cwd(), 'package.json');
+
+            try {
+                const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+                pkg.dependencies ||= {};
+
+                const toAdd: Record<string, string> = {};
+                const visited = new Set<string>();
+
+                async function fetchYumeriDeps(name: string) {
+                    if (visited.has(name)) return;
+                    visited.add(name);
+
+                    const registryUrl = `${config.get('npmregistry', 'https://registry.npmmirror.com')}/${encodeURIComponent(name)}`;
+                    const res = await fetch(registryUrl);
+                    if (!res.ok) {
+                        logger.warn(`获取 ${name} 信息失败：${res.statusText}`);
+                        return;
+                    }
+
+                    const data = await res.json();
+                    const latestVer = data['dist-tags']?.latest || version;
+                    toAdd[name] = `^${latestVer}`;
+
+                    const deps = data.versions?.[latestVer]?.dependencies || {};
+                    for (const depName of Object.keys(deps)) {
+                        if (depName.startsWith('yumeri-plugin-')) {
+                            await fetchYumeriDeps(depName);
+                        }
+                    }
                 }
-            } else {
-                session.body = JSON.stringify({ success: false, message: 'Package manager not supported' });
+
+                await fetchYumeriDeps(packageName);
+
+                // 更新 package.json
+                for (const [depName, depVer] of Object.entries(toAdd)) {
+                    pkg.dependencies[depName] = depVer;
+                }
+
+                await fsp.writeFile(packageJsonPath, JSON.stringify(pkg, null, 2) + '\n');
+
+                // 安装依赖
+                await new Promise<void>((resolve, reject) => {
+                    const child = spawn('yarn', ['install', `--registry=${config.get('npmregistry', 'https://registry.npmmirror.com')}`], { cwd: process.cwd() });
+                    let stderr = '';
+                    child.stdout.on('data', data => logger.info(data.toString()));
+                    child.stderr.on('data', data => { logger.error(data.toString()); stderr += data.toString(); });
+                    child.on('close', code => {
+                        if (code !== 0) reject(new Error(stderr || 'Unknown error'));
+                        else resolve();
+                    });
+                    child.on('error', err => reject(err));
+                });
+
+                session.body = JSON.stringify({ success: true, message: 'Installation successful', installed: Object.keys(toAdd) });
+            } catch (e: any) {
+                session.body = JSON.stringify({ success: false, message: e.message });
             }
         },
         '/versions': async (session: Session, params: URLSearchParams) => {
@@ -136,30 +173,26 @@ export async function apply(ctx: Context, config: Config) {
                 session.body = JSON.stringify({ success: false, message: 'Invalid package name' });
                 return;
             }
-            const packageManager = getPackageManager();
-            const command = packageManager === 'npm' ? `npm uninstall ${packageName}` :
-                packageManager === 'yarn' ? `yarn remove ${packageName}` :
-                    packageManager === 'pnpm' ? `pnpm remove ${packageName}` : null;
 
-            if (command) {
-                try {
-                    await new Promise<void>((resolve, reject) => {
-                        exec(command, (error, stdout, stderr) => {
-                            if (error) {
-                                logger.error(`Uninstallation failed: ${stderr}`);
-                                reject(new Error(stderr));
-                            } else {
-                                logger.info(`Uninstallation successful: ${stdout}`);
-                                resolve();
-                            }
-                        });
+            try {
+                await new Promise<void>((resolve, reject) => {
+                    const child = spawn('yarn', ['remove', packageName], { cwd: process.cwd() });
+                    let stderr = '';
+
+                    child.stdout.on('data', data => logger.info(data.toString()));
+                    child.stderr.on('data', data => { logger.error(data.toString()); stderr += data.toString(); });
+
+                    child.on('close', code => {
+                        if (code !== 0) reject(new Error(stderr || 'Unknown error'));
+                        else resolve();
                     });
-                    session.body = JSON.stringify({ success: true, message: 'Uninstallation successful' });
-                } catch (e: any) {
-                    session.body = JSON.stringify({ success: false, message: e.message });
-                }
-            } else {
-                session.body = JSON.stringify({ success: false, message: 'Package manager not supported' });
+
+                    child.on('error', err => reject(err));
+                });
+
+                session.body = JSON.stringify({ success: true, message: 'Uninstallation successful' });
+            } catch (e: any) {
+                session.body = JSON.stringify({ success: false, message: e.message });
             }
         },
         '/currentver': async (session: Session, params: URLSearchParams) => {
@@ -170,11 +203,98 @@ export async function apply(ctx: Context, config: Config) {
             }
             const version = await getSpecificPackageVersion(packageName);
             session.body = JSON.stringify({ version: version });
+        },
+        '/dependencies': async (session: Session, params: URLSearchParams) => {
+            try {
+                const projectPath = process.cwd(); // 当前项目目录
+                const packageJsonPath = path.join(projectPath, 'package.json');
+
+                if (!fs.existsSync(packageJsonPath)) {
+                    session.body = JSON.stringify({ success: false, message: 'package.json 不存在' });
+                    return;
+                }
+
+                const pkg = JSON.parse(await fsp.readFile(packageJsonPath, 'utf8'));
+                const dependencies = pkg.dependencies || {};
+
+                const allDeps = Object.entries(dependencies).map(([name, version]) => ({
+                    name,
+                    version
+                }));
+
+                session.body = JSON.stringify({
+                    success: true,
+                    dependencies: allDeps
+                });
+            } catch (e: any) {
+                session.body = JSON.stringify({
+                    success: false,
+                    message: e.message || '获取依赖信息时发生错误'
+                });
+            }
+        },
+        '/savever': async (session: Session, params: URLSearchParams) => {
+            try {
+                const depsParam = params.get('deps'); // 格式: name1@1.2.3,name2@latest,name3@null
+                if (!depsParam) {
+                    session.body = JSON.stringify({ success: false, message: '缺少 deps 参数' });
+                    return;
+                }
+
+                const projectPath = process.cwd();
+                const packageJsonPath = path.join(projectPath, 'package.json');
+                const pkg = JSON.parse(await fsp.readFile(packageJsonPath, 'utf8'));
+                pkg.dependencies ||= {};
+
+                const depsList = depsParam.split(','); // name@version 或 name@null
+                const toInstall: string[] = [];
+                const toRemove: string[] = [];
+
+                for (const dep of depsList) {
+                    const [name, version] = dep.split('@');
+                    if (!name) continue;
+
+                    if (version === 'null') {
+                        // 卸载
+                        delete pkg.dependencies[name];
+                        toRemove.push(name);
+                    } else {
+                        // 安装或改版本
+                        pkg.dependencies[name] = version || 'latest';
+                        toInstall.push(name);
+                    }
+                }
+
+                await fsp.writeFile(packageJsonPath, JSON.stringify(pkg, null, 2) + '\n');
+
+                // 执行 yarn install
+                await new Promise<void>((resolve, reject) => {
+                    const child = spawn('yarn', ['install', `--registry=${config.get('npmregistry', 'https://registry.npmmirror.com')}`], { cwd: projectPath });
+                    let stderr = '';
+                    child.stdout.on('data', data => logger.info(data.toString()));
+                    child.stderr.on('data', data => { logger.error(data.toString()); stderr += data.toString(); });
+                    child.on('close', code => {
+                        if (code !== 0) reject(new Error(stderr || 'Unknown error'));
+                        else resolve();
+                    });
+                    child.on('error', err => reject(err));
+                });
+
+                session.body = JSON.stringify({
+                    success: true,
+                    installed: toInstall,
+                    removed: toRemove,
+                    message: '依赖已更新并安装完成'
+                });
+
+            } catch (e: any) {
+                session.body = JSON.stringify({ success: false, message: e.message || '批量更新依赖失败' });
+            }
         }
     };
 
     for (const [path, handler] of Object.entries(routes)) {
-        ctx.route(`/market${path}`).action(
+        ctx.route(`/api/market${path}`).action(
             requireLogin(async (sess, params) => {
                 sess.setMime('json');
                 await handler(sess, params);
@@ -183,10 +303,12 @@ export async function apply(ctx: Context, config: Config) {
     }
 
 
+    consoleApi.addconsoleitem('dep', 'fa-dev', '依赖管理', path.join(__dirname, '../static/dep.html'), path.join(__dirname, '../static/'));
     consoleApi.addconsoleitem('market', 'fa-plug', '插件市场', path.join(__dirname, '../static/index.html'), path.join(__dirname, '../static/'));
 }
 
 export function disable(ctx: Context) {
     const consoleApi: OperateConsole = ctx.getComponent('console');
     consoleApi.removeconsoleitem('market');
+    consoleApi.removeconsoleitem('dep');
 }

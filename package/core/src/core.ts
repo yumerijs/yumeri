@@ -14,8 +14,8 @@ import { Middleware } from './middleware';
 import { Route } from './route';
 import { Context } from './context';
 import { HookHandler, Hook } from './hook';
-import { Server } from 'http';
 import { Server as CoreServer } from './server';
+import { I18n } from './i18n';
 
 interface Plugin {
   apply: (ctx: Context, config: Config) => Promise<void>;
@@ -38,6 +38,7 @@ interface CoreOptions {
   staticDir: string;
   enableCors: boolean;
   enableWs: boolean;
+  lang: string[];
 }
 
 /**
@@ -62,6 +63,7 @@ export class Core {
   public hooks: Record<string, Hook> = {};
   public coreConfig: CoreOptions;
   public server: CoreServer;
+  public i18n: I18n;
   private pluginWatchers: Record<string, chokidar.FSWatcher> = {};
   private pluginModules: { [name: string]: any } = {};
   private configPath: string = '';
@@ -71,9 +73,10 @@ export class Core {
    */
   private pluginContexts: Record<string, Context> = {};
 
-  constructor(pluginLoader?: PluginLoader, coreConfig?: CoreOptions) {
+  constructor(pluginLoader?: PluginLoader, coreConfig?: CoreOptions, setCore = true) {
     this.coreConfig = coreConfig;
     this.pluginLoader = pluginLoader;
+    if (setCore) Logger.setCore(this);
   }
 
   /**
@@ -116,6 +119,7 @@ export class Core {
       this.logger.error('Failed to load config:', e);
       throw e;
     }
+    this.i18n = new I18n(this.coreConfig.lang || ['zh', 'en']);
   }
 
   /**

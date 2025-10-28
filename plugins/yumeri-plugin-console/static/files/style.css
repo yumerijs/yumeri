@@ -1,0 +1,462 @@
+ .switch {
+     position: relative;
+     display: inline-block;
+     width: 40px;
+     height: 22px;
+ }
+
+ .switch input {
+     opacity: 0;
+     width: 0;
+     height: 0;
+ }
+
+ .slider {
+     position: absolute;
+     cursor: pointer;
+     top: 0;
+     left: 0;
+     right: 0;
+     bottom: 0;
+     background-color: #ccc;
+     transition: .3s;
+     border-radius: 34px;
+ }
+
+ .slider:before {
+     position: absolute;
+     content: "";
+     height: 16px;
+     width: 16px;
+     left: 3px;
+     bottom: 3px;
+     background-color: white;
+     transition: .3s;
+     border-radius: 50%;
+ }
+
+ input:checked+.slider {
+     background-color: #4CAF50;
+ }
+
+ input:checked+.slider:before {
+     transform: translateX(18px);
+ }
+
+ select {
+     padding: 8px 12px;
+     border-radius: 6px;
+     border: 1px solid #ccc;
+     background-color: #fff;
+     font-size: 14px;
+     color: #333;
+     outline: none;
+     appearance: none;
+     width: 100%;
+     max-width: 400px;
+     background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%23666' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+     background-repeat: no-repeat;
+     background-position: right 10px center;
+     background-size: 12px 8px;
+ }
+
+ select:focus {
+     border-color: var(--accent);
+     box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
+ }
+
+ :root {
+     --primary: #4CAF50;
+     --danger: #f44336;
+     --accent: #007BFF;
+     --bg-light: #f8f9fa;
+     --bg-dark: #2c2c2c;
+ }
+
+ * {
+     margin: 0;
+     padding: 0;
+     box-sizing: border-box;
+ }
+
+ body {
+     font-family: "Segoe UI", sans-serif;
+     background-color: #ffffff;
+     color: #333;
+     min-height: 100vh;
+     display: flex;
+     transition: all 0.3s ease-in-out;
+ }
+
+ .sidebar {
+     background-color: var(--bg-light);
+     border-right: 1px solid #ddd;
+     padding: 20px;
+     height: 100vh;
+     width: 250px;
+     overflow-y: auto;
+     transition: transform 0.3s ease-in-out;
+     flex-shrink: 0;
+ }
+
+ .sidebar ul {
+     list-style: none;
+ }
+
+ .sidebar li {
+     display: flex;
+     align-items: center;
+     justify-content: flex-start;
+     padding: 12px 10px;
+     border-radius: 8px;
+     margin-bottom: 8px;
+     cursor: pointer;
+     transition: background 0.2s;
+ }
+
+ .sidebar li:hover {
+     background-color: #e2e6ea;
+ }
+
+ .plugin-status {
+     width: 12px;
+     height: 12px;
+     border-radius: 50%;
+     margin-right: 10px;
+ }
+
+ .plugin-status.enabled {
+     background-color: var(--primary);
+ }
+
+ .plugin-status.disabled {
+     background-color: #ccc;
+ }
+
+ .plugin-status.pending {
+     background-color: var(--danger);
+ }
+
+ .main-content {
+     padding: 30px;
+     display: flex;
+     flex-direction: column;
+     flex: 1;
+     min-width: 0;
+ }
+
+ h2 {
+     font-size: 24px;
+     margin-bottom: 15px;
+ }
+
+ #plugin-status p {
+     font-weight: bold;
+     margin-bottom: 10px;
+ }
+
+ #configuration-area label {
+     font-weight: 500;
+ }
+
+ #configuration-area input {
+     display: block;
+     margin-bottom: 15px;
+     padding: 8px 10px;
+     border: 1px solid #ccc;
+     border-radius: 6px;
+     width: 100%;
+     max-width: 400px;
+ }
+
+ .button-row {
+     margin-top: 20px;
+ }
+
+ button {
+     padding: 10px 18px;
+     border: none;
+     border-radius: 6px;
+     font-size: 14px;
+     cursor: pointer;
+     margin-right: 10px;
+     transition: background-color 0.2s ease;
+ }
+
+ .save-button {
+     background-color: var(--accent);
+     color: #fff;
+ }
+
+ .enable-button {
+     background-color: var(--primary);
+     color: #fff;
+ }
+
+ .disable-button {
+     background-color: var(--danger);
+     color: #fff;
+ }
+
+ .notification {
+     position: fixed;
+     display: none;
+     top: 30px;
+     left: 50%;
+     transform: translateX(-50%);
+     background: var(--primary);
+     color: white;
+     padding: 12px 24px;
+     border-radius: 6px;
+     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+     opacity: 0;
+     z-index: 999;
+     transition: all 0.3s ease;
+ }
+
+ .notification.show {
+     top: 60px;
+     opacity: 1;
+ }
+
+ .notification.error {
+     background-color: var(--danger);
+ }
+
+ /* 新增样式 - 配置项容器 */
+ .config-item {
+     margin-bottom: 20px;
+     padding-bottom: 15px;
+     border-bottom: 1px solid #eee;
+ }
+
+ .object-container {
+     border: 1px solid #ccc;
+     border-radius: 8px;
+     padding: 10px 14px;
+     margin: 8px 0 12px 0;
+     background-color: #fafafa;
+ }
+
+ .object-header {
+     font-weight: bold;
+     margin-bottom: 6px;
+     color: #333;
+     padding-left: 2px;
+ }
+
+ .config-item .object-container {
+     margin-left: 16px;
+     background-color: #fdfdfd;
+ }
+
+ /* 新增样式 - 数组容器 */
+ .array-container {
+     margin-bottom: 15px;
+ }
+
+ .array-header {
+     font-weight: bold;
+     margin-bottom: 10px;
+     color: #333;
+ }
+
+ .array-item {
+     display: flex;
+     align-items: flex-start;
+     margin-bottom: 8px;
+     padding: 8px;
+     border: 1px solid #eee;
+     border-radius: 4px;
+     background-color: #f9f9f9;
+ }
+
+ .array-item-content {
+     flex-grow: 1;
+ }
+
+ .array-controls {
+     margin-top: 10px;
+ }
+
+ .add-array-item,
+ .remove-array-item {
+     padding: 5px 10px;
+     font-size: 12px;
+     margin-right: 5px;
+ }
+
+ .add-array-item {
+     background-color: var(--accent);
+     color: white;
+ }
+
+ .remove-array-item {
+     background-color: var(--danger);
+     color: white;
+ }
+
+ /* 复杂数组项的样式 */
+ .complex-array-item {
+     border: 1px solid #ddd;
+     border-radius: 6px;
+     padding: 10px;
+     margin-bottom: 10px;
+     background-color: #f9f9f9;
+ }
+
+ .complex-array-item-header {
+     display: flex;
+     justify-content: space-between;
+     align-items: center;
+     margin-bottom: 10px;
+ }
+
+ .complex-array-item-title {
+     font-weight: bold;
+     color: #333;
+ }
+
+ @media (min-width: 768px) {
+     .toggle-sidebar {
+         display: none;
+     }
+ }
+
+ @media (max-width: 768px) {
+     body {
+         flex-direction: column;
+     }
+
+     .sidebar {
+         position: fixed;
+         top: 0;
+         left: 0;
+         transform: translateX(-100%);
+         z-index: 100;
+         height: 100%;
+         width: 250px;
+         background: var(--bg-dark);
+         color: white;
+     }
+
+     .sidebar.open {
+         transform: translateX(0);
+     }
+
+     .toggle-sidebar {
+         position: fixed;
+         top: 15px;
+         left: 15px;
+         z-index: 101;
+         background: var(--primary);
+         color: white;
+         padding: 10px;
+         border-radius: 6px;
+         border: none;
+         cursor: pointer;
+     }
+
+     .overlay {
+         display: none;
+         position: fixed;
+         z-index: 99;
+         background: rgba(0, 0, 0, 0.5);
+         top: 0;
+         left: 0;
+         width: 100%;
+         height: 100%;
+     }
+
+     .main-content {
+         padding: 80px 20px 20px;
+     }
+
+     .meta-box {
+         display: inline-block;
+         margin: 4px 6px;
+         padding: 6px 10px;
+         border-radius: 10px;
+         background-color: #e6ffe6;
+         border: 1px solid #7fd97f;
+         color: #2a662a;
+         font-size: 14px;
+     }
+
+     .meta-box.provide {
+         background-color: #e6f5ff;
+         border-color: #6fb9f5;
+         color: #285f8f;
+     }
+
+     .add-plugin-btn {
+         display: block;
+         width: 90%;
+         margin: 10px auto;
+         padding: 6px 10px;
+         background: #3b82f6;
+         color: white;
+         border: none;
+         border-radius: 6px;
+         cursor: pointer;
+         font-size: 14px;
+     }
+
+     .add-plugin-btn:hover {
+         background: #2563eb;
+     }
+
+     /* 模态框整体背景 */
+     .modal {
+         position: fixed;
+         top: 0;
+         left: 0;
+         width: 100%;
+         height: 100%;
+         background-color: rgba(0, 0, 0, 0.4);
+         display: flex;
+         justify-content: center;
+         align-items: center;
+         z-index: 999;
+         opacity: 0;
+         pointer-events: none;
+         transition: opacity 0.3s ease;
+     }
+
+     /* 当显示模态框时加上 display:block 或 display:flex */
+     .modal[style*="display: block"] {
+         opacity: 1;
+         pointer-events: auto;
+     }
+
+     /* 模态框内容 */
+     .modal-content {
+         background: white;
+         padding: 20px;
+         border-radius: 10px;
+         width: 320px;
+         max-height: 70vh;
+         overflow-y: auto;
+         transform: translateY(-30px);
+         transition: transform 0.3s ease, opacity 0.3s ease;
+         opacity: 0;
+     }
+
+     /* 当父元素显示时，内容动画出现 */
+     .modal[style*="display: block"] .modal-content {
+         transform: translateY(0);
+         opacity: 1;
+     }
+
+     /* 可点击插件列表 */
+     .clickable-plugin {
+         padding: 5px 10px;
+         border-radius: 6px;
+         cursor: pointer;
+         transition: background 0.2s;
+     }
+
+     .clickable-plugin:hover {
+         background: #f0f0f0;
+     }
+ }

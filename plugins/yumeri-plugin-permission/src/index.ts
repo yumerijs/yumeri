@@ -1,14 +1,13 @@
-import { Context, Config, Session, Logger, ConfigSchema } from 'yumeri';
-import * as path from 'path';
-import fs from 'fs';
-import { User } from 'yumeri-plugin-user'
-import { Database } from '@yumerijs/types/dist/database'
+import { Database } from '@yumerijs/types';
+import { Context, Config, Logger, ConfigSchema } from 'yumeri';
+import { User } from 'yumeri-plugin-user';
+import './types'; // Import for declaration merging
 
 const logger = new Logger("permission");
 
-export const depend = ['database', 'user']; // 需要的服务
-export const usage = `用户权限模型<br>依赖于yumeri-plugin-user（用户模型）<br>超管权限大小为10`
-export const provide = ['permission']   // 提供的服务
+export const depend = ['database', 'user'];
+export const usage = `用户权限模型<br>依赖于yumeri-plugin-user（用户模型）<br>超管权限大小为10`;
+export const provide = ['permission'];
 
 export const config = {
   schema: {
@@ -22,26 +21,32 @@ export const config = {
 };
 
 export interface Permit {
-  getPermit(username: string): Promise<number>
+  getPermit(id: number): Promise<number>;
 }
 
 export async function apply(ctx: Context, config: Config) {
-  const user = ctx.getComponent('user') as User
-  const db = ctx.getComponent('database') as Database
-  if (!await db.tableExists('permission')) {
-    await db.createTable('permission', {
-      username: { type: 'string', primaryKey: true },
-      permit: { type: 'number', default: config.get<number>('defaultpermit') }
-    })
-  }
+  const db = ctx.getComponent('database') as Database;
+
+  // Use extend() to define the table schema. This is idempotent.
+  await db.extend('permission', {
+    id: { type: 'unsigned', nullable: false },
+    permit: { type: 'unsigned', initial: config.get('defaultpermit', 1) }
+  }, { primary: 'id' });
+
   ctx.registerComponent('permission', {
-    async getPermit(username: string) {
-      const result = await db.findOne('permission', { username })
+    async getPermit(id: number): Promise<number> {
+      const result = await db.selectOne('permission', { id });
       if (result) {
-        return result.permit
+        return result.permit;
       } else {
-        return config.get<number>('defaultpermit')
+        // Although the table has a default, a record might not exist yet for a new user.
+        // Creating it here ensures consistency.
+        await db.create('permission', { 
+          id, 
+          permit: config.get('defaultpermit', 1) 
+        });
+        return config.get('defaultpermit', 1);
       }
     }
-  } as Permit)
+  } as Permit);
 }

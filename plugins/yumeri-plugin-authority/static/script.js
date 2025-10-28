@@ -4,13 +4,15 @@
 
     passwordToggles.forEach(toggle => {
         toggle.addEventListener('click', () => {
-            const passwordInput = toggle.previousElementSibling; // 获取同级的前一个元素，即 input
-            if (passwordInput && passwordInput.type === 'password') {
+            const passwordInput = toggle.parentElement.querySelector('input');
+            if (!passwordInput) return;
+
+            if (passwordInput.type === 'password') {
                 passwordInput.type = 'text';
-                toggle.textContent = 'visibility'; // 修改图标为可见
-            } else if (passwordInput && passwordInput.type === 'text') {
+                toggle.textContent = 'visibility';
+            } else {
                 passwordInput.type = 'password';
-                toggle.textContent = 'visibility_off'; // 修改图标为不可见
+                toggle.textContent = 'visibility_off';
             }
         });
     });

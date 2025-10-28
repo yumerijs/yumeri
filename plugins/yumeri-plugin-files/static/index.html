@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件管理</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="./files/style.css">
+</head>
+<body>
+    <div class="file-manager-container">
+        <div class="sidebar">
+            <div class="toolbar">
+                <div id="breadcrumb"></div>
+                <div class="actions">
+                    <button id="create-folder-btn" title="新建文件夹"><i class="fas fa-folder-plus"></i></button>
+                    <button id="create-file-btn" title="新建文件"><i class="fas fa-file-medical"></i></button>
+                </div>
+            </div>
+            <ul id="file-list"></ul>
+        </div>
+        <div class="main-view">
+            <div id="editor-info">
+                <button id="sidebar-toggle"><i class="fas fa-bars"></i></button>
+                <span id="editor-filename">选择一个文件并编辑</span>
+            </div>
+            <div id="editor-container"></div>
+            <div class="editor-actions">
+                <button id="download-btn" disabled><i class="fas fa-download"></i> 下载</button>
+                <button id="save-btn" disabled><i class="fas fa-save"></i> 保存</button>
+            </div>
+        </div>
+    </div>
+    <div class="overlay" id="sidebar-overlay"></div>
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.33.0/min/vs/loader.js"></script>
+    <script src="./files/script.js"></script>
+</body>
+</html>

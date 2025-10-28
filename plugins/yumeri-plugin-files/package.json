@@ -1,0 +1,32 @@
+{
+  "name": "yumeri-plugin-files",
+  "version": "1.0.0",
+  "description": "Console File Manager for Yumeri",
+  "main": "dist/index.js",
+  "dev": "src/index.ts",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "yarn build"
+  },
+  "keywords": [
+    "yumeri",
+    "api",
+    "webserver"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/mime": "^4.0.0",
+    "@types/node": "^22.14.1",
+    "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "mime": "^4.1.0"
+  },
+  "peerDependencies": {
+    "yumeri": "^2.0.0"
+  }
+}

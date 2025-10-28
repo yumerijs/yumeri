@@ -1,1 +1,1 @@
-export default 'This is types for Yumeri.js'
+export * from './database'

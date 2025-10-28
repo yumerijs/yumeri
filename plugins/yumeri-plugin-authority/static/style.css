@@ -1,431 +1,194 @@
-﻿@charset "UTF-8";
-
-/* ==============================================
-   Material Symbols Icon Font 样式
-   Material You 使用的字体图标
-   ============================================== */
-.material-symbols-outlined {
-    font-family: 'Material Symbols Outlined';
-    font-weight: normal;
-    font-style: normal;
-    font-size: 24px; /* Material Design 默认图标大小 */
-    line-height: 1;
-    letter-spacing: normal;
-    text-transform: none;
-    display: inline-block;
-    white-space: nowrap;
-    word-wrap: normal;
-    direction: ltr;
-    -webkit-font-feature-settings: 'liga';
-    -webkit-font-smoothing: antialiased;
+﻿:root {
+  --primary: #6750A4;
+  --on-primary: #fff;
+  --background: #FFFBFE;
+  --surface: #FFFBFE;
+  --on-surface: #1C1B1F;
+  --surface-variant: #E7E0EC;
+  --outline: #79747E;
+  --corner: 8px;
+  --spacing: 8px;
 }
 
-/* ==============================================
-   通用 / 基础样式
-   ============================================== */
 body {
-    font-family: 'Roboto', sans-serif;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    background-color: var(--md-sys-color-background); /* Material You 背景色 */
-    color: var(--md-sys-color-on-background);       /* Material You 文本色 */
-    line-height: 1.5;
-    font-size: 16px;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  font-family: 'Roboto', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  background: var(--background);
+  color: var(--on-surface);
 }
 
-a {
-    color: var(--md-sys-color-primary); /* 链接颜色使用主色 */
-    text-decoration: none;
-    font-weight: 500; /* Medium 权重 */
-}
-
-a:hover {
-    text-decoration: underline;
-}
-
-/* ==============================================
-   容器布局
-   ============================================== */
 .container {
-    display: flex; /* 启用 Flexbox 布局 */
-    flex-direction: column; /* 默认垂直堆叠，适合移动端 */
-    width: 100%;
-    max-width: 480px; /* 移动端内容最大宽度 */
-    background-color: var(--md-sys-color-surface);
-    box-shadow: 0px 1px 3px 0px var(--md-sys-color-shadow), 0px 1px 2px -1px var(--md-sys-color-shadow); /* Material Design 微阴影 */
-    border-radius: var(--md-sys-shape-corner-medium); /* Material You 推荐的圆角 */
-    overflow: hidden; /* 防止内容溢出圆角 */
-    margin: calc(var(--md-sys-spacing-unit) * 2); /* 页面边距 */
-}
-
-/* ==============================================
-   Header 区域
-   ============================================== */
-.header {
-    padding: calc(var(--md-sys-spacing-unit) * 4); /* 大内边距营造空间感 */
-    text-align: center;
-    background-color: var(--md-sys-color-primary-container);
-    color: var(--md-sys-color-on-primary-container);
-    /* Material You header 常见不对称圆角 */
-    border-bottom-left-radius: var(--md-sys-shape-corner-large);
-    border-bottom-right-radius: var(--md-sys-shape-corner-small);
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 40px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
 .header h1 {
-    margin: 0;
-    font-size: 2.25rem; /* display-small 字体大小 (Material Design 3 Typography) */
-    font-weight: 700; /* Bold 权重 */
-    line-height: 1.2;
+  margin: 0;
+  font-weight: 600;
+  font-size: 28px;
 }
 
-/* ==============================================
-   表单区域
-   ============================================== */
 .form-wrapper {
-    padding: calc(var(--md-sys-spacing-unit) * 3); /* 表单内边距 */
-    display: flex;
-    flex-direction: column;
-    gap: calc(var(--md-sys-spacing-unit) * 2); /* 表单项之间的间距 */
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-/* Material You 风格的文本输入框 (Outlined Text Field) */
 .input-group {
-    position: relative; /* 用于定位 label 和 toggle 图标 */
-    margin-bottom: calc(var(--md-sys-spacing-unit) * 1.5); /* 输入框组底部间距 */
+  margin-bottom: 8px;
 }
 
+/* 浮动标签输入框 */
 .text-field {
-    position: relative;
-    width: 100%;
-    height: 56px; /* Material Design 标准文本字段高度 */
-    border-radius: var(--md-sys-shape-corner-small);
-    overflow: hidden; /* 确保内容不溢出 */
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  height: 56px;
+  color: var(--on-surface);
 }
 
 .text-field.outlined {
-    border: 1px solid var(--md-sys-color-outline); /* 初始描边 */
-    background-color: transparent; /* 背景透明 */
-    transition: border-color 0.2s ease-out, border-width 0.2s ease-out; /* 动画效果 */
-}
-
-.text-field.outlined:focus-within {
-    border-color: var(--md-sys-color-primary); /* 聚焦时边框颜色 */
-    border-width: 2px; /* 聚焦时边框变粗 */
-}
-
-.text-field label {
-    position: absolute;
-    left: var(--md-sys-spacing-unit);
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--md-sys-color-on-surface-variant); /* 默认标签颜色 */
-    font-size: 1rem;
-    transition: all 0.2s ease-out;
-    pointer-events: none; /* 允许点击穿透到 input */
-    padding: 0 4px; /* 留出边框的空间，使标签浮起时不被边框覆盖 */
-    background-color: var(--md-sys-color-surface); /* 配合聚焦时标签背景色，覆盖边框 */
-    z-index: 1; /* 确保标签在边框之上 */
+  border: 1px solid var(--outline);
+  border-radius: var(--corner);
+  background: var(--surface);
 }
 
 .text-field input {
-    width: calc(100% - calc(var(--md-sys-spacing-unit) * 2)); /* 减去左右 padding */
-    height: 100%;
-    border: none;
-    background-color: transparent;
-    padding: 0 var(--md-sys-spacing-unit);
-    font-size: 1rem;
-    color: var(--md-sys-color-on-surface);
-    outline: none; /* 移除默认聚焦样式 */
+  position: absolute;
+  inset: 0;
+  padding: 18px 44px 18px 12px;
+  width: 100%;
+  height: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--on-surface);
+  font-size: 16px;
 }
 
-/* 文本字段聚焦时或有值时标签上浮 */
-.text-field input:focus+label,
-.text-field input:not(:placeholder-shown)+label {
-    top: 0;
-    transform: translateY(-50%) translateX(-4px); /* 向上移动，并微微向左错位 */
-    font-size: 0.75rem; /* 缩小字体 */
-    color: var(--md-sys-color-primary); /* 聚焦时标签颜色 */
-    background-color: var(--md-sys-color-surface); /* 覆盖边框上的背景色 */
-    padding: 0 4px;
+.text-field label {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--surface-variant);
+  pointer-events: none; /* 防止遮挡 checkbox */
+  transition: 0.2s ease;
+  padding: 0 4px;
+  font-size: 16px;
 }
 
-/* 确保 outlined 样式下标签的背景色正确覆盖边框 */
-.text-field.outlined input:focus+label,
-.text-field.outlined input:not(:placeholder-shown)+label {
-    border: none; /* 确保不显示标签边框 */
+.text-field input:focus + label,
+.text-field input:not(:placeholder-shown) + label {
+  top: 6px;
+  transform: none;
+  font-size: 12px;
+  color: var(--primary);
+  background: var(--surface);
 }
 
-/* 密码输入框的显示/隐藏按钮 */
-.password-toggle {
-    position: absolute;
-    right: var(--md-sys-spacing-unit);
-    top: 50%;
-    transform: translateY(-50%);
-    cursor: pointer;
-    color: var(--md-sys-color-on-surface-variant);
-    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; /* Material Symbols 字体设置 */
+.text-field.outlined:has(input:focus) {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary) inset;
 }
 
-/* ==============================================
-   按钮样式
-   ============================================== */
-.button {
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    padding: calc(var(--md-sys-spacing-unit) * 1.5) calc(var(--md-sys-spacing-unit) * 3); /* Material Design 推荐的大间距按钮 */
-    font-size: 1rem;
-    font-weight: 500; /* Medium 权重 */
-    border-radius: var(--md-sys-shape-corner-large); /* 大圆角 */
-    cursor: pointer;
-    transition: all 0.2s ease-in-out;
-    text-decoration: none; /* 确保a标签也应用按钮样式 */
-    white-space: nowrap; /* 防止文本换行 */
+.text-field .password-toggle {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--surface-variant);
+  cursor: pointer;
+  font-size: 22px;
 }
 
+@supports not (selector(:has(*))) {
+  .text-field.outlined:focus-within {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 1px var(--primary) inset;
+  }
+}
+
+/* 按钮 */
 .button.filled {
-    background-color: var(--md-sys-color-primary);
-    color: var(--md-sys-color-on-primary);
-    border: none;
-    box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.3), 0px 1px 3px 1px rgba(0, 0, 0, 0.15); /* 填充按钮的小阴影 */
-    transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0 16px;
+  border: none;
+  border-radius: var(--corner);
+  background: var(--primary);
+  color: var(--on-primary);
+  cursor: pointer;
+  font-weight: 600;
 }
 
 .button.filled:hover {
-    /* 使用 color-mix 实现悬停时颜色稍微变暗 */
-    background-color: color-mix(in srgb, var(--md-sys-color-primary) 80%, black);
-    box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.3), 0px 2px 6px 2px rgba(0, 0, 0, 0.15); /* 悬停时阴影加深 */
+  filter: brightness(0.95);
 }
 
-.button.outlined {
-    background-color: transparent;
-    color: var(--md-sys-color-primary);
-    border: 1px solid var(--md-sys-color-outline); /* 描边按钮 */
-    box-shadow: none;
-    transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+/* 辅助链接 */
+.auxiliary-link {
+  font-size: 14px;
+  color: var(--surface-variant);
 }
 
-.button.outlined:hover {
-    background-color: var(--md-sys-color-primary-container);
-    color: var(--md-sys-color-on-primary-container);
-    border-color: var(--md-sys-color-primary);
+.auxiliary-link a {
+  color: var(--primary);
+  text-decoration: none;
 }
 
-/* ==============================================
-   复选框样式 Material Design Checkbox (基础简化版)
-   ============================================== */
+.auxiliary-link a:hover {
+  text-decoration: underline;
+}
+
+/* 忘记密码链接 */
+.forgot-password-link {
+  display: inline-block;
+  margin: 8px 0 0;
+  color: var(--primary);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.forgot-password-link:hover {
+  text-decoration: underline;
+}
+
+/* checkbox 样式 */
 .checkbox-group {
-    display: flex;
-    align-items: center;
-    margin-bottom: calc(var(--md-sys-spacing-unit) * 2); /* 底部间距 */
-    font-size: 0.875rem; /* body-small */
-    color: var(--md-sys-color-on-surface-variant);
+  position: relative; /* 确保在上层 */
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--on-surface);
+  margin-top: 8px;
 }
 
 .checkbox-group input[type="checkbox"] {
-    /* 隐藏原生复选框 */
-    appearance: none;
-    -webkit-appearance: none;
-    width: 20px; /* 标准尺寸 */
-    height: 20px;
-    border: 2px solid var(--md-sys-color-outline);
-    border-radius: var(--md-sys-shape-corner-small); /* 4px 圆角 */
-    margin-right: var(--md-sys-spacing-unit);
-    cursor: pointer;
-    position: relative;
-    transition: all 0.2s ease-in-out;
-    flex-shrink: 0; /* 防止复选框被压缩 */
-}
-
-.checkbox-group input[type="checkbox"]:checked {
-    background-color: var(--md-sys-color-primary);
-    border-color: var(--md-sys-color-primary);
-}
-
-.checkbox-group input[type="checkbox"]:checked::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 10px; /* 勾的宽度 */
-    height: 5px; /* 勾的高度 */
-    border: 2px solid var(--md-sys-color-on-primary); /* 勾的颜色 */
-    border-top: none;
-    border-right: none;
-    transform: translate(-50%, -50%) rotate(-45deg); /* 旋转形成勾 */
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
 }
 
 .checkbox-group label {
-    cursor: pointer;
+  cursor: pointer;
 }
 
-/* ==============================================
-   辅助链接
-   ============================================== */
-.auxiliary-link {
-    text-align: center;
-    margin-top: calc(var(--md-sys-spacing-unit) * 2); /* 顶部间距 */
-    font-size: 0.875rem;
-    color: var(--md-sys-color-on-surface-variant);
+.checkbox-group a {
+  color: var(--primary);
+  text-decoration: none;
 }
 
-/* ==============================================
-   大屏幕下的品牌/宣传区
-   ============================================== */
-.branding-area {
-    display: none; /* 默认隐藏，在小屏幕上不显示 */
-    background-color: var(--md-sys-color-surface-variant);
-    color: var(--md-sys-color-on-surface-variant);
-    padding: calc(var(--md-sys-spacing-unit) * 4);
-    text-align: center;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    gap: calc(var(--md-sys-spacing-unit) * 2);
-    /* 大屏幕下容器整体圆角，这里可以自定义单侧 */
-    border-top-left-radius: var(--md-sys-shape-corner-small);
-    border-top-right-radius: var(--md-sys-shape-corner-large);
-}
-
-.branding-area .logo-large-screen {
-    max-width: 120px;
-    height: auto;
-    border-radius: var(--md-sys-shape-corner-medium);
-    object-fit: contain; /* 确保图片完整显示 */
-}
-
-.branding-area h2 {
-    font-size: 1.5rem; /* headline-small */
-    margin: 0;
-    line-height: 1.3;
-}
-
-.branding-area p {
-    font-size: 1rem; /* body-large */
-    margin: 0;
-    line-height: 1.5;
-}
-
-/* ==============================================
-   响应式设计 (Media Queries)
-   ============================================== */
-
-/* 中等尺寸屏幕 (平板竖屏), 例如宽度 > 600px */
-@media (min-width: 600px) {
-    .container {
-        max-width: 600px;
-        padding: 0; /* 内部内容自己控制 padding */
-        box-shadow: 0px 4px 6px -1px var(--md-sys-color-shadow), 0px 2px 4px -1px var(--md-sys-color-shadow); /* 更深的阴影 */
-    }
-
-    .header {
-        padding: calc(var(--md-sys-spacing-unit) * 6); /* 增加顶部内边距 */
-    }
-
-    .form-wrapper {
-        padding: calc(var(--md-sys-spacing-unit) * 4); /* 增加表单内边距 */
-    }
-
-    .button.filled,
-    .button.outlined {
-        width: 100%; /* 按钮在大屏幕下也拉宽 */
-        max-width: 360px; /* 限制按钮最大宽度，Material Design 建议 */
-        margin-left: auto;
-        margin-right: auto; /* 居中 */
-    }
-
-    /* 如果有社交登录按钮组，也给它居中和最大宽度 */
-    .social-login-buttons {
-        max-width: 360px;
-        margin-left: auto;
-        margin-right: auto;
-    }
-}
-
-/* 扩展尺寸屏幕 (平板横屏或桌面), 例如宽度 > 840px */
-@media (min-width: 840px) {
-    body {
-        /* 对于桌面屏幕，可以调整 body 的背景色或添加图案 */
-        background-color: var(--md-sys-color-surface1); /* 稍微深一点的背景 */
-    }
-
-    .container {
-        max-width: 900px; /* 两栏布局的总宽度 */
-        flex-direction: row; /* 横向布局 */
-        border-radius: var(--md-sys-shape-corner-large); /* 统一大圆角 */
-        min-height: 600px; /* 确保容器有最小高度 */
-    }
-
-    .header {
-        display: none; /* 大屏幕下隐藏移动端 header，内容融入 branding-area */
-    }
-
-    .form-wrapper {
-        flex: 1; /* 表单区占据剩余空间 */
-        max-width: 450px; /* 限制表单区的宽度，保持可读性 */
-        padding: calc(var(--md-sys-spacing-unit) * 6); /* 增加大屏幕下的内边距 */
-        justify-content: center; /* 垂直居中表单内容 */
-    }
-
-    .branding-area {
-        display: flex; /* 大屏幕下显示品牌区 */
-        flex: 1; /* 品牌区占据剩余空间 */
-        min-width: 350px; /* 确保品牌区有最小宽度 */
-        position: relative;
-        overflow: hidden;
-        border-radius: 0; /* 移除独立圆角 */
-        /* 大屏幕下品牌区左侧圆角 */
-        border-top-left-radius: var(--md-sys-shape-corner-large);
-        border-bottom-left-radius: var(--md-sys-shape-corner-large);
-        background-color: var(--md-sys-color-primary-container); /* 品牌区背景色 */
-        color: var(--md-sys-color-on-primary-container);
-    }
-
-    /* 品牌区背景蒙版或渐变，用于增强文本可读性 */
-    .branding-area::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: linear-gradient(to top, rgba(0, 0, 0, 0.3), transparent); /* 底部到顶部渐变，内容在底部 */
-        z-index: 1;
-    }
-
-    /* 确保品牌区内容在蒙版之上 */
-    .branding-area *, .branding-area .logo-large-screen {
-        position: relative;
-        z-index: 2;
-    }
-
-    .branding-area h2,
-    .branding-area p {
-        color: var(--md-sys-color-on-primary-container); /* 确保文本在大尺寸屏幕上显示 */
-    }
-
-    .logo-large-screen {
-        filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.5)); /* 给图片增加一点阴影效果 */
-    }
-}
-
-/* 更大的桌面屏幕, > 1200px */
-@media (min-width: 1200px) {
-    .container {
-        max-width: 1200px;
-    }
-
-    .form-wrapper {
-        max-width: 500px; /* 进一步限制表单宽度 */
-    }
-
-    .branding-area {
-        min-width: 500px; /* 增加品牌区最小宽度 */
-    }
+.checkbox-group a:hover {
+  text-decoration: underline;
 }

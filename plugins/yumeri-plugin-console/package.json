@@ -1,6 +1,6 @@
 {
   "name": "yumeri-plugin-console",
-  "version": "1.3.1",
+  "version": "2.0.0",
   "description": "Web console for yumeri",
   "main": "dist/index.js",
   "dev": "src/index.ts",
@@ -29,13 +29,17 @@
   },
   "homepage": "https://github.com/yumerijs/yumeri#readme",
   "devDependencies": {
+    "@types/fs-extra": "^11",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.14.1",
     "typescript": "^5.8.2"
   },
   "dependencies": {
+    "fs-extra": "^11.3.2",
     "js-yaml": "^4.1.0",
-    "mime": "^4.0.7",
-    "yumeri": "^1.3.0"
+    "mime": "^4.0.7"
+  },
+  "peerDependencies": {
+    "yumeri": "^2.0.0"
   }
 }

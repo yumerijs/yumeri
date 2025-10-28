@@ -559,9 +559,9 @@
             try {
                 let pluginsData;
                 if (query) {
-                    pluginsData = await fetchApi(`/market/search?q=${encodeURIComponent(query)}`);
+                    pluginsData = await fetchApi(`/api/market/search?q=${encodeURIComponent(query)}`);
                 } else {
-                    pluginsData = await fetchApi('/market/list');
+                    pluginsData = await fetchApi('/api/market/list');
                 }
                 
                 if (!pluginsData || pluginsData.length === 0) {
@@ -628,15 +628,16 @@
 
             try {
                 // 获取所有版本并填充下拉框
-                const versionsData = await fetchApi(`/market/versions?name=${encodeURIComponent(plugin.name)}`);
+                const versionsData = await fetchApi(`/api/market/versions?name=${encodeURIComponent(plugin.name)}`);
                 versionSelect.innerHTML = ''; // 清空原有选项
-                if (versionsData && versionsData.versions && versionsData.versions.length > 0) {
-                    versionsData.versions.forEach(ver => {
+
+                if (versionsData && Object.keys(versionsData).length > 0) {
+                    for (const ver in versionsData) {
                         const option = document.createElement('option');
-                        option.value = ver.version;
-                        option.textContent = ver.version;
+                        option.value = versionsData[ver].version;
+                        option.textContent = versionsData[ver].version;
                         versionSelect.appendChild(option);
-                    });
+                    };
                     // 默认选择最新版本
                     versionSelect.value = plugin.version;
                 } else {
@@ -645,7 +646,7 @@
                 }
 
                 // 获取当前已安装版本
-                const currentVerData = await fetchApi(`/market/currentver?name=${encodeURIComponent(plugin.name)}`);
+                const currentVerData = await fetchApi(`/api/market/currentver?name=${encodeURIComponent(plugin.name)}`);
                 if (currentVerData && currentVerData.version) {
                     modalCurrentVersion.textContent = currentVerData.version;
                     uninstallBtn.disabled = false; // 已安装则启用卸载
@@ -678,7 +679,7 @@
             toggleLoadingOverlay(true); // 显示加载遮罩
 
             try {
-                await fetchApi(`/market/install?name=${encodeURIComponent(currentPluginName)}&version=${encodeURIComponent(selectedVersion)}`, 'POST');
+                await fetchApi(`/api/market/install?name=${encodeURIComponent(currentPluginName)}&version=${encodeURIComponent(selectedVersion)}`, 'POST');
                 showMessage('success', `${currentPluginName} v${selectedVersion} 安装成功！`);
                 // 安装成功后刷新插件列表，因为状态可能改变
                 refreshPluginList(searchInput.value);
@@ -697,7 +698,7 @@
             toggleLoadingOverlay(true); // 显示加载遮罩
 
             try {
-                await fetchApi(`/market/uninstall?name=${encodeURIComponent(currentPluginName)}`, 'POST');
+                await fetchApi(`/api/market/uninstall?name=${encodeURIComponent(currentPluginName)}`, 'POST');
                 showMessage('success', `${currentPluginName} 卸载成功！`);
                 // 卸载成功后刷新插件列表
                 refreshPluginList(searchInput.value);

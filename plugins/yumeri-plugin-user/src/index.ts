@@ -1,10 +1,28 @@
-import { Context, Config, Session, Logger, ConfigSchema } from 'yumeri';
-import { Database } from '@yumerijs/types/dist/database'
-const logger = new Logger("user");
+import { Context, Config, Logger, ConfigSchema } from 'yumeri'
+import { Database } from '@yumerijs/types'
+import * as crypto from 'crypto'
 
-export const depend = ['database'];
-export const provide = ['user'];
-export const usage = '用户模型插件'
+const logger = new Logger('user')
+
+export const depend = ['database']
+export const provide = ['user']
+export const usage = '提供 Yumeri 用户模型'
+
+interface UserTable {
+  id: number
+  username: string
+  password: string
+  email?: string | null
+  phone?: string | null
+  createAt: Date
+  updateAt: Date
+}
+
+declare module '@yumerijs/types' {
+  interface Tables {
+    user: UserTable
+  }
+}
 
 export const config = {
   schema: {
@@ -30,79 +48,82 @@ export const config = {
       description: '密码加密方式'
     }
   } as Record<string, ConfigSchema>
-};
-export class User {
-  constructor(private database: Database, private config: Config) {}
-  async getuserinfo(username: string): Promise<Record<string, any> | null>{
-    const result = this.database.findOne(this.config.get<string>('name', 'user'), { username });
-    return result;
+}
+
+export class UserComponent {
+  private tableName: string
+
+  constructor(private db: Database, private config: Config) {
+    this.tableName = this.config.get('name', 'user')
   }
-  async getuserinfobyid(id: number): Promise<Record<string, any> | null>{
-    const result = this.database.findOne(this.config.get<string>('name', 'user'), { id });
-    return result;
+
+  private hashPassword(password: string): string {
+    const encryptType = this.config.get<string>('encryptType', 'md5')
+    return crypto.createHash(encryptType).update(password).digest('hex')
   }
-  async updateuserinfo(id: number, data: Record<string, any>): Promise<number> {
-    const result = await this.database.update(this.config.get<string>('name', 'user'), data, { id });
-    return result;
+
+  async getuserinfo(username: string) {
+    return this.db.selectOne('user', { username }, ['id', 'username', 'email', 'phone', 'createAt', 'updateAt'])
   }
-  async changepassword(username: string, password: string): Promise<number> {
-    const result = await this.database.update(this.config.get<string>('name', 'user'), { password }, { username });
-    return result;
+
+  async getuserinfobyid(id: number) {
+    return this.db.selectOne('user', { id }, ['id', 'username', 'email', 'phone', 'createAt', 'updateAt'])
   }
-  async register(username: string, password: string, email?: string, phone?: string): Promise<number> {
-    const encryptType = this.config.get<string>('encryptType', 'md5');
-    if (encryptType === 'md5') {
-      password = require('crypto').createHash('md5').update(password).digest('hex');
-    } else if (encryptType === 'sha1') {
-      password = require('crypto').createHash('sha1').update(password).digest('hex');
-    } else if (encryptType === 'sha256') {
-      password = require('crypto').createHash('sha256').update(password).digest('hex');
-    } else if (encryptType === 'sha512') {
-      password = require('crypto').createHash('sha512').update(password).digest('hex');
-    }
-    const insertData = {
+
+  async updateuserinfo(id: number, data: Partial<UserTable>) {
+    return this.db.update('user', { id }, data)
+  }
+
+  async changepassword(username: string, password: string) {
+    const hashedPassword = this.hashPassword(password)
+    return this.db.update('user', { username }, { password: hashedPassword })
+  }
+
+  async register(username: string, password: string, email?: string, phone?: string) {
+    const hashedPassword = this.hashPassword(password)
+    const data: Partial<UserTable> = {
       username,
-      password,
-      email: email ?? null,
-      phone: phone ?? null,
-    };
-    const result = await this.database.insert(this.config.get<string>('name', 'user'), insertData);
-    return result;
+      password: hashedPassword,
+      email: this.config.get('isEmailopen') ? email ?? null : null,
+      phone: this.config.get('isPhoneopen') ? phone ?? null : null,
+      createAt: new Date(),
+      updateAt: new Date()
+    }
+    try {
+      const result = this.db.create('user', data)
+      return result
+    } catch (error) {
+      return false
+    }
   }
+
   async login(username: string, password: string): Promise<boolean> {
-    // 要根据加密模式进行加密
-    const encryptType = this.config.get<string>('encryptType', 'md5');
-    if (encryptType === 'md5') {
-      password = require('crypto').createHash('md5').update(password).digest('hex');
-    } else if (encryptType === 'sha1') {
-      password = require('crypto').createHash('sha1').update(password).digest('hex');
-    } else if (encryptType === 'sha256') {
-      password = require('crypto').createHash('sha256').update(password).digest('hex');
-    } else if (encryptType === 'sha512') {
-      password = require('crypto').createHash('sha512').update(password).digest('hex');
-    }
-    const result = await this.database.findOne(this.config.get<string>('name', 'user'), { username, password });
-    if (result) {
-      return true;
-    } else {
-      return false;
-    }
+    const hashedPassword = this.hashPassword(password)
+    const result = await this.db.selectOne('user', { username, password: hashedPassword })
+    return !!result
   }
 }
+
 export async function apply(ctx: Context, config: Config) {
-  const database: Database = ctx.getComponent('database');
-  if(!await database.tableExists(config.get<string>('name', 'user'))) {
-    await database.createTable(config.get<string>('name', 'user'), {
-      id: { type: 'INTEGER', autoIncrement: true, primaryKey: true },
-      username: { type: 'VARCHAR', length: 20, unique: true },
-      password: { type: 'VARCHAR', length: 128 },
-      email: { type: 'VARCHAR', length: 255, unique: true },
-      phone: { type: 'VARCHAR', length: 16, unique: true },
-      createAt: { type: 'DATETIME', default: 'CURRENT_TIMESTAMP_FUNC' },
-      updateAt: { type: 'DATETIME', default: 'CURRENT_TIMESTAMP_FUNC' },
-    });
+  const db = ctx.getComponent('database') as Database
+
+  const schema: Record<string, any> = {
+    id: { type: 'unsigned', autoIncrement: true },
+    username: 'string',
+    password: 'string',
+    createAt: 'date',
+    updateAt: 'date'
   }
-  const user = new User(database, config);
-  ctx.registerComponent('user', user);
-  logger.info('User model loaded');
+
+  if (config.get('isEmailopen')) schema.email = 'string'
+  if (config.get('isPhoneopen')) schema.phone = 'string'
+
+  db.extend('user', schema, {
+    primary: 'id',
+    autoInc: true,
+    unique: ['username']
+  })
+
+  ctx.registerComponent('user', new UserComponent(db, config))
+  logger.info('User model loaded')
 }

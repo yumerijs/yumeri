@@ -1,526 +1,359 @@
 import { Context, Config, Session, Logger, ConfigSchema } from 'yumeri';
-import mysql from 'mysql2/promise'; // 导入 mysql2/promise
-import {
-    TableSchema,
-    ColumnDefinition,
-    QueryConditions,
-    QueryOperator,
-    FindOptions,
-    OrderByOption,
-    AlterColumnAction,
-    ColumnAlteration
-} from '@yumerijs/types/dist/database'; // 假设类型定义在同目录下的 types.ts
+import { Database as YumeriDatabase, Tables, Schema, IndexDefinition, FieldDefinition, FieldType, Query, UpdateData, Operator } from '@yumerijs/types';
+import mysql from 'mysql2/promise';
 
-export const provide = ['database'];
+const logger = new Logger("mysql");
+export const provide = ['database']
 
-const logger = new Logger("mysql"); // 提前实例化 Logger
+// --- Query Builder (reused from sqlite implementation) ---
 
-// 辅助函数：将友好类型映射到 SQL 类型
-function mapFriendlyTypeToSQL(def: ColumnDefinition): string {
-    let sqlType = def.type.toUpperCase();
-    switch (sqlType) {
-        case 'STRING':
-            return `VARCHAR(${def.length || 255})`; // 默认长度 255
-        case 'NUMBER':
-            return `INT`; // 默认 INT, 也可以根据 length/precision 进一步判断
-        case 'BOOLEAN':
-            return `TINYINT(1)`;
-        case 'DECIMAL':
-            return `DECIMAL(${def.precision || 10},${def.scale || 2})`;
-        case 'CHAR':
-            return `CHAR(${def.length || 1})`;
-        case 'VARCHAR':
-            return `VARCHAR(${def.length || 255})`;
-        case 'ENUM':
-            if (!def.enum || def.enum.length === 0) {
-                throw new Error(`ENUM type requires 'enum' property with at least one value for field: ${def.comment || ''}`);
+function buildWhereClause(query: Query<any>): { sql: string, params: any[] } {
+    const conditions: string[] = [];
+    const params: any[] = [];
+
+    for (const key in query) {
+        if (key === '$or' || key === '$and') {
+            const subQueries = query[key] as Query<any>[];
+            const subResults = subQueries.map(buildWhereClause).filter(r => r.sql);
+            if (subResults.length > 0) {
+                const operator = key === '$or' ? ' OR ' : ' AND ';
+                conditions.push(`(${subResults.map(r => r.sql).join(operator)})`);
+                params.push(...subResults.flatMap(r => r.params));
             }
-            return `ENUM(${def.enum.map(val => `'${val}'`).join(', ')})`;
-        default:
-            return sqlType;
-    }
-}
-
-// 辅助函数：构建列的 SQL 片段
-function buildColumnSQL(field: string, def: ColumnDefinition): string {
-    let parts = [`\`${field}\` ${mapFriendlyTypeToSQL(def)}`];
-
-    if (def.unsigned) parts.push('UNSIGNED');
-    if (def.zerofill) parts.push('ZEROFILL');
-    if (def.notNull) parts.push('NOT NULL');
-    if (def.unique) parts.push('UNIQUE');
-    if (def.autoIncrement) parts.push('AUTO_INCREMENT');
-
-    if (def.default !== undefined) {
-        if (def.default === 'CURRENT_TIMESTAMP_FUNC' && ['DATETIME', 'TIMESTAMP'].includes(def.type.toUpperCase())) {
-            parts.push('DEFAULT CURRENT_TIMESTAMP');
-        } else if (typeof def.default === 'string') {
-            parts.push(`DEFAULT '${def.default}'`);
-        } else if (def.default === null) {
-            parts.push(`DEFAULT NULL`); // 明确指定 NULL
-        } else {
-            parts.push(`DEFAULT ${def.default}`);
+            continue;
         }
-    }
 
-    if (def.onUpdate === 'CURRENT_TIMESTAMP_FUNC' && ['DATETIME', 'TIMESTAMP'].includes(def.type.toUpperCase())) {
-        parts.push('ON UPDATE CURRENT_TIMESTAMP');
-    }
+        const value = query[key];
 
-    if (def.comment) {
-        parts.push(`COMMENT '${def.comment}'`);
-    }
+        if (value === undefined || value === null) continue;
 
-    return parts.join(' ');
-}
-// 辅助函数：构建 WHERE 子句及其参数
-function buildWhereClause(conditions: QueryConditions, params: any[]): string {
-    const clauseParts: string[] = [];
+        if (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).some(k => k.startsWith('$'))) {
+            const operatorKeys = Object.keys(value) as (keyof Operator<any>)[];
+            for (const op of operatorKeys) {
+                const opValue = value[op];
+                if (opValue === undefined || opValue === null) continue; // 同样跳过
 
-    // 辅助函数：判断一个对象是否是普通的 JavaScript 对象（非数组、非Date等）
-    function isPlainObject(val: any): val is Record<string, any> {
-        return typeof val === 'object' && val !== null && !Array.isArray(val) && !(val instanceof Date);
-    }
-
-    for (const key in conditions) {
-        if (!Object.prototype.hasOwnProperty.call(conditions, key)) continue;
-
-        const value = conditions[key];
-
-        if (key === '$or' || key === '$and') { // 合并处理 $or 和 $and
-            if (Array.isArray(value) && value.length > 0) {
-                const operatorGroup: string[] = [];
-                const logicalOperator = key === '$or' ? ' OR ' : ' AND ';
-
-                for (const subCondition of value) {
-                    if (isPlainObject(subCondition)) {
-                        const subParams: any[] = [];
-                        // 修复点：先断言为 unknown，再断言为 QueryConditions
-                        const subClause = buildWhereClause(subCondition as unknown as QueryConditions, subParams);
-                        if (subClause) {
-                            operatorGroup.push(`(${subClause})`);
-                            params.push(...subParams);
-                        }
-                    } else {
-                        logger.warn(`Invalid ${key} condition detected for key: ${key}. Expected a plain object for sub-condition.`);
-                    }
-                }
-                if (operatorGroup.length > 0) {
-                    clauseParts.push(`(${operatorGroup.join(logicalOperator)})`);
-                }
-            } else {
-                logger.warn(`Invalid ${key} value for key: ${key}. Expected a non-empty array.`);
-            }
-        }
-        else if (isPlainObject(value) && Object.keys(value).some(opKey => opKey.startsWith('$'))) {
-            // ... (这部分逻辑保持不变，因为 $eq 等操作符内部的值可以是 Date，但 value 本身必须是纯对象)
-            const field = `\`${key}\``;
-            const operatorConditions: string[] = [];
-            const queryOperator = value as QueryOperator;
-
-            for (const opKey in queryOperator) {
-                if (!Object.prototype.hasOwnProperty.call(queryOperator, opKey)) continue;
-
-                const opValue = queryOperator[opKey as keyof QueryOperator];
-
-                switch (opKey) {
-                    case '$eq': operatorConditions.push(`${field} = ?`); params.push(opValue); break;
-                    case '$ne': operatorConditions.push(`${field} != ?`); params.push(opValue); break;
-                    case '$gt': operatorConditions.push(`${field} > ?`); params.push(opValue); break;
-                    case '$gte': operatorConditions.push(`${field} >= ?`); params.push(opValue); break;
-                    case '$lt': operatorConditions.push(`${field} < ?`); params.push(opValue); break;
-                    case '$lte': operatorConditions.push(`${field} <= ?`); params.push(opValue); break;
+                switch (op) {
+                    case '$eq': conditions.push(`\`${key}\` = ?`); params.push(opValue); break;
+                    case '$ne': conditions.push(`\`${key}\` != ?`); params.push(opValue); break;
+                    case '$gt': conditions.push(`\`${key}\` > ?`); params.push(opValue); break;
+                    case '$gte': conditions.push(`\`${key}\` >= ?`); params.push(opValue); break;
+                    case '$lt': conditions.push(`\`${key}\` < ?`); params.push(opValue); break;
+                    case '$lte': conditions.push(`\`${key}\` <= ?`); params.push(opValue); break;
                     case '$in':
                         if (Array.isArray(opValue) && opValue.length > 0) {
-                            operatorConditions.push(`${field} IN (${opValue.map(() => '?').join(', ')})`);
+                            conditions.push(`\`${key}\` IN (${opValue.map(() => '?').join(',')})`);
                             params.push(...opValue);
-                        } else { operatorConditions.push('FALSE'); }
+                        }
                         break;
                     case '$nin':
                         if (Array.isArray(opValue) && opValue.length > 0) {
-                            operatorConditions.push(`${field} NOT IN (${opValue.map(() => '?').join(', ')})`);
+                            conditions.push(`\`${key}\` NOT IN (${opValue.map(() => '?').join(',')})`);
                             params.push(...opValue);
-                        } else { operatorConditions.push('TRUE'); }
-                        break;
-                    case '$like': operatorConditions.push(`${field} LIKE ?`); params.push(opValue); break;
-                    case '$notLike': operatorConditions.push(`${field} NOT LIKE ?`); params.push(opValue); break;
-                    case '$between':
-                        if (Array.isArray(opValue) && opValue.length === 2) {
-                            operatorConditions.push(`${field} BETWEEN ? AND ?`);
-                            params.push(opValue[0], opValue[1]);
                         }
-                        break;
-                    case '$notBetween':
-                        if (Array.isArray(opValue) && opValue.length === 2) {
-                            operatorConditions.push(`${field} NOT BETWEEN ? AND ?`);
-                            params.push(opValue[0], opValue[1]);
-                        }
-                        break;
-                    case '$isNull':
-                        if (opValue === true) { operatorConditions.push(`${field} IS NULL`); } else if (opValue === false) { operatorConditions.push(`${field} IS NOT NULL`); }
-                        break;
-                    case '$notNull':
-                        if (opValue === true) { operatorConditions.push(`${field} IS NOT NULL`); } else if (opValue === false) { operatorConditions.push(`${field} IS NULL`); }
-                        break;
-                    default:
-                        logger.warn(`Unsupported query operator: ${opKey} for field \`${key}\`.`);
                         break;
                 }
             }
-            if (operatorConditions.length > 0) {
-                clauseParts.push(`(${operatorConditions.join(' AND ')})`);
-            }
-        }
-        else {
-            // 简单相等匹配
-            clauseParts.push(`\`${key}\` = ?`);
+        } else {
+            conditions.push(`\`${key}\` = ?`);
             params.push(value);
         }
     }
 
-    return clauseParts.join(' AND ');
+    return { sql: conditions.join(' AND '), params };
 }
 
-export class MysqlDatabase {
-    private pool: mysql.Pool;
+// --- Database Implementation ---
 
-    constructor(config: mysql.PoolOptions) {
-        this.pool = mysql.createPool(config);
+class MysqlDatabase implements YumeriDatabase {
+    private constructor(private pool: mysql.Pool) { }
+
+    static async create(options: mysql.PoolOptions): Promise<MysqlDatabase> {
+        const pool = mysql.createPool(options);
+        // Test connection
+        const conn = await pool.getConnection();
+        conn.release();
+        logger.info('MySQL database connection test successful.');
+        return new MysqlDatabase(pool);
     }
 
-    // 执行 SQL，返回影响行数和插入 ID
-    async runSQL(sql: string, params: any[] = []): Promise<{ insertId?: number; affectedRows?: number }> {
-        try {
-            const [result] = await this.pool.execute(sql, params);
-            const { insertId, affectedRows } = result as mysql.ResultSetHeader;
-            return { insertId, affectedRows };
-        } catch (error: any) {
-            logger.error(`Error running SQL: ${sql} with params: ${JSON.stringify(params)} - ${error.message}`, error);
-            throw error; // 重新抛出以便上层处理
+    private getFieldDef(def: FieldType | FieldDefinition): FieldDefinition {
+        return typeof def === 'string' ? { type: def } : def;
+    }
+
+    private mapTypeToSql(def: FieldDefinition): string {
+        const type = def.type.toUpperCase();
+        switch (type) {
+            case 'STRING': return `VARCHAR(${def.length || 255})`;
+            case 'TEXT': return 'TEXT';
+            case 'JSON': return 'JSON';
+            case 'INTEGER': return 'INT';
+            case 'UNSIGNED': return 'INT UNSIGNED';
+            case 'BIGINT': return 'BIGINT';
+            case 'FLOAT': return 'FLOAT';
+            case 'DOUBLE': return 'DOUBLE';
+            case 'DECIMAL': return `DECIMAL(${def.precision || 10}, ${def.scale || 2})`;
+            case 'BOOLEAN': return 'TINYINT(1)';
+            case 'DATE': return 'DATE';
+            case 'TIME': return 'TIME';
+            case 'TIMESTAMP': return 'TIMESTAMP';
+            case 'DATETIME': return 'DATETIME';
+            default: return type;
         }
     }
 
-    // 查询所有结果
-    async all(sql: string, params: any[] = []): Promise<any[]> {
-        try {
-            const [rows] = await this.pool.execute(sql, params);
-            return rows as any[];
-        } catch (error: any) {
-            logger.error(`Error querying all: ${sql} with params: ${JSON.stringify(params)} - ${error.message}`, error);
-            throw error;
-        }
+    private buildColumnSql(field: string, def: FieldDefinition): string {
+        let sql = `\`${field}\` ${this.mapTypeToSql(def)}`;
+        if (def.nullable === false) sql += ' NOT NULL';
+        if (def.initial !== undefined) sql += ` DEFAULT ${this.pool.escape(def.initial)}`;
+        if (def.autoIncrement) sql += ' AUTO_INCREMENT';
+        return sql;
     }
 
-    // 查询单个结果
-    async get(sql: string, params: any[] = []): Promise<any | undefined> {
-        const rows = await this.all(sql, params);
-        return rows[0];
-    }
+    async extend<K extends keyof Tables>(
+        table: K,
+        schema: Schema<Partial<Tables[K]>>,
+        indexes?: IndexDefinition<Tables[K]>
+    ): Promise<void> {
+        const tableName = table as string;
+        const [rows] = await this.pool.query('SHOW TABLES LIKE ?', [tableName]);
+        const tableExists = (rows as any[]).length > 0;
 
-    // 插入一条数据，返回 insertId
-    async insert(tableName: string, data: Record<string, any>): Promise<number> {
-        const keys = Object.keys(data);
-        const values = Object.values(data);
-        const placeholders = keys.map(() => '?').join(', ');
+        if (!tableExists) {
+            // 表不存在，直接创建
+            const fields = Object.keys(schema);
+            const columns = fields.map(field => this.buildColumnSql(field, this.getFieldDef(schema[field])));
 
-        if (keys.length === 0) {
-            logger.warn(`No data provided for insert into table \`${tableName}\`. Returning 0 for insertId.`);
-            return 0; // 或者抛出错误
-        }
+            // 主键
+            if (indexes?.primary) {
+                const primaryKeys = (Array.isArray(indexes.primary) ? indexes.primary : [indexes.primary]) as string[];
+                columns.push(`PRIMARY KEY (${primaryKeys.map(k => `\`${k}\``).join(', ')})`);
+            }
 
-        const sql = `INSERT INTO \`${tableName}\` (${keys.map(k => `\`${k}\``).join(', ')}) VALUES (${placeholders})`;
-        const result = await this.runSQL(sql, values);
-        return result.insertId || 0; // 当没有 insertId 时返回 0
-    }
+            // 唯一索引
+            if (indexes?.unique) {
+                const uniqueKeys = Array.isArray(indexes.unique[0])
+                    ? indexes.unique as string[][]
+                    : (indexes.unique as string[][]).map(k => Array.isArray(k) ? k : [k]);
 
-    // 批量插入（事务处理）
-    async batchInsert(tableName: string, dataArray: Record<string, any>[]): Promise<void> {
-        if (dataArray.length === 0) {
-            logger.warn(`No data provided for batch insert into table \`${tableName}\`.`);
-            return;
-        }
+                uniqueKeys.forEach(keys => {
+                    columns.push(`UNIQUE KEY (${keys.map(k => `\`${k}\``).join(', ')})`);
+                });
+            }
 
-        const connection = await this.pool.getConnection();
-        try {
-            await connection.beginTransaction();
+            const sql = `CREATE TABLE \`${tableName}\` (${columns.join(', ')}) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`;
+            logger.info(`Creating table "${tableName}"`);
+            await this.run(sql);
+        } else {
+            // 表存在，检查字段和索引
+            const [existingCols] = await this.pool.query(`DESCRIBE \`${tableName}\``);
+            const existingColNames = (existingCols as any[]).map(c => c.Field);
 
-            for (const data of dataArray) {
-                const keys = Object.keys(data);
-                if (keys.length === 0) {
-                    logger.warn(`Skipping empty data object in batch insert for table \`${tableName}\`.`);
-                    continue;
+            const alterClauses: string[] = [];
+
+            // 新字段或类型修改
+            for (const field of Object.keys(schema)) {
+                const def = this.getFieldDef(schema[field]);
+                if (!existingColNames.includes(field)) {
+                    alterClauses.push(`ADD COLUMN ${this.buildColumnSql(field, def)}`);
+                } else {
+                    // 字段已存在，检查类型/默认值是否一致
+                    const col = (existingCols as any[]).find(c => c.Field === field);
+                    const newColSql = this.buildColumnSql(field, def);
+                    if (!newColSql.includes(col.Type)) {
+                        alterClauses.push(`MODIFY COLUMN ${newColSql}`);
+                    }
                 }
-                const values = Object.values(data);
-                const placeholders = keys.map(() => '?').join(', ');
-                const sql = `INSERT INTO \`${tableName}\` (${keys.map(k => `\`${k}\``).join(', ')}) VALUES (${placeholders})`;
-                await connection.execute(sql, values);
             }
 
-            await connection.commit();
-            logger.info(`Batch insert into table \`${tableName}\` successful.`);
-        } catch (err: any) {
-            await connection.rollback();
-            logger.error(`Batch insert into table \`${tableName}\` failed: ${err.message}`, err);
-            throw err;
-        } finally {
-            connection.release();
+            if (alterClauses.length > 0) {
+                await this.run(`ALTER TABLE \`${tableName}\` ${alterClauses.join(', ')}`);
+            }
+
+            // 索引更新
+            if (indexes) {
+                const [existingIndexes] = await this.pool.query(`SHOW INDEX FROM \`${tableName}\``);
+                const indexMap: Record<string, any> = {};
+                (existingIndexes as any[]).forEach(idx => {
+                    if (idx.Key_name !== 'PRIMARY') {
+                        if (!indexMap[idx.Key_name]) indexMap[idx.Key_name] = [];
+                        indexMap[idx.Key_name].push(idx.Column_name);
+                    }
+                });
+
+                // 主键
+                if (indexes.primary) {
+                    const primaryKeys = (Array.isArray(indexes.primary) ? indexes.primary : [indexes.primary]) as string[];
+                    const [pkCheck] = await this.pool.query(`SHOW KEYS FROM \`${tableName}\` WHERE Key_name = 'PRIMARY'`);
+                    const existingPk = (pkCheck as any[]).map(p => p.Column_name);
+                    if (primaryKeys.join(',') !== existingPk.join(',')) {
+                        logger.info(`Altering table "${tableName}" primary key`);
+                        await this.run(`ALTER TABLE \`${tableName}\` DROP PRIMARY KEY, ADD PRIMARY KEY (${primaryKeys.map(k => `\`${k}\``).join(',')})`);
+                    }
+                }
+
+                // 唯一索引
+                if (indexes.unique) {
+                    const uniqueKeys = Array.isArray(indexes.unique[0])
+                        ? indexes.unique as string[][]
+                        : (indexes.unique as string[][]).map(k => Array.isArray(k) ? k : [k]);
+
+                    for (const keys of uniqueKeys) {
+                        const name = keys.join('_') + '_uniq';
+                        const existing = indexMap[name] || [];
+                        if (existing.join(',') !== keys.join(',')) {
+                            // 删除旧索引再建新索引
+                            if (existing.length) {
+                                await this.run(`ALTER TABLE \`${tableName}\` DROP INDEX \`${name}\``);
+                            }
+                            await this.run(`ALTER TABLE \`${tableName}\` ADD UNIQUE INDEX \`${name}\` (${keys.map(k => `\`${k}\``).join(',')})`);
+                        }
+                    }
+                }
+            }
         }
     }
 
-    // 更新数据
-    async update(tableName: string, data: Record<string, any>, conditions: QueryConditions): Promise<number> {
-        const setClause = Object.keys(data).map(key => `\`${key}\` = ?`).join(', ');
-        const setValues = Object.values(data);
-
-        if (setClause === '') {
-            logger.warn(`No data to update for table \`${tableName}\`.`);
-            return 0;
-        }
-
-        const whereParams: any[] = [];
-        const whereClause = buildWhereClause(conditions, whereParams);
-
-        let sql = `UPDATE \`${tableName}\` SET ${setClause}`;
-        if (whereClause) {
-            sql += ` WHERE ${whereClause}`;
-        } else {
-            logger.warn(`No WHERE conditions provided for update on table \`${tableName}\`. All rows will be updated.`);
-        }
-
-        const result = await this.runSQL(sql, [...setValues, ...whereParams]);
-        return result.affectedRows || 0;
+    async create<K extends keyof Tables>(table: K, data: Partial<Tables[K]>): Promise<Tables[K]> {
+        const tableName = table as string;
+        const keys = Object.keys(data).map(k => `\`${k}\``).join(', ');
+        const placeholders = Object.keys(data).map(() => '?').join(', ');
+        const sql = `INSERT INTO ${tableName} (${keys}) VALUES (${placeholders})`;
+        const result = await this.run(sql, Object.values(data));
+        return { ...data, id: result.insertId } as any;
     }
 
-    // 删除数据
-    async delete(tableName: string, conditions: QueryConditions): Promise<number> {
-        const whereParams: any[] = [];
-        const whereClause = buildWhereClause(conditions, whereParams);
-
-        let sql = `DELETE FROM \`${tableName}\``;
-        if (whereClause) {
-            sql += ` WHERE ${whereClause}`;
-        } else {
-            logger.warn(`No WHERE conditions provided for delete on table \`${tableName}\`. All rows will be deleted.`);
-        }
-
-        const result = await this.runSQL(sql, whereParams);
-        return result.affectedRows || 0;
+    async select<K extends keyof Tables, F extends keyof Tables[K]>(table: K, query: Query<Tables[K]>, fields?: F[]): Promise<Pick<Tables[K], F>[]> {
+        const tableName = table as string;
+        const { sql: whereSql, params } = buildWhereClause(query);
+        const selectFields = fields ? fields.map(f => `\`${f as string}\``).join(', ') : '*';
+        const sql = `SELECT ${selectFields} FROM ${tableName}${whereSql ? ` WHERE ${whereSql}` : ''}`;
+        return this.all(sql, params);
     }
 
-    // 查询列表
-    async find(tableName: string, conditions: QueryConditions = {}, options: FindOptions = {}): Promise<any[]> {
-        const params: any[] = [];
-        const whereClause = buildWhereClause(conditions, params);
-
-        let selectClause = options.select && options.select.length > 0
-            ? options.select.map(col => `\`${col}\``).join(', ')
-            : '*';
-
-        let sql = `SELECT ${selectClause} FROM \`${tableName}\``;
-
-        if (whereClause) sql += ` WHERE ${whereClause}`;
-
-        if (options.groupBy) {
-            const groupByColumns = Array.isArray(options.groupBy) ? options.groupBy : [options.groupBy];
-            sql += ` GROUP BY ${groupByColumns.map(col => `\`${col}\``).join(', ')}`;
-        }
-
-        if (options.having) {
-            sql += ` HAVING ${options.having}`; // HAVING 语句通常不使用占位符，如果需要，请自行构建
-        }
-
-        if (options.orderBy) {
-            const orderByArr: OrderByOption[] = Array.isArray(options.orderBy)
-                ? options.orderBy.map(item => typeof item === 'string' ? { field: item } : item)
-                : [typeof options.orderBy === 'string' ? { field: options.orderBy } : options.orderBy];
-
-            const orderByParts = orderByArr.map(item => {
-                const direction = item.direction ? ` ${item.direction}` : '';
-                return `\`${item.field}\`${direction}`;
-            });
-            sql += ` ORDER BY ${orderByParts.join(', ')}`;
-        }
-
-        if (options.limit) sql += ` LIMIT ${options.limit}`;
-        if (options.offset) sql += ` OFFSET ${options.offset}`;
-
-        return await this.all(sql, params);
+    async selectOne<K extends keyof Tables, F extends keyof Tables[K]>(table: K, query: Query<Tables[K]>, fields?: F[]): Promise<Pick<Tables[K], F> | undefined> {
+        const tableName = table as string;
+        const { sql: whereSql, params } = buildWhereClause(query);
+        const selectFields = fields ? fields.map(f => `\`${f as string}\``).join(', ') : '*';
+        const sql = `SELECT ${selectFields} FROM ${tableName}${whereSql ? ` WHERE ${whereSql}` : ''} LIMIT 1`;
+        return this.get(sql, params);
     }
 
-    // 查询单个记录
-    async findOne(tableName: string, conditions: QueryConditions = {}, options: FindOptions = {}): Promise<any | undefined> {
-        const results = await this.find(tableName, conditions, { ...options, limit: 1 });
-        return results[0];
+    async update<K extends keyof Tables>(table: K, query: Query<Tables[K]>, data: UpdateData<Partial<Tables[K]>>): Promise<number> {
+        const tableName = table as string;
+        const { sql: whereSql, params: whereParams } = buildWhereClause(query);
+        const setParts: string[] = [];
+        const setParams: any[] = [];
+        for (const key in data) {
+            const value = data[key as keyof typeof data];
+            if (typeof value === 'object' && value !== null && '$inc' in value) {
+                setParts.push(`\`${key}\` = \`${key}\` + ?`);
+                setParams.push((value as { $inc: number }).$inc);
+            } else {
+                setParts.push(`\`${key}\` = ?`);
+                setParams.push(value);
+            }
+        }
+        if (setParts.length === 0) return 0;
+        const sql = `UPDATE ${tableName} SET ${setParts.join(', ')}${whereSql ? ` WHERE ${whereSql}` : ''}`;
+        const result = await this.run(sql, [...setParams, ...whereParams]);
+        return result.affectedRows ?? 0;
     }
 
-    // 关闭连接池
+    async remove<K extends keyof Tables>(table: K, query: Query<Tables[K]>): Promise<number> {
+        const tableName = table as string;
+        const { sql: whereSql, params } = buildWhereClause(query);
+        const sql = `DELETE FROM ${tableName}${whereSql ? ` WHERE ${whereSql}` : ''}`;
+        const result = await this.run(sql, params);
+        return result.affectedRows ?? 0;
+    }
+
+    async upsert<K extends keyof Tables>(table: K, data: Partial<Tables[K]>[], key: keyof Tables[K] | (keyof Tables[K])[], update?: UpdateData<Partial<Tables[K]>>): Promise<void> {
+        const tableName = table as string;
+        if (data.length === 0) return;
+
+        const insertKeys = Object.keys(data[0]);
+        const updatePayload = update ?? data[0];
+        const updateParts: string[] = [];
+
+        for (const key in updatePayload) {
+            const value = updatePayload[key as keyof typeof updatePayload];
+            if (typeof value === 'object' && value !== null && '$inc' in value) {
+                updateParts.push(`\`${key}\` = \`${key}\` + ${this.pool.escape((value as any).$inc)}`);
+            } else {
+                updateParts.push(`\`${key}\` = VALUES(\`${key}\`)`);
+            }
+        }
+
+        const sql = `
+            INSERT INTO ${tableName} (${insertKeys.map(k => `\`${k}\``).join(', ')})
+            VALUES ${data.map(item => `(${insertKeys.map(k => this.pool.escape(item[k as keyof typeof item])).join(', ')})`).join(', ')}
+            ON DUPLICATE KEY UPDATE ${updateParts.join(', ')}
+        `;
+        await this.run(sql);
+    }
+
+    async drop<K extends keyof Tables>(table: K): Promise<void> {
+        await this.run(`DROP TABLE IF EXISTS ${table as string}`);
+    }
+
+    async run(sql: string, params?: any[]): Promise<any> {
+        const [result] = await this.pool.execute(sql, params);
+        return result;
+    }
+    async get(sql: string, params?: any[]): Promise<any> {
+        const [rows] = await this.pool.execute(sql, params);
+        return (rows as any[])[0];
+    }
+    async all(sql: string, params?: any[]): Promise<any[]> {
+        const [rows] = await this.pool.execute(sql, params);
+        return rows as any[];
+    }
     async close(): Promise<void> {
-        try {
-            await this.pool.end();
-            logger.info('MySQL connection pool closed.');
-        } catch (error: any) {
-            logger.error(`Error closing MySQL pool: ${error.message}`, error);
-            throw error;
-        }
-    }
-
-    async createTable(tableName: string, schema: TableSchema): Promise<void> {
-        const exists = await this.tableExists(tableName);
-        if (exists) {
-            logger.info(`Table \`${tableName}\` already exists, skipping creation.`);
-            return;
-        }
-
-        const columns = Object.entries(schema).map(([field, def]) => buildColumnSQL(field, def));
-        const primaryKeys = Object.entries(schema)
-            .filter(([, def]) => def.primaryKey)
-            .map(([field]) => `\`${field}\``);
-
-        if (primaryKeys.length > 0) {
-            columns.push(`PRIMARY KEY (${primaryKeys.join(', ')})`);
-        }
-
-        const sql = `CREATE TABLE \`${tableName}\` (${columns.join(', ')})`;
-        await this.runSQL(sql);
-        logger.info(`Table \`${tableName}\` created successfully.`);
-    }
-
-    // 更新表结构（支持 ADD COLUMN, MODIFY COLUMN, DROP COLUMN）
-    async updateTableStructure(tableName: string, alterations: ColumnAlteration[]): Promise<void> {
-        if (alterations.length === 0) {
-            logger.warn(`No alterations provided for table \`${tableName}\`.`);
-            return;
-        }
-
-        const alterStatements: string[] = [];
-        for (const alt of alterations) {
-            switch (alt.action) {
-                case 'ADD':
-                    if (!alt.definition) throw new Error(`Column definition required for ADD action for field: ${alt.field}`);
-                    alterStatements.push(`ADD COLUMN ${buildColumnSQL(alt.field, alt.definition)}`);
-                    break;
-                case 'MODIFY':
-                    if (!alt.definition) throw new Error(`Column definition required for MODIFY action for field: ${alt.field}`);
-                    // MODIFY COLUMN 保持原有位置，或明确指定 AFTER/FIRST
-                    alterStatements.push(`MODIFY COLUMN ${buildColumnSQL(alt.field, alt.definition)}`);
-                    break;
-                case 'DROP':
-                    alterStatements.push(`DROP COLUMN \`${alt.field}\``);
-                    break;
-                default:
-                    logger.warn(`Unsupported alteration action: ${alt.action} for table \`${tableName}\`, field \`${alt.field}\`.`);
-                    break;
-            }
-        }
-
-        if (alterStatements.length === 0) {
-            logger.warn(`No valid alterations to apply for table \`${tableName}\`.`);
-            return;
-        }
-
-        const sql = `ALTER TABLE \`${tableName}\` ${alterStatements.join(', ')}`;
-        await this.runSQL(sql);
-        logger.info(`Table \`${tableName}\` structure updated successfully.`);
-    }
-
-    // 判断表是否存在
-    async tableExists(tableName: string): Promise<boolean> {
-        // 使用 pool.query 来避免 SHOW TABLES LIKE 的预处理问题
-        try {
-            const [rows] = await this.pool.query('SHOW TABLES LIKE ?', [tableName]);
-            // rows 是一个包含 RowDataPacket 的数组，需要检查它的长度
-            return (rows as mysql.RowDataPacket[]).length > 0;
-        } catch (error: any) {
-            logger.error(`Error checking table existence for \`${tableName}\`: ${error.message}`, error);
-            throw error;
-        }
+        await this.pool.end();
+        logger.info('MySQL connection pool closed.');
     }
 }
 
-// 模块的配置 schema
-// ConfigSchema 应该从 yumeri 导入，这里假设它是一个 Record<string, any>
+// --- Plugin Definition ---
+
 export const config = {
     schema: {
-        host: {
-            type: 'string',
-            default: 'localhost',
-            description: 'MySQL数据库主机名'
-        },
-        port: {
-            type: 'number',
-            default: 3306,
-            description: 'MySQL数据库端口'
-        },
-        user: {
-            type: 'string',
-            required: true,
-            description: 'MySQL用户名'
-        },
-        password: {
-            type: 'string',
-            required: true,
-            description: 'MySQL密码'
-        },
-        database: {
-            type: 'string',
-            required: true,
-            description: '要连接的数据库名称'
-        },
-        connectionLimit: {
-            type: 'number',
-            default: 10,
-            description: '连接池最大连接数'
-        },
-        charset: {
-            type: 'string',
-            default: 'utf8mb4',
-            description: '数据库连接字符集'
-        },
-        dateStrings: {
-            type: 'boolean',
-            default: false,
-            description: '是否将日期时间类型作为字符串返回'
-        }
-    } as Record<string, ConfigSchema> // 确保与 Yumeri 的 ConfigSchema 类型兼容
+        host: { type: 'string', default: 'localhost', description: 'MySQL 主机名' },
+        port: { type: 'number', default: 3306, description: 'MySQL 端口' },
+        user: { type: 'string', required: true, description: '用户名' },
+        password: { type: 'string', required: true, description: '密码' },
+        database: { type: 'string', required: true, description: '数据库名' },
+        connectionLimit: { type: 'number', default: 10, description: '连接池大小' },
+        charset: { type: 'string', default: 'utf8mb4', description: '字符集', enum: ['utf8', 'utf8mb4'] },
+    } as Record<string, ConfigSchema>
 };
 
-// 插件的 apply 函数
 export async function apply(ctx: Context, config: Config) {
-    const mysqlOptions: mysql.PoolOptions = {
-        host: config.get<string>('host', 'localhost'),
-        port: config.get<number>('port', 3306),
-        user: config.get<string>('user', ''),
-        password: config.get<string>('password', ''),
-        database: config.get<string>('database', ''),
-        connectionLimit: config.get<number>('connectionLimit', 10),
-        charset: config.get<string>('charset', 'utf8mb4'),
-        dateStrings: config.get<boolean>('dateStrings', false),
-        namedPlaceholders: false, // 强制使用 ? 占位符
-        rowsAsArray: false // 返回结果为对象而不是数组
+    const options: mysql.PoolOptions = {
+        host: config.get('host'),
+        port: config.get('port'),
+        user: config.get('user'),
+        password: config.get('password'),
+        database: config.get('database'),
+        connectionLimit: config.get('connectionLimit'),
+        charset: config.get('charset'),
     };
 
-    // 检查必填项，并直接抛出错误以防止后续连接失败
-    if (!mysqlOptions.user) {
-        throw new Error("MySQL plugin: 'user' is required in config.");
+    if (!options.user || !options.password || !options.database) {
+        logger.error('MySQL plugin is not configured correctly. Please provide user, password, and database.');
+        return;
     }
-    if (!mysqlOptions.password) {
-        throw new Error("MySQL plugin: 'password' is required in config.");
-    }
-    if (!mysqlOptions.database) {
-        throw new Error("MySQL plugin: 'database' is required in config.");
-    }
-
-    const db = new MysqlDatabase(mysqlOptions);
 
     try {
-        // 尝试获取一个连接以验证配置和连接性
-        const connection = await db['pool'].getConnection(); // 直接访问 private pool
-        connection.release();
-        logger.info('MySQL database connection test successful.');
-    } catch (error: any) {
-        logger.error(`MySQL database connection test failed: ${error.message}`, error);
+        const db = await MysqlDatabase.create(options);
+        ctx.registerComponent('database', db);
+    } catch (error) {
+        logger.error('Failed to connect to MySQL database:', error);
     }
+}
 
-    ctx.registerComponent('database', db);
-    logger.info('MySQL database component registered.');
+export async function disable(ctx: Context) {
+    const db = ctx.getComponent('database') as MysqlDatabase;
+    await db.close();
 }

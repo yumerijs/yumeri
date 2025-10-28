@@ -1,103 +1,54 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>登录 - Material You</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
-    <style>
-        /* 这里放置一些内联的或者Material You主题相关的CSS变量默认值 */
-        /* 实际项目中，这些变量会通过JS动态生成或从后端获取 */
-        :root {
-            --md-sys-color-primary: #6750A4; /* 示例主色 */
-            --md-sys-color-on-primary: #FFFFFF;
-            --md-sys-color-primary-container: #EADDFF;
-            --md-sys-color-on-primary-container: #21005D;
-            --md-sys-color-secondary: #625B71;
-            --md-sys-color-on-secondary: #FFFFFF;
-            --md-sys-color-secondary-container: #E8DEF8;
-            --md-sys-color-on-secondary-container: #1D192B;
-            --md-sys-color-tertiary: #7D5260;
-            --md-sys-color-on-tertiary: #FFFFFF;
-            --md-sys-color-tertiary-container: #FFD8E4;
-            --md-sys-color-on-tertiary-container: #31111D;
-            --md-sys-color-error: #BA1A1A;
-            --md-sys-color-on-error: #FFFFFF;
-            --md-sys-color-error-container: #FFDAD6;
-            --md-sys-color-on-error-container: #410002;
-            --md-sys-color-background: #FFFBFE;
-            --md-sys-color-on-background: #1C1B1F;
-            --md-sys-color-surface: #FFFBFE;
-            --md-sys-color-on-surface: #1C1B1F;
-            --md-sys-color-surface-variant: #E7E0EC;
-            --md-sys-color-on-surface-variant: #49454F;
-            --md-sys-color-outline: #79747E;
-            --md-sys-color-outline-variant: #CAC4D0;
-            --md-sys-color-shadow: #000000;
-            --md-sys-color-scrim: #000000;
-            --md-sys-color-inverse-surface: #313033;
-            --md-sys-color-inverse-on-surface: #F4EFF4;
-            --md-sys-color-inverse-primary: #D0BCFF; /* 示例反色 */
-            --md-sys-color-surface1: #e9e3ed;
-            --md-sys-color-surface2: #e3dced;
-            --md-sys-color-surface3: #ded6ec;
-            --md-sys-color-surface4: #d6cfec;
-
-            /* 间距和圆角 */
-            --md-sys-spacing-unit: 8px; /* 定义基础间距单位 */
-            --md-sys-shape-corner-small: 4px;
-            --md-sys-shape-corner-medium: 8px;
-            --md-sys-shape-corner-large: 12px; /* 按钮、卡片推荐 */
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
+  {{authority:htmlheader}}
 </head>
 <body>
-    <div class="container">
-        <header class="header">
-            <h1>欢迎回来</h1>
-        </header>
+  <div class="container">
+    <header class="header">
+      <h1>欢迎回来</h1>
+    </header>
+    {{authority:preloginform}}
 
-        <main class="form-wrapper">
-            <form id="loginForm">
-                <div class="input-group">
-                    <div class="text-field outlined">
-                        <label for="login-identifier">用户名或电子邮件</label>
-                        <input type="text" id="identifier" name="login-identifier" required>
-                    </div>
-                </div>
+    <main class="form-wrapper">
+      <form id="loginForm">
+        {{authority:loginform}}
+        <div class="input-group">
+          <div class="text-field outlined">
+            <input type="text" id="identifier" name="login-identifier" placeholder=" " required>
+            <label for="identifier">用户名或电子邮件</label>
+          </div>
+        </div>
 
-                <div class="input-group">
-                    <div class="text-field outlined">
-                        <label for="login-password">密码</label>
-                        <input type="password" id="password" name="login-password" required>
-                        <span class="material-symbols-outlined password-toggle">visibility_off</span>
-                    </div>
-                </div>
+        <div class="input-group">
+          <div class="text-field outlined">
+            <input type="password" id="password" name="login-password" placeholder=" " required>
+            <label for="password">密码</label>
+            <span class="material-symbols-outlined password-toggle" id="pwdToggle">visibility_off</span>
+          </div>
+        </div>
 
-                <a href="#" class="forgot-password-link">忘记密码？</a>
+        {{authority:postloginform}}
 
-                <button type="submit" class="button filled">登录</button>
+        <a href="#" class="forgot-password-link">忘记密码？</a>
 
-                <!-- <div class="divider">
-                    <p class="divider-text">或者</p>
-                </div> -->
-            </form>
+        <button type="submit" class="button filled">登录</button>
+      </form>
 
-            <p class="auxiliary-link">
-                还没有账户？<a href="register">立即注册</a>
-            </p>
-        </main>
+      <p class="auxiliary-link">
+        还没有账户？<a href="register">立即注册</a>
+      </p>
+    </main>
+  </div>
 
-        <!-- <aside class="branding-area">
-            <img src="https://via.placeholder.com/200x200?text=Welcome+Back" alt="欢迎图片" class="logo-large-screen">
-            <h2>我们很高兴再次见到你！</h2>
-            <p>登录以继续享受您的个性化体验。</p>
-        </aside> -->
-    </div>
-
-    <script src="script.js"></script>
+  <script src="script.js"></script>
 </body>
+<footer>
+{{authority:htmlfooter}}</footer>
 </html>

@@ -25,17 +25,39 @@ export const config = {
 
 let loginstatus: Record<string, string> = {};
 
+let consoleitem: Record<string, ConsoleItem> = {};
+
+const operateconsole = {
+  addconsoleitem: (name: string, icon: string, displayname: string, htmlpath: string, staticpath: string) => {
+    consoleitem[name] = new ConsoleItem(icon, displayname, htmlpath, staticpath);
+  },
+  removeconsoleitem: (name: string) => {
+    delete consoleitem[name];
+  },
+  getloginstatus: (session: Session) => !!loginstatus[session.sessionid]
+};
+
+async function getHook(ctx: Context, hookname: string, originString: string) {
+  const result: string[] = await ctx.executeHook(hookname);
+  let item = '';
+  if (result) {
+    result.forEach((items) => {
+      item = item + items;
+    })
+  }
+  const newString = originString.replace(`{{${hookname}}}`, item);
+  return newString;
+}
+
 export async function apply(ctx: Context, config: Config) {
   const configManager = new PluginConfigManager();
   const core = ctx.getCore();
   configManager.setCore(core);
-  let consoleitem: Record<string, ConsoleItem> = {};
   const staticDir = path.join(__dirname, '..', 'static');
   const basePath = config.get<string>('path', 'console');
 
   consoleitem['config'] = new ConsoleItem('fa-cog', '配置', path.join(staticDir, 'config.html'), path.join(staticDir, 'files'));
 
-  // Middleware for login check
   const requireLogin = async (session: Session, next: () => Promise<void>) => {
     if (loginstatus[session.sessionid]) {
       await next();
@@ -45,13 +67,11 @@ export async function apply(ctx: Context, config: Config) {
     }
   };
 
-  // Redirect root to home
   ctx.route(`/${basePath}`).action((session) => {
     session.body = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>重定向</title></head><body><script>window.location.href = "/${basePath}/home";</script><p>正在重定向</p></body></html>`;
     session.setMime('html');
   });
 
-  // Static pages
   ctx.route(`/${basePath}/login`).action((session) => {
     const loginHtmlPath = path.join(staticDir, 'login.html');
     if (fs.existsSync(loginHtmlPath)) {
@@ -63,16 +83,18 @@ export async function apply(ctx: Context, config: Config) {
   ctx.route(`/${basePath}/home`).action((session) => requireLogin(session, async () => {
     const consoleHtmlPath = path.join(staticDir, 'home.html');
     if (fs.existsSync(consoleHtmlPath)) {
-      session.body = fs.readFileSync(consoleHtmlPath, 'utf8');
+      const parseone = await getHook(ctx, 'console:home', fs.readFileSync(consoleHtmlPath, 'utf8'));
+      const parsetwo = await getHook(ctx, 'console:homejs', parseone);
+      session.body = parsetwo;
       session.setMime('html');
     }
   }));
 
-  // API routes
-  ctx.route(`/${basePath}/api/loginpass`).action((session, params) => {
+  ctx.route(`/api/console/loginpass`).action(async (session, params) => {
     session.setMime('json');
-    if (params.get('username') === config.get<string>('adminname', 'admin') && params.get('password') === config.get<string>('adminpassword', 'admin')) {
-      loginstatus[session.sessionid] = params.get('username')!;
+    const reqst = await session.parseRequestBody();
+    if (reqst.username === config.get<string>('adminname', 'admin') && reqst.password === config.get<string>('adminpassword', 'admin')) {
+      loginstatus[session.sessionid] = reqst.username!;
       session.body = JSON.stringify({ success: true });
     } else {
       session.body = JSON.stringify({ success: false, message: '用户名或密码错误' });
@@ -128,6 +150,37 @@ export async function apply(ctx: Context, config: Config) {
       if (!pluginName) return { usage: '' };
       return { usage: configManager.getPluginUsage(pluginName) || '' };
     },
+    pluginmetadata: (params: URLSearchParams) => {
+      const pluginName = params.get('name');
+      if (!pluginName) return { usage: '', provide: [], depend: [] };
+      const meta = configManager.getMetadata(pluginName) || {};
+      return {
+        usage: meta.usage || '',
+        provide: meta.provide || [],
+        depend: meta.depend || []
+      };
+    },
+    // 新建插件
+    addplugin: async (params: URLSearchParams) => {
+      const pluginName = params.get('name');
+      if (!pluginName) return { success: false, message: '缺少插件名称参数' };
+      try {
+        await configManager.addPluginToConfig(pluginName);
+        return { success: true, message: `插件 ${pluginName} 已成功添加` };
+      } catch (error) {
+        return { success: false, message: `添加插件失败: ${error}` };
+      }
+    },
+
+    // 获取未在配置文件声明的已安装插件
+    unregistered: async () => {
+      try {
+        const unregistered = await configManager.getUnregisteredPlugins();
+        return { success: true, plugins: unregistered };
+      } catch (error) {
+        return { success: false, message: `获取未注册插件失败: ${error}` };
+      }
+    },
     consoleitem: () => {
       return Object.entries(consoleitem).map(([key, item]) => ({
         item: item.icon,
@@ -138,7 +191,7 @@ export async function apply(ctx: Context, config: Config) {
   };
 
   for (const [routeName, handler] of Object.entries(apiRoutes)) {
-    ctx.route(`/${basePath}/api/${routeName}`).action(async (session, params) => {
+    ctx.route(`/api/console/${routeName}`).action(async (session, params) => {
       await requireLogin(session, async () => {
         try {
           session.setMime('json');
@@ -151,8 +204,7 @@ export async function apply(ctx: Context, config: Config) {
       });
     });
   }
-  // Dynamic console item routes
-  const aroute = ctx.route(`/${basePath}/:item/:asset*`).action((session, params, item, asset) => requireLogin(session, async () => {
+  ctx.route(`/${basePath}/:item/:asset*`).action((session, params, item, asset) => requireLogin(session, async () => {
     const consoleItem = consoleitem[item];
     if (consoleItem) {
       const assetPath = asset ? path.join(consoleItem.staticpath, asset) : consoleItem.htmlpath;
@@ -165,14 +217,6 @@ export async function apply(ctx: Context, config: Config) {
   }
   ));
 
-  const operateconsole = {
-    addconsoleitem: (name: string, icon: string, displayname: string, htmlpath: string, staticpath: string) => {
-      consoleitem[name] = new ConsoleItem(icon, displayname, htmlpath, staticpath);
-    },
-    removeconsoleitem: (name: string) => {
-      delete consoleitem[name];
-    },
-    getloginstatus: (session: Session) => !!loginstatus[session.sessionid]
-  };
+
   ctx.registerComponent('console', operateconsole);
 }

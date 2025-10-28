@@ -43,9 +43,9 @@ export class Hook {
    * @returns 执行结果
    */
   async trigger(...args: any[]): Promise<any[]> {
-    let result: any[];
+    let result: any[] = [];
     for (const handler of Object.values(this.handlers)) {
-      result.push(handler(...args));
+      result.push(await handler(...args));
     }
     return result;
   }

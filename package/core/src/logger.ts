@@ -11,12 +11,11 @@ export class Logger {
   private title: string;
   private titleColor: (text: string) => string;
   public static coreInstance: Core | null = null;
-  public static logs: string[] = [];
+  public static logs: { level: string; message: string, timestamp: string }[] = [];
 
   public static setCore(core: Core) {
     if (Logger.coreInstance !== null) {
-      const logger = new Logger('Logger');
-      logger.warn("Logger.coreInstance is already set. Overwriting would cause confusion.");
+      return
     }
     Logger.coreInstance = core;
   }
@@ -45,7 +44,8 @@ export class Logger {
     const levelColor = level === 'E' ? pc.red : level === 'W' ? pc.yellow : pc.cyan;
     const timestamp = this.getTimestamp();
     console.log(`${pc.gray(timestamp)} [${levelColor(level)}] ${this.titleColor(this.title)}`, ...args);
-    Logger.coreInstance?.emit('log', { level, message: args.join(' ') });
+    Logger.coreInstance?.emit('log', { level, message: args.join(' '), timestamp });
+    Logger.logs.push({ level, message: args.join(' '), timestamp });
   }
 
 
