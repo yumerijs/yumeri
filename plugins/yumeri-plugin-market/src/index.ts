@@ -88,13 +88,10 @@ export async function apply(ctx: Context, config: Config) {
         },
         '/install': async (session: Session, params: URLSearchParams) => {
             const packageName = params.get('name');
-            const version = params.get('version');
-            if (!packageName || !packageName.includes('yumeri')) {
-                session.body = JSON.stringify({ success: false, message: 'Invalid package name' });
+            const version = params.get('version') || 'latest';
+            if (!packageName || !packageName.startsWith('yumeri-plugin-')) {
+                session.body = JSON.stringify({ success: false, message: '只允许安装 yumeri-plugin- 开头的依赖' });
                 return;
-            }
-            if (version === null) {
-                session.body = JSON.stringify({ success: false, message: 'Missing version' });
             }
 
             const packageJsonPath = path.resolve(process.cwd(), 'package.json');
@@ -104,41 +101,41 @@ export async function apply(ctx: Context, config: Config) {
                 pkg.dependencies ||= {};
 
                 const toAdd: Record<string, string> = {};
+                const visited = new Set<string>();
 
-                // 递归函数
-                async function fetchDeps(name: string, ver: string) {
-                    if (toAdd[name]) return;
-                    toAdd[name] = ver;
+                async function fetchYumeriDeps(name: string) {
+                    if (visited.has(name)) return;
+                    visited.add(name);
 
-                    // 获取 npm 包信息
                     const registryUrl = `${config.get('npmregistry', 'https://registry.npmmirror.com')}/${encodeURIComponent(name)}`;
                     const res = await fetch(registryUrl);
-                    if (!res.ok) return;
-                    const data = await res.json();
-                    const targetVer = ver === 'latest' ? data['dist-tags'].latest : ver;
-                    const depObj = data.versions[targetVer]?.dependencies || {};
+                    if (!res.ok) {
+                        logger.warn(`获取 ${name} 信息失败：${res.statusText}`);
+                        return;
+                    }
 
-                    for (const [depName] of Object.entries(depObj)) {
+                    const data = await res.json();
+                    const latestVer = data['dist-tags']?.latest || version;
+                    toAdd[name] = `^${latestVer}`;
+
+                    const deps = data.versions?.[latestVer]?.dependencies || {};
+                    for (const depName of Object.keys(deps)) {
                         if (depName.startsWith('yumeri-plugin-')) {
-                            // yumeri-plugin- 系列递归
-                            await fetchDeps(depName, 'latest');
-                        } else {
-                            // 其他依赖只加一层
-                            if (!toAdd[depName]) toAdd[depName] = 'latest';
+                            await fetchYumeriDeps(depName);
                         }
                     }
                 }
 
-                await fetchDeps(packageName, version as string);
+                await fetchYumeriDeps(packageName);
 
-                // 合并到 package.json
+                // 更新 package.json
                 for (const [depName, depVer] of Object.entries(toAdd)) {
                     pkg.dependencies[depName] = depVer;
                 }
 
                 await fsp.writeFile(packageJsonPath, JSON.stringify(pkg, null, 2) + '\n');
 
-                // 执行 yarn install
+                // 安装依赖
                 await new Promise<void>((resolve, reject) => {
                     const child = spawn('yarn', ['install', `--registry=${config.get('npmregistry', 'https://registry.npmmirror.com')}`], { cwd: process.cwd() });
                     let stderr = '';
