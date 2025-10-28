@@ -1,12 +1,13 @@
 {
   "name": "yumeri-plugin-logger",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Log in console",
   "main": "dist/index.js",
   "dev": "src/index.ts",
   "types": "dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "static"
   ],
   "scripts": {
     "build": "tsc",
