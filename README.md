@@ -42,9 +42,8 @@ The Yumeri framework consists of the following components:
 
 3. **Plugin System**  
    Yumeri plugins are distributed as npm packages with the prefix `yumeri-plugin-` for easy recognition. The framework currently includes several built-in plugins:
-   - `yumeri-plugin-console`: Console interface plugin  
+   - `yumeri-plugin-console`: Console interface plugin
    - `yumeri-plugin-echo`: A testing plugin that outputs content  
-   - `yumeri-plugin-server`: HTTP server plugin  
    - `yumeri-plugin-sqlite`: SQLite database support plugin
 
 ## Use Cases

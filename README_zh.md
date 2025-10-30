@@ -37,7 +37,6 @@ Yumeri框架主要由以下几个部分组成：
 3. **插件系统**：Yumeri的插件采用npm包形式，包名前缀为yumeri-plugin-，用于识别此为Yumeri的插件。框架自带了几个基础插件：
    - yumeri-plugin-console：控制台插件
    - yumeri-plugin-echo：（测试专用）输出内容插件
-   - yumeri-plugin-server：服务器插件
    - yumeri-plugin-sqlite: SQLite数据库插件
 
 ## 适用场景
