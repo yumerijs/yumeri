@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "start": "yumeri start",
-    "dev": "cross-env NODE_ENV=development yumeri start -r esbuild-register -r tsconfig-paths/register",
+    "dev": "cross-env NODE_ENV=development yumeri start -r esbuild-register",
     "setup": "yumeri-scripts setup"
   },
   "dependencies": {

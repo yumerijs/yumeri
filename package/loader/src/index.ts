@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import { promisify } from 'util';
 import { exec } from 'child_process';
 import { pathToFileURL } from 'url';
+import 'esbuild-register';
 
 const execAsync = promisify(exec);
 
@@ -44,90 +45,11 @@ class PluginLoader {
     }
 
     async load(pluginName: string): Promise<Plugin> {
-        if (this.pluginCache[pluginName] && !this.isDev) {
-            return this.pluginCache[pluginName];
+        if (this.isDev) {
+            this.clearRequireCache(pluginName, new Set());
         }
-
-        let pluginPath: string;
-        let isLocalPlugin = false;
-
-        const localPluginPath = path.resolve(process.cwd(), this.pluginsDir, pluginName);
-        const localPluginPathAlt = path.resolve(process.cwd(), pluginName);
-
-        if (fs.existsSync(localPluginPath)) {
-            pluginPath = localPluginPath;
-            isLocalPlugin = true;
-        } else if (fs.existsSync(localPluginPathAlt)) {
-            pluginPath = localPluginPathAlt;
-            isLocalPlugin = true;
-        } else if (path.isAbsolute(pluginName) || pluginName.startsWith('.')) {
-            pluginPath = path.resolve(pluginName);
-            isLocalPlugin = true;
-        } else {
-            try {
-                pluginPath = require.resolve(pluginName);
-            } catch (e: any) {
-                if (e.code === 'MODULE_NOT_FOUND') {
-                    throw new Error(`Plugin ${pluginName} not found. Please install it first.`);
-                }
-                throw e;
-            }
-        }
-
-        try {
-            if (isLocalPlugin) {
-                const plugin = await this.loadPluginFromPath(pluginPath, isLocalPlugin);
-                this.pluginCache[pluginName] = plugin;
-                return plugin;
-            } else {
-                const plugin = await import(pluginName);
-                return plugin.default || plugin;
-            }
-        } catch (e) {
-            this.logger.error(`Failed to load plugin from ${pluginPath}:`, e);
-            throw e;
-        }
-    }
-
-    private async loadPluginFromPath(pluginPath: string, isLocalPlugin: boolean): Promise<Plugin> {
-        try {
-            let targetPath = pluginPath;
-
-            if (isLocalPlugin && this.isDev) {
-                const jsonPath = path.join(pluginPath, 'package.json');
-                if (fs.existsSync(jsonPath)) {
-                    const jsonContent = fs.readFileSync(jsonPath, 'utf-8');
-                    const pkg = JSON.parse(jsonContent);
-                    if (pkg.dev) {
-                        targetPath = path.join(pluginPath, pkg.dev);
-                    } else if (pkg.main) {
-                        targetPath = path.join(pluginPath, pkg.main);
-                    }
-                }
-            }
-
-            if (this.isDev) {
-                // In development, use require() to leverage esbuild-register
-                // and clear cache for HMR.
-                const resolvedPath = require.resolve(targetPath);
-
-                // Clean up the cache for the main module and its children
-                if (require.cache[resolvedPath]) {
-                    this.clearRequireCache(resolvedPath, new Set());
-                }
-
-                const module = require(resolvedPath);
-                return module.default || module;
-            } else {
-                // In production, use dynamic import.
-                const url = pathToFileURL(targetPath).href;
-                const module = await import(url);
-                return module.default || module;
-            }
-        } catch (e) {
-            this.logger.error(`Error loading plugin from path ${pluginPath}:`, e);
-            throw e;
-        }
+        const plugin = await require(pluginName);
+        return plugin.default || plugin;
     }
 
     private clearRequireCache(moduleId: string, visited: Set<string>) {
@@ -149,7 +71,6 @@ class PluginLoader {
         // Delete the module from cache
         delete require.cache[moduleId];
     }
-
 
     async unloadPlugin(pluginName: string): Promise<void> {
         if (!this.pluginCache[pluginName]) {

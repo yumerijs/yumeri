@@ -5,7 +5,7 @@
     "paths": {
       "@yumerijs/*": ["package/*/src"],
       "*": ["package/*/src"],
-      "yumeri-plugin-*": ["plugins/yumeri-plugin-*/src/index.ts"]
+      "yumeri-plugin-*": ["plugins/yumeri-plugin-*/src"]
     }
   }
 }
