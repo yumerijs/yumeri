@@ -195,6 +195,50 @@ export async function apply(ctx: Context, config: Config) {
                 session.body = JSON.stringify({ success: false, message: e.message });
             }
         },
+        '/npm-versions': async (session: Session, params: URLSearchParams) => {
+            try {
+                const packageJsonPath = path.join(process.cwd(), 'package.json');
+                if (!fs.existsSync(packageJsonPath)) {
+                    session.body = JSON.stringify({ success: false, message: 'package.json 不存在' });
+                    return;
+                }
+
+                const pkg = JSON.parse(await fsp.readFile(packageJsonPath, 'utf8'));
+                const dependencies = pkg.dependencies || {};
+                const nodeModulesPath = path.join(process.cwd(), 'node_modules');
+
+                const result: Record<string, { installed?: string, npmVersions: string[] }> = {};
+
+                await Promise.all(Object.keys(dependencies).map(async (depName) => {
+                    let installedVersion: string | undefined;
+                    const depPkgJsonPath = path.join(nodeModulesPath, depName, 'package.json');
+
+                    if (fs.existsSync(depPkgJsonPath)) {
+                        try {
+                            const depPkg = JSON.parse(await fsp.readFile(depPkgJsonPath, 'utf8'));
+                            installedVersion = depPkg.version;
+                        } catch { }
+                    }
+
+                    // 获取 npm 上的版本
+                    let npmVersions: string[] = [];
+                    try {
+                        const registryUrl = `${config.get('npmregistry', 'https://registry.npmmirror.com')}/${encodeURIComponent(depName)}`;
+                        const res = await fetch(registryUrl);
+                        if (res.ok) {
+                            const data = await res.json();
+                            npmVersions = Object.keys(data.versions || {});
+                        }
+                    } catch { }
+
+                    result[depName] = { installed: installedVersion, npmVersions };
+                }));
+
+                session.body = JSON.stringify({ success: true, dependencies: result });
+            } catch (e: any) {
+                session.body = JSON.stringify({ success: false, message: e.message || '获取 npm 版本列表失败' });
+            }
+        },
         '/currentver': async (session: Session, params: URLSearchParams) => {
             const packageName = params.get('name');
             if (!packageName) {
@@ -206,8 +250,9 @@ export async function apply(ctx: Context, config: Config) {
         },
         '/dependencies': async (session: Session, params: URLSearchParams) => {
             try {
-                const projectPath = process.cwd(); // 当前项目目录
+                const projectPath = process.cwd();
                 const packageJsonPath = path.join(projectPath, 'package.json');
+                const nodeModulesPath = path.join(projectPath, 'node_modules');
 
                 if (!fs.existsSync(packageJsonPath)) {
                     session.body = JSON.stringify({ success: false, message: 'package.json 不存在' });
@@ -216,21 +261,25 @@ export async function apply(ctx: Context, config: Config) {
 
                 const pkg = JSON.parse(await fsp.readFile(packageJsonPath, 'utf8'));
                 const dependencies = pkg.dependencies || {};
+                const allDeps: { name: string, version: string }[] = [];
 
-                const allDeps = Object.entries(dependencies).map(([name, version]) => ({
-                    name,
-                    version
-                }));
+                for (const depName of Object.keys(dependencies)) {
+                    let installedVersion = dependencies[depName]; // fallback: package.json 里的范围
+                    const depPkgJsonPath = path.join(nodeModulesPath, depName, 'package.json');
 
-                session.body = JSON.stringify({
-                    success: true,
-                    dependencies: allDeps
-                });
+                    if (fs.existsSync(depPkgJsonPath)) {
+                        try {
+                            const depPkg = JSON.parse(await fsp.readFile(depPkgJsonPath, 'utf8'));
+                            installedVersion = depPkg.version || installedVersion;
+                        } catch { }
+                    }
+
+                    allDeps.push({ name: depName, version: installedVersion });
+                }
+
+                session.body = JSON.stringify({ success: true, dependencies: allDeps });
             } catch (e: any) {
-                session.body = JSON.stringify({
-                    success: false,
-                    message: e.message || '获取依赖信息时发生错误'
-                });
+                session.body = JSON.stringify({ success: false, message: e.message || '获取依赖信息失败' });
             }
         },
         '/savever': async (session: Session, params: URLSearchParams) => {
@@ -303,7 +352,7 @@ export async function apply(ctx: Context, config: Config) {
     }
 
 
-    consoleApi.addconsoleitem('dep', 'fa-dev', '依赖管理', path.join(__dirname, '../static/dep.html'), path.join(__dirname, '../static/'));
+    consoleApi.addconsoleitem('dep', 'fa-box-open', '依赖管理', path.join(__dirname, '../static/dep.html'), path.join(__dirname, '../static/'));
     consoleApi.addconsoleitem('market', 'fa-plug', '插件市场', path.join(__dirname, '../static/index.html'), path.join(__dirname, '../static/'));
 }
 

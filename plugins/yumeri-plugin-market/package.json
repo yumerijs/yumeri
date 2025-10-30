@@ -1,6 +1,6 @@
 {
     "name": "yumeri-plugin-market",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "description": "Plugin market for Yumeri",
     "main": "dist/index.js",
     "dev": "src/index.ts",
