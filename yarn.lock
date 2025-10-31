@@ -405,10 +405,13 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@yumerijs/loader@workspace:package/loader"
   dependencies:
+    "@types/js-yaml": "npm:^4.0.9"
     "@types/node": "npm:^22.13.10"
     "@yumerijs/core": "npm:^2.0.0"
+    chokidar: "npm:^4.0.3"
     esbuild: "npm:^0.25.9"
     esbuild-register: "npm:^3.6.0"
+    js-yaml: "npm:^4.1.0"
     typescript: "npm:^5.8.2"
   languageName: unknown
   linkType: soft
