@@ -22,16 +22,23 @@ export class Logger {
 
   constructor(title: string) {
     this.title = title;
-    this.titleColor = this.getRandomColor();
+    this.titleColor = this.getColorByName(this.title);
   }
 
-  private getRandomColor(): (text: string) => string {
+  private getColorByName(name: string): (text: string) => string {
     const availableColors = [
       pc.red, pc.green, pc.yellow, pc.blue,
-      pc.magenta, pc.cyan, pc.white, pc.gray
+      pc.magenta, pc.cyan, pc.white,
+      pc.redBright, pc.greenBright, pc.yellowBright, 
+      pc.blueBright, pc.magentaBright, pc.cyanBright
     ];
-    const randomIndex = Math.floor(Math.random() * availableColors.length);
-    return availableColors[randomIndex];
+    // Simple hash function to ensure consistent color for the same title
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash % availableColors.length);
+    return availableColors[index];
   }
 
   private getTimestamp(): string {
