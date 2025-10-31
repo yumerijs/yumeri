@@ -7,7 +7,6 @@ import { exec } from 'child_process';
 import { pathToFileURL } from 'url';
 import * as yaml from 'js-yaml';
 import * as chokidar from 'chokidar';
-import 'esbuild-register';
 
 const execAsync = promisify(exec);
 

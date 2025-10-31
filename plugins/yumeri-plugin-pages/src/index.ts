@@ -19,7 +19,7 @@ interface Pages {
   status: string;
   comment_status: string;
 }
-
+ 
 interface Pagesmeta {
   id: number;
   page_id: number;

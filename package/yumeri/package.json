@@ -1,7 +1,7 @@
 {
   "name": "yumeri",
-  "version": "2.0.0",
-  "description": "基于nodejs的API管理平台",
+  "version": "2.0.2",
+  "description": "基于nodejs的Web构建平台",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
@@ -34,8 +34,8 @@
     "typescript": "^5.8.2"
   },
   "dependencies": {
-    "@yumerijs/core": "^2.0.0",
-    "@yumerijs/loader": "^2.0.0",
+    "@yumerijs/core": "^2.0.2",
+    "@yumerijs/loader": "^2.0.2",
     "cac": "^6.7.14"
   }
 }

@@ -381,7 +381,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@yumerijs/core@npm:^2.0.0, @yumerijs/core@workspace:package/core":
+"@yumerijs/core@npm:^2.0.1, @yumerijs/core@workspace:package/core":
   version: 0.0.0-use.local
   resolution: "@yumerijs/core@workspace:package/core"
   dependencies:
@@ -390,7 +390,6 @@ __metadata:
     "@types/mime-types": "npm:^3"
     "@types/node": "npm:^22.13.10"
     "@types/ws": "npm:^8"
-    "@yumerijs/loader": "npm:^2.0.0"
     chokidar: "npm:^4.0.3"
     formidable: "npm:^3.5.4"
     js-yaml: "npm:^4.1.0"
@@ -401,13 +400,13 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@yumerijs/loader@npm:^2.0.0, @yumerijs/loader@workspace:package/loader":
+"@yumerijs/loader@npm:^2.0.1, @yumerijs/loader@workspace:package/loader":
   version: 0.0.0-use.local
   resolution: "@yumerijs/loader@workspace:package/loader"
   dependencies:
     "@types/js-yaml": "npm:^4.0.9"
     "@types/node": "npm:^22.13.10"
-    "@yumerijs/core": "npm:^2.0.0"
+    "@yumerijs/core": "npm:^2.0.1"
     chokidar: "npm:^4.0.3"
     esbuild: "npm:^0.25.9"
     esbuild-register: "npm:^3.6.0"
@@ -2682,7 +2681,7 @@ __metadata:
     mime: "npm:^4.0.7"
     typescript: "npm:^5.8.2"
   peerDependencies:
-    yumeri: ^2.0.0
+    yumeri: ^2.0.1
   languageName: unknown
   linkType: soft
 
@@ -2842,8 +2841,8 @@ __metadata:
   dependencies:
     "@types/formidable": "npm:^3.4.5"
     "@types/node": "npm:^22.13.10"
-    "@yumerijs/core": "npm:^2.0.0"
-    "@yumerijs/loader": "npm:^2.0.0"
+    "@yumerijs/core": "npm:^2.0.1"
+    "@yumerijs/loader": "npm:^2.0.1"
     cac: "npm:^6.7.14"
     typescript: "npm:^5.8.2"
   bin:

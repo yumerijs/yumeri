@@ -50,7 +50,7 @@ export const config = {
   } as Record<string, ConfigSchema>
 }
 
-export class UserComponent {
+export class User {
   private tableName: string
 
   constructor(private db: Database, private config: Config) {
@@ -124,6 +124,6 @@ export async function apply(ctx: Context, config: Config) {
     unique: ['username']
   })
 
-  ctx.registerComponent('user', new UserComponent(db, config))
+  ctx.registerComponent('user', new User(db, config))
   logger.info('User model loaded')
 }

@@ -49,7 +49,7 @@ async function getHook(ctx: Context, hookname: string, originString: string) {
   const newString = originString.replace(`{{${hookname}}}`, item);
   return newString;
 }
-
+ 
 export interface Authority {
   getLoginstatus(sessionid: string): boolean
   getUserinfo(sessionid: string): Promise<Record<string, any>> | false

@@ -1,6 +1,6 @@
 {
   "name": "yumeri-plugin-author-center",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Yumeri 作者中心插件",
   "main": "dist/index.js",
   "dev": "src/index.ts",
@@ -29,7 +29,7 @@
   "dependencies": {
     "yumeri-plugin-authority": "^1.2.0",
     "yumeri-plugin-pages": "^1.0.0",
-    "yumeri-plugin-permission": "^1.0.3",
+    "yumeri-plugin-permission": "^1.0.4",
     "yumeri-plugin-user": "^1.1.0"
   }
 }
