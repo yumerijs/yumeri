@@ -1,8 +1,3 @@
-/**
- * @time: 2025/10/25 01:30
- * @author: FireGuo
- * WindyPear-Team All right reserved
- **/
 
 import { Core } from './core';
 import { Route } from './route';

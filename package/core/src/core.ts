@@ -1,3 +1,4 @@
+
 import { Config } from './config';
 import { Logger } from './logger';
 import { Session } from './session';
@@ -41,9 +42,11 @@ export class Core {
   public coreConfig: CoreOptions;
   public server: CoreServer;
   public i18n: I18n;
+  public loader: any;
 
-  constructor(coreConfig?: CoreOptions, setCore = true) {
+  constructor(loader?: any, coreConfig?: CoreOptions, setCore = true) {
     this.coreConfig = coreConfig || ({} as CoreOptions);
+    this.loader = loader;
     if (setCore) Logger.setCore(this);
   }
 
@@ -73,7 +76,7 @@ export class Core {
 
   public async plugin(pluginInstance: Plugin, context: Context, config: Config): Promise<void> {
     const shortName = this.getShortPluginName(context.pluginname);
-    this.logger.info(`Applying plugin: "${shortName}"`);
+    this.logger.info(`apply plugin ${shortName}`);
     if (pluginInstance.apply) {
         await pluginInstance.apply(context, config);
     }

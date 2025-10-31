@@ -1,3 +1,4 @@
+
 import * as path from 'path';
 import { Core, Config, Logger, Context, PluginStatus } from '@yumerijs/core';
 import * as fs from 'fs';
@@ -31,9 +32,26 @@ export class PluginLoader {
     private isDev: boolean = false;
 
     constructor(core?: Core, private pluginsDir: string = 'plugins') {
-        this.core = core || new Core(undefined, false);
+        this.core = core || new Core(this, undefined, false);
         this.isDev = process.env.NODE_ENV === 'development';
-        Logger.setCore(this.core); // Set the core instance for the logger
+        Logger.setCore(this.core);
+    }
+
+    /**
+     * Reloads the config file from disk into memory and emits a 'config-reloaded' event.
+     * This does NOT reload any plugins.
+     */
+    public async reloadConfigFile(): Promise<void> {
+        this.logger.info('Reloading config file...');
+        try {
+            const doc = yaml.load(fs.readFileSync(this.configPath, 'utf8'));
+            this.config = doc;
+            this.core.coreConfig = this.config.core || {};
+            this.core.emit('config-reloaded', this.config);
+            this.logger.info('Config file reloaded.');
+        } catch (e) {
+            this.logger.error('Failed to reload config file:', e);
+        }
     }
 
     getCore(): Core {
@@ -62,9 +80,6 @@ export class PluginLoader {
             this.config = doc;
             this.logger.info('Config loaded.');
 
-            if (this.isDev) {
-                this.watchConfig(configPath);
-            }
             this.core.coreConfig = this.config.core || {};
             this.core.i18n = new (require('@yumerijs/core').I18n)(this.core.coreConfig.lang || ['zh', 'en']);
         } catch (e) {
@@ -73,45 +88,8 @@ export class PluginLoader {
         }
     }
 
-    private watchConfig(configPath: string): void {
-        const watcher = chokidar.watch(configPath, {
-            persistent: true,
-            ignoreInitial: true,
-            awaitWriteFinish: {
-                stabilityThreshold: 300,
-                pollInterval: 100,
-            },
-        });
-
-        watcher.on('change', async () => {
-            try {
-                const doc = yaml.load(fs.readFileSync(configPath, 'utf8')) as any;
-                if (doc && doc.plugins) {
-                    this.config.plugins = doc.plugins;
-                }
-                await this.core.emit('config-changed', this.config);
-            } catch (error) {
-                this.logger.error('Failed to reload config:', error);
-            }
-        });
-
-        this.logger.info(`Watching for config changes at ${configPath}`);
-    }
-
     async getPluginConfig(pluginName: string): Promise<Config> {
         const actualPluginName = pluginName.startsWith('~') ? pluginName.substring(1) : pluginName;
-
-        if (this.configPath && this.isDev) {
-            try {
-                const doc = yaml.load(fs.readFileSync(this.configPath, 'utf8')) as any;
-                if (doc && doc.plugins) {
-                    this.config.plugins = doc.plugins;
-                }
-            } catch (error) {
-                this.logger.warn('Failed to refresh config for hot reload:', error);
-            }
-        }
-
         if (!this.config.plugins[actualPluginName]) {
             return new Config(actualPluginName);
         }
@@ -199,7 +177,6 @@ export class PluginLoader {
             const pluginConfig = await this.getPluginConfig(pluginName);
             const context = this.getContext(pluginName);
 
-            // The new API
             await this.core.plugin(pluginInstance, context, pluginConfig);
 
             this.pluginStatus[pluginName] = PluginStatus.ENABLED;
@@ -304,7 +281,13 @@ export class PluginLoader {
         }
     }
 
+    /**
+     * Reloads a single plugin's code by clearing the require cache and then reloading it.
+     * @param pluginName The name of the plugin to reload.
+     */
     public async reloadPlugin(pluginName: string): Promise<void> {
+        this.logger.info(`Reloading plugin code for "${pluginName}"...`);
+        this.clearRequireCache(pluginName, new Set());
         await this.unloadPlugin(pluginName);
         const success = await this.loadSinglePlugin(pluginName);
         if (success) {
@@ -349,9 +332,6 @@ export class PluginLoader {
     }
 
     async loadModule(pluginName: string): Promise<Plugin> {
-        if (this.isDev) {
-            this.clearRequireCache(pluginName, new Set());
-        }
         const plugin = await require(pluginName);
         return plugin.default || plugin;
     }

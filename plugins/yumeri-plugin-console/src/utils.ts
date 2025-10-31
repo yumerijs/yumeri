@@ -51,7 +51,7 @@ export class PluginConfigManager {
         const actualPluginName = pluginName.startsWith('~') ? pluginName.substring(1) : pluginName;
         // 从 Core 正确地异步获取并展开配置内容
         try {
-            const cfg = this.core ? await this.core.getPluginConfig(actualPluginName) : null;
+            const cfg = this.core ? await this.core.loader.getPluginConfig(actualPluginName) : null;
             this.configCache[actualPluginName] = (cfg && (cfg as any).content) ? (cfg as any).content : {};
         } catch {
             this.configCache[actualPluginName] = {};
@@ -353,7 +353,7 @@ export class PluginConfigManager {
             if (reload && this.core && !isDisabled) {
                 try {
                     // 重新加载插件
-                    await this.core.reloadPlugin(actualPluginName);
+                    await this.core.loader.reloadPlugin(actualPluginName);
                     // logger.info(`Plugin ${actualPluginName} reloaded after config change.`);
                 } catch (reloadError) {
                     logger.error(`Failed to reload plugin ${actualPluginName} after config change:`, reloadError);
@@ -450,7 +450,7 @@ export class PluginConfigManager {
             // 触发配置变更事件
             if (this.core) {
                 try {
-                    await this.core.unloadPlugin(pluginName);
+                    await this.core.loader.unloadPlugin(pluginName);
                 } catch (unloadError) {
                     logger.error(`Failed to unload plugin ${pluginName} after being disabled:`, unloadError);
                 }
@@ -524,7 +524,7 @@ export class PluginConfigManager {
             // 触发配置变更事件
             if (this.core) {
                 try {
-                    await this.core.loadSinglePlugin(actualPluginName)
+                    await this.core.loader.loadSinglePlugin(actualPluginName)
                 } catch (loadError) {
                     logger.error(`Failed to load plugin ${actualPluginName} after being enabled:`, loadError);
                 }
@@ -543,7 +543,7 @@ export class PluginConfigManager {
      */
     getPluginStatus(pluginName: string): string {
         const actualPluginName = pluginName.startsWith('~') ? pluginName.substring(1) : pluginName;
-        return this.core?.pluginStatus[actualPluginName] || "DISABLED";
+        return this.core?.loader.pluginStatus[actualPluginName] || "DISABLED";
     }
 
     /**
