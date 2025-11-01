@@ -1,201 +1,306 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
-<meta charset="UTF-8">
-<title>依赖管理</title>
-<style>
-body { font-family: Arial, sans-serif; margin: 20px; background:#f9f9f9; }
-h1 { margin-bottom: 10px; }
-.scroll-container { overflow-x:auto; -webkit-overflow-scrolling: touch; }
-table { width: 100%; border-collapse: collapse; min-width: 600px; margin-top: 10px; background:#fff; border-radius:6px; box-shadow:0 0 8px rgba(0,0,0,0.1); }
-th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-th { background-color: #f0f0f0; }
-select { width: 100%; padding:4px; }
-button { margin: 5px 5px 5px 0; padding: 6px 12px; cursor: pointer; border:none; border-radius:4px; background:#2d8cf0; color:#fff; transition:0.2s; }
-button:hover { background:#1c6cd9; }
-.status { margin-top: 10px; color:#333; }
-.changed-dot { display:inline-block; width:8px; height:8px; background:green; border-radius:50%; margin-right:5px; }
-.modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; }
-.modal-content { background:#fff; padding:20px; border-radius:6px; max-width:90%; }
-.modal-buttons { margin-top:15px; text-align:right; }
-.modal-buttons button { margin-left:10px; }
-.add-input { width: 200px; padding: 4px; margin-right:5px; border:1px solid #ccc; border-radius:4px; }
-</style>
+    <meta charset="UTF-8">
+    <title>依赖管理</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f9f9f9;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+        }
+
+        .scroll-container {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 600px;
+            margin-top: 10px;
+            background: #fff;
+            border-radius: 6px;
+            box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f0f0f0;
+        }
+
+        select {
+            width: 100%;
+            padding: 4px;
+        }
+
+        button {
+            margin: 5px 5px 5px 0;
+            padding: 6px 12px;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            background: #2d8cf0;
+            color: #fff;
+            transition: 0.2s;
+        }
+
+        button:hover {
+            background: #1c6cd9;
+        }
+
+        .status {
+            margin-top: 10px;
+            color: #333;
+        }
+
+        .changed-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: green;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: #fff;
+            padding: 20px;
+            border-radius: 6px;
+            max-width: 90%;
+        }
+
+        .modal-buttons {
+            margin-top: 15px;
+            text-align: right;
+        }
+
+        .modal-buttons button {
+            margin-left: 10px;
+        }
+
+        .add-input {
+            width: 200px;
+            padding: 4px;
+            margin-right: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/yumeri-ui@latest/dist/yumeri-ui.css">
 </head>
+
 <body>
 
-<h1>依赖管理</h1>
-<div>
-    <button id="updateLatestBtn">一键更新到最新版本</button>
-    <button id="saveBtn">保存更改</button>
-    <input type="text" id="addName" class="add-input" placeholder="依赖名">
-    <input type="text" id="addVer" class="add-input" placeholder="版本 (可留空)">
-    <button id="addBtn">添加依赖</button>
-</div>
-<div class="status" id="status"></div>
-<div class="scroll-container">
-    <table>
-      <thead>
-        <tr>
-          <th>依赖名</th>
-          <th>当前版本</th>
-          <th>可选版本</th>
-        </tr>
-      </thead>
-      <tbody id="depsBody"></tbody>
-    </table>
-</div>
-
-<div class="modal" id="confirmModal">
-  <div class="modal-content">
-    <h3>确认更改</h3>
-    <div id="modalBody"></div>
-    <div class="modal-buttons">
-      <button id="modalCancel">取消</button>
-      <button id="modalConfirm">确认</button>
+    <h1>依赖管理</h1>
+    <div>
+        <button id="updateLatestBtn" class="btn">一键更新到最新版本</button>
+        <button id="saveBtn" class="btn">保存更改</button>
+        <input type="text" id="addName" class="add-input input" placeholder="依赖名">
+        <input type="text" id="addVer" class="add-input input" placeholder="版本 (可留空)">
+        <button id="addBtn" class="btn">添加依赖</button>
     </div>
-  </div>
-</div>
+    <div class="status" id="status"></div>
+    <div class="notification" id="notification"></div>
+    <div class="scroll-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>依赖名</th>
+                    <th>当前版本</th>
+                    <th>可选版本</th>
+                </tr>
+            </thead>
+            <tbody id="depsBody"></tbody>
+        </table>
+    </div>
 
-<script>
-const depsBody = document.getElementById('depsBody');
-const statusEl = document.getElementById('status');
-const saveBtn = document.getElementById('saveBtn');
-const addBtn = document.getElementById('addBtn');
-const addName = document.getElementById('addName');
-const addVer = document.getElementById('addVer');
-const updateLatestBtn = document.getElementById('updateLatestBtn');
-const modal = document.getElementById('confirmModal');
-const modalBody = document.getElementById('modalBody');
-const modalCancel = document.getElementById('modalCancel');
-const modalConfirm = document.getElementById('modalConfirm');
+    <div class="modal" id="confirmModal">
+        <div class="modal-content">
+            <h3>确认更改</h3>
+            <div id="modalBody"></div>
+            <div class="modal-buttons">
+                <button id="modalCancel">取消</button>
+                <button id="modalConfirm">确认</button>
+            </div>
+        </div>
+    </div>
 
-let dependencies = []; // [{name, version, allVersions: [], changed:false}]
+    <script>
+        const depsBody = document.getElementById('depsBody');
+        const statusEl = document.getElementById('status');
+        const saveBtn = document.getElementById('saveBtn');
+        const addBtn = document.getElementById('addBtn');
+        const addName = document.getElementById('addName');
+        const addVer = document.getElementById('addVer');
+        const updateLatestBtn = document.getElementById('updateLatestBtn');
+        const modal = document.getElementById('confirmModal');
+        const modalBody = document.getElementById('modalBody');
+        const modalCancel = document.getElementById('modalCancel');
+        const modalConfirm = document.getElementById('modalConfirm');
+        const notification = document.getElementById('notification');
 
-// 获取依赖列表
-async function fetchDependencies() {
-    const res = await fetch('/api/market/dependencies');
-    const data = await res.json();
-    if (data.success) {
-        dependencies = data.dependencies.map(dep => ({ ...dep, allVersions: [], changed:false }));
-        await fetchAllVersions();
-        renderTable();
-    } else {
-        statusEl.textContent = '获取依赖失败: ' + data.message;
-    }
-}
-
-// 获取 npm 版本列表
-async function fetchAllVersions() {
-    try {
-        const res = await fetch('/api/market/npm-versions');
-        const data = await res.json();
-        if (data.success) {
-            dependencies.forEach(dep => {
-                const verInfo = data.dependencies[dep.name];
-                dep.allVersions = verInfo?.npmVersions || [];
-                // 当前版本不在列表里也加进去
-                if (dep.version && !dep.allVersions.includes(dep.version)) dep.allVersions.unshift(dep.version);
-            });
-        } else {
-            dependencies.forEach(dep => dep.allVersions = [dep.version]);
+        function notificate(message, type = 'info') {
+            notification.innerHTML = `<p>${message}</p>`;
+            notification.classList.add('show');
+            notification.classList.add(type);
+            setTimeout(() => {
+                notification.classList.remove('show');
+                notification.classList.remove(type);
+            }, 3000);
         }
-    } catch(e){
-        dependencies.forEach(dep => dep.allVersions = [dep.version]);
-    }
-}
+        let dependencies = []; // [{name, version, allVersions: [], changed:false}]
 
-function renderTable() {
-    depsBody.innerHTML = '';
-    dependencies.forEach((dep) => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${dep.changed?'<span class="changed-dot"></span>':''}${dep.name}</td>
+        // 获取依赖列表
+        async function fetchDependencies() {
+            const res = await fetch('/api/market/dependencies');
+            const data = await res.json();
+            if (data.success) {
+                dependencies = data.dependencies.map(dep => ({ ...dep, allVersions: [], changed: false }));
+                await fetchAllVersions();
+                renderTable();
+            } else {
+                // statusEl.textContent = '获取依赖失败: ' + data.message;
+                notificate('获取依赖失败: ' + data.message, 'danger');
+            }
+        }
+
+        // 获取 npm 版本列表
+        async function fetchAllVersions() {
+            try {
+                const res = await fetch('/api/market/npm-versions');
+                const data = await res.json();
+                if (data.success) {
+                    dependencies.forEach(dep => {
+                        const verInfo = data.dependencies[dep.name];
+                        dep.allVersions = verInfo?.npmVersions || [];
+                        // 当前版本不在列表里也加进去
+                        if (dep.version && !dep.allVersions.includes(dep.version)) dep.allVersions.unshift(dep.version);
+                    });
+                } else {
+                    dependencies.forEach(dep => dep.allVersions = [dep.version]);
+                }
+            } catch (e) {
+                dependencies.forEach(dep => dep.allVersions = [dep.version]);
+            }
+        }
+
+        function renderTable() {
+            depsBody.innerHTML = '';
+            dependencies.forEach((dep) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+            <td>${dep.changed ? '<span class="changed-dot"></span>' : ''}${dep.name}</td>
             <td>${dep.version}</td>
             <td>
                 <select>
-                    ${dep.allVersions.map(v => `<option value="${v}" ${v===dep.version?'selected':''}>${v}</option>`).join('')}
+                    ${dep.allVersions.map(v => `<option value="${v}" ${v === dep.version ? 'selected' : ''}>${v}</option>`).join('')}
                     <option value="__REMOVE__">移除依赖</option>
                 </select>
             </td>
         `;
-        const select = tr.querySelector('select');
-        select.addEventListener('change', () => {
-            if(select.value==='__REMOVE__'){
-                dep.changed = true;
-                dep.version = 'null'; 
-            } else {
-                dep.changed = select.value !== dep.version && dep.version!=='null';
-                dep.version = select.value;
+                const select = tr.querySelector('select');
+                select.addEventListener('change', () => {
+                    if (select.value === '__REMOVE__') {
+                        dep.changed = true;
+                        dep.version = 'null';
+                    } else {
+                        dep.changed = select.value !== dep.version && dep.version !== 'null';
+                        dep.version = select.value;
+                    }
+                    renderTable();
+                });
+                depsBody.appendChild(tr);
+            });
+        }
+
+        // 添加依赖
+        addBtn.addEventListener('click', async () => {
+            const name = addName.value.trim();
+            const version = addVer.value.trim() || 'latest';
+            if (!name) return;
+            if (dependencies.find(d => d.name === name)) {
+                alert('依赖已存在');
+                return;
             }
+            dependencies.push({ name, version, allVersions: [version], changed: true });
+            renderTable();
+            addName.value = ''; addVer.value = '';
+        });
+
+        // 一键更新到最新版本
+        updateLatestBtn.addEventListener('click', () => {
+            dependencies.forEach(dep => {
+                if (dep.allVersions && dep.allVersions.length > 0) {
+                    const latest = dep.allVersions[dep.allVersions.length - 1];
+                    if (latest !== dep.version) {
+                        dep.version = latest;
+                        dep.changed = true;
+                    }
+                }
+            });
             renderTable();
         });
-        depsBody.appendChild(tr);
-    });
-}
 
-// 添加依赖
-addBtn.addEventListener('click', async () => {
-    const name = addName.value.trim();
-    const version = addVer.value.trim() || 'latest';
-    if (!name) return;
-    if (dependencies.find(d => d.name === name)) {
-        alert('依赖已存在');
-        return;
-    }
-    dependencies.push({ name, version, allVersions:[version], changed:true });
-    renderTable();
-    addName.value=''; addVer.value='';
-});
-
-// 一键更新到最新版本
-updateLatestBtn.addEventListener('click', () => {
-    dependencies.forEach(dep => {
-        if(dep.allVersions && dep.allVersions.length>0){
-            const latest = dep.allVersions[dep.allVersions.length-1];
-            if(latest !== dep.version){
-                dep.version = latest;
-                dep.changed = true;
+        // 保存更改
+        saveBtn.addEventListener('click', () => {
+            const changedDeps = dependencies.filter(d => d.changed);
+            if (changedDeps.length === 0) {
+                notificate('没有更改');
+                return;
             }
-        }
-    });
-    renderTable();
-});
+            modalBody.innerHTML = '<ul>' + changedDeps.map(d => `<li>${d.name}: ${d.version}</li>`).join('') + '</ul>';
+            modal.classList.add('active');
+        });
 
-// 保存更改
-saveBtn.addEventListener('click', () => {
-    const changedDeps = dependencies.filter(d => d.changed);
-    if (changedDeps.length===0) {
-        statusEl.textContent='没有更改';
-        return;
-    }
-    modalBody.innerHTML = '<ul>' + changedDeps.map(d=>`<li>${d.name}: ${d.version}</li>`).join('') + '</ul>';
-    modal.style.display='flex';
-});
+        modalCancel.addEventListener('click', () => { modal.classList.remove('active'); });
 
-modalCancel.addEventListener('click', ()=>{ modal.style.display='none'; });
+        modalConfirm.addEventListener('click', async () => {
+            modal.classList.remove('active');
+            const changedDeps = dependencies.filter(d => d.changed);
+            const params = new URLSearchParams();
+            params.set('deps', changedDeps.map(d => `${d.name}@${d.version}`).join(','));
+            notificate('正在保存');
+            try {
+                const res = await fetch('/api/market/savever?' + params.toString(), { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    notificate(`已安装: ${data.installed.join(', ')}, 已移除: ${data.removed.join(', ')}`);
+                    await fetchDependencies();
+                } else {
+                    notificate('保存失败: ' + data.message, 'danger');
+                }
+            } catch (e) {
+                notificate('请求失败: ' + e.message, 'danger');
+            }
+        });
 
-modalConfirm.addEventListener('click', async () => {
-    modal.style.display='none';
-    const changedDeps = dependencies.filter(d => d.changed);
-    const params = new URLSearchParams();
-    params.set('deps', changedDeps.map(d=>`${d.name}@${d.version}`).join(','));
-    statusEl.textContent='正在保存更改...';
-    try {
-        const res = await fetch('/api/market/savever?' + params.toString(), { method:'POST' });
-        const data = await res.json();
-        if (data.success) {
-            statusEl.textContent=`已安装: ${data.installed.join(', ')}, 已移除: ${data.removed.join(', ')}`;
-            await fetchDependencies();
-        } else {
-            statusEl.textContent='保存失败: '+data.message;
-        }
-    } catch(e){
-        statusEl.textContent='请求失败: '+e.message;
-    }
-});
-
-fetchDependencies();
-</script>
+        fetchDependencies();
+    </script>
 </body>
+
 </html>
