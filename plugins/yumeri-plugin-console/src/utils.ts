@@ -49,13 +49,25 @@ export class PluginConfigManager {
      */
     async getPluginConfig(pluginName: string): Promise<any> {
         const actualPluginName = pluginName.startsWith('~') ? pluginName.substring(1) : pluginName;
-        // 从 Core 正确地异步获取并展开配置内容
+        
         try {
-            const cfg = this.core ? await this.core.loader.getPluginConfig(actualPluginName) : null;
-            this.configCache[actualPluginName] = (cfg && (cfg as any).content) ? (cfg as any).content : {};
-        } catch {
+            // 直接读取 config.yml 文件
+            const configFileContent = fs.readFileSync(this.configPath, 'utf8');
+            const configData: any = yaml.load(configFileContent);
+
+            // 从解析后的数据中找到对应插件的配置
+            if (configData && configData.plugins) {
+                // 同时检查启用（pluginName）和禁用（~pluginName）两种状态的键
+                const pluginConfig = configData.plugins[actualPluginName] ?? configData.plugins[`~${actualPluginName}`] ?? {};
+                this.configCache[actualPluginName] = pluginConfig;
+            } else {
+                this.configCache[actualPluginName] = {};
+            }
+        } catch (error) {
+            logger.error(`Failed to read or parse config file at ${this.configPath}:`, error);
             this.configCache[actualPluginName] = {};
         }
+
         const schema = await this.getPluginSchema(actualPluginName);
         const config = this.configCache[actualPluginName] || {};
 

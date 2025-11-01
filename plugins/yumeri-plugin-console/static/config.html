@@ -1,54 +1,53 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>插件管理</title>
-    <link rel="stylesheet" href="./config/style.css">
-    <script src="./config/script.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>插件管理</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/yumeri-ui/dist/yumeri-ui.css">
+  <link rel="stylesheet" href="./config/style.css">
 </head>
+<body class="flex min-h-screen bg-bg-light text-base">
 
-<body>
-    <div class="overlay" id="overlay"></div>
-    <button class="toggle-sidebar" id="toggle-sidebar">☰</button>
+  <div class="overlay" id="overlay"></div>
+  <button id="toggle-sidebar" class="toggle-sidebar btn primary sm:hidden">☰</button>
 
-    <aside class="sidebar" id="sidebar">
-        <div class="sidebar-top">
-            <button id="add-plugin-btn" class="add-plugin-btn">添加插件</button>
-        </div>
-
-        <nav>
-            <ul id="plugin-list"></ul>
-        </nav>
-    </aside>
-
-    <main class="main-content">
-        <h2 id="plugin-title">请选择插件</h2>
-        <p id="plugin-usage"></p><br>
-        <div id="plugin-meta"></div>
-        <div id="plugin-status"></div>
-        <div id="configuration-area">
-            <p>请从左侧选择一个插件进行配置。</p>
-        </div>
-        <div class="button-row">
-            <button class="save-button">保存配置</button>
-            <button class="enable-button">启用插件</button>
-            <button class="disable-button">禁用插件</button>
-        </div>
-    </main>
-
-    <div id="notification" class="notification"></div>
-
-    <div id="add-plugin-modal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <h3>可添加的插件</h3>
-            <ul id="available-plugin-list"></ul>
-            <div class="modal-buttons">
-                <button id="close-modal-btn">关闭</button>
-            </div>
-        </div>
+  <aside id="sidebar" class="sidebar bg-bg-light border-r border-border p-4 sm:relative sm:transform-none">
+    <div class="sidebar-top mb-4">
+      <button id="add-plugin-btn" class="add-plugin-btn btn primary full-width">添加插件</button>
     </div>
-</body>
+    <nav>
+      <ul id="plugin-list" class="list-none p-0 m-0"></ul>
+    </nav>
+  </aside>
 
+  <main class="main-content flex-1 p-6">
+    <h2 id="plugin-title" class="text-xl font-bold mb-4">请选择插件</h2>
+    <p id="plugin-usage" class="mb-4"></p>
+    <div id="plugin-meta" class="mb-2"></div>
+    <div id="plugin-status" class="mb-4"></div>
+    <div id="configuration-area" class="mb-6">
+      <p>请从左侧选择一个插件进行配置。</p>
+    </div>
+    <div class="button-row flex gap-2">
+      <button id="save-button" class="save-button btn primary">保存配置</button>
+      <button id="enable-button" class="enable-button btn success">启用插件</button>
+      <button id="disable-button" class="disable-button btn danger">禁用插件</button>
+    </div>
+  </main>
+
+  <div id="notification" class="notification"></div>
+
+  <div id="add-plugin-modal" class="modal">
+    <div class="modal-content box relative">
+      <h3 class="text-lg font-bold mb-4">可添加的插件</h3>
+      <ul id="available-plugin-list" class="list-none p-0 m-0 mb-4"></ul>
+      <div class="modal-buttons">
+        <button id="close-modal-btn" class="btn outline full-width">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./config/script.js"></script>
+</body>
 </html>

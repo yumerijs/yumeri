@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const closeModalBtn = document.getElementById('close-modal-btn');
 
     addPluginBtn.addEventListener('click', async () => {
-        addPluginModal.style.display = 'block';
+        addPluginModal.classList.add('active');
         availablePluginList.innerHTML = '<li>加载中...</li>';
 
         try {
@@ -48,8 +48,12 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    closeModalBtn.addEventListener('click', () => {
-        addPluginModal.style.display = 'none';
+    const closeModalButtons = document.querySelectorAll('#close-modal-btn');
+
+    closeModalButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            addPluginModal.classList.remove('active');
+        });
     });
 
     let currentPluginName = null; // 显示用短名，例如 "pages"
@@ -76,21 +80,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // 显示通知
     function showNotification(message, type = 'success') {
-        notification.textContent = message;
-        notification.className = 'notification';
-        if (type === 'error') {
-            notification.classList.add('error');
-        }
-        notification.style.display = 'block';
-        setTimeout(() => {
-            notification.classList.add('show');
-        }, 10);
+        // Set the message inside a <p> tag
+        notification.innerHTML = `<p>${message}</p>`;
 
+        // Base class is 'notification'
+        notification.className = 'notification';
+
+        // Add the type class ('success', 'danger', etc.)
+        if (type === 'error') {
+            notification.classList.add('danger'); // yumeri-ui uses 'danger' for errors
+        } else {
+            notification.classList.add(type);
+        }
+
+        // Show the notification by adding the 'show' class
+        notification.classList.add('show');
+
+        // Hide it after 3 seconds by removing the 'show' class
         setTimeout(() => {
             notification.classList.remove('show');
-            setTimeout(() => {
-                notification.style.display = 'none';
-            }, 300);
         }, 3000);
     }
 
@@ -314,354 +322,344 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+  function renderTextInput(container, item) {
+    const label = document.createElement('label');
+    label.textContent = item.description || item.key;
+    label.htmlFor = item.key;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.id = item.key;
+    input.value = item.value !== null && item.value !== undefined ? item.value : '';
+    input.dataset.key = item.key;
+
+    // 关键：加上统一样式类
+    input.classList.add('input');
+
+    container.appendChild(label);
+    container.appendChild(input);
+}
+
     function renderTextInput(container, item) {
-        const label = document.createElement('label');
-        label.textContent = item.description || item.key;
-        label.htmlFor = item.key;
+    const label = document.createElement('label');
+    label.textContent = item.description || item.key;
+    label.htmlFor = item.key;
 
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.id = item.key;
-        input.value = item.value !== null && item.value !== undefined ? item.value : '';
-        input.dataset.key = item.key;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.id = item.key;
+    input.value = item.value !== null && item.value !== undefined ? item.value : '';
+    input.dataset.key = item.key;
 
-        container.appendChild(label);
-        container.appendChild(input);
+    input.classList.add('input');
+
+    container.appendChild(label);
+    container.appendChild(input);
+}
+
+function renderNumberInput(container, item) {
+    const label = document.createElement('label');
+    label.textContent = item.description || item.key;
+    label.htmlFor = item.key;
+
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.id = item.key;
+    input.value = item.value !== null && item.value !== undefined ? item.value : 0;
+    input.dataset.key = item.key;
+
+    input.classList.add('input');
+
+    container.appendChild(label);
+    container.appendChild(input);
+}
+
+function renderBooleanInput(container, item) {
+    const label = document.createElement('label');
+    label.textContent = item.description || item.key;
+    label.htmlFor = item.key;
+    container.appendChild(label);
+
+    const switchLabel = document.createElement('label');
+    switchLabel.className = 'switch';
+
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.id = item.key;
+    input.checked = !!item.value;
+    input.dataset.key = item.key;
+
+    const slider = document.createElement('span');
+    slider.className = 'slider round';
+
+    switchLabel.appendChild(input);
+    switchLabel.appendChild(slider);
+    container.appendChild(switchLabel);
+}
+
+function renderSelectInput(container, item) {
+    const label = document.createElement('label');
+    label.textContent = item.description || item.key;
+    label.htmlFor = item.key;
+
+    const select = document.createElement('select');
+    select.id = item.key;
+    select.dataset.key = item.key;
+    select.classList.add('input');
+
+    if (Array.isArray(item.options)) {
+        item.options.forEach(option => {
+            const optionEl = document.createElement('option');
+            optionEl.value = option;
+            optionEl.textContent = option;
+            if (option === item.value) optionEl.selected = true;
+            select.appendChild(optionEl);
+        });
     }
 
-    function renderNumberInput(container, item) {
-        const label = document.createElement('label');
-        label.textContent = item.description || item.key;
-        label.htmlFor = item.key;
+    container.appendChild(label);
+    container.appendChild(select);
+}
 
-        const input = document.createElement('input');
+function renderArrayInput(container, item) {
+    const header = document.createElement('div');
+    header.className = 'array-header';
+    header.textContent = item.description || item.key;
+    container.appendChild(header);
+
+    const arrayContainer = document.createElement('div');
+    arrayContainer.className = 'array-container';
+    arrayContainer.dataset.key = item.key;
+    arrayContainer.dataset.type = 'array';
+    arrayContainer.dataset.itemType = item.itemType || 'string';
+
+    if (Array.isArray(item.value)) {
+        item.value.forEach(value => {
+            const arrayItem = createArrayItem(value, item.itemType || 'string');
+            arrayContainer.appendChild(arrayItem);
+        });
+    }
+
+    const addButton = document.createElement('button');
+    addButton.className = 'add-array-item btn';
+    addButton.textContent = '添加项';
+    addButton.dataset.action = 'add-array-item';
+    addButton.dataset.target = item.key;
+
+    const controls = document.createElement('div');
+    controls.className = 'array-controls';
+    controls.appendChild(addButton);
+
+    container.appendChild(arrayContainer);
+    container.appendChild(controls);
+}
+
+function createArrayItem(value, itemType) {
+    const arrayItem = document.createElement('div');
+    arrayItem.className = 'array-item';
+
+    const itemContent = document.createElement('div');
+    itemContent.className = 'array-item-content';
+
+    let input;
+    if (itemType === 'number') {
+        input = document.createElement('input');
         input.type = 'number';
-        input.id = item.key;
-        input.value = item.value !== null && item.value !== undefined ? item.value : 0;
-        input.dataset.key = item.key;
-
-        container.appendChild(label);
-        container.appendChild(input);
-    }
-
-    function renderBooleanInput(container, item) {
-        const label = document.createElement('label');
-        label.textContent = item.description || item.key;
-        label.htmlFor = item.key;
-        container.appendChild(label);
-
+        input.value = value ?? 0;
+        input.classList.add('input');
+    } else if (itemType === 'boolean') {
         const switchLabel = document.createElement('label');
         switchLabel.className = 'switch';
 
-        const input = document.createElement('input');
+        input = document.createElement('input');
         input.type = 'checkbox';
-        input.id = item.key;
-        input.checked = !!item.value;
-        input.dataset.key = item.key;
+        input.checked = !!value;
 
         const slider = document.createElement('span');
         slider.className = 'slider round';
 
         switchLabel.appendChild(input);
         switchLabel.appendChild(slider);
-        container.appendChild(switchLabel);
+        itemContent.appendChild(switchLabel);
+    } else {
+        input = document.createElement('input');
+        input.type = 'text';
+        input.value = value ?? '';
+        input.classList.add('input');
     }
 
-    function renderSelectInput(container, item) {
-        const label = document.createElement('label');
-        label.textContent = item.description || item.key;
-        label.htmlFor = item.key;
+    if (itemType !== 'boolean') itemContent.appendChild(input);
 
-        const select = document.createElement('select');
-        select.id = item.key;
-        select.dataset.key = item.key;
+    const removeButton = document.createElement('button');
+    removeButton.className = 'remove-array-item btn';
+    removeButton.textContent = '删除';
+    removeButton.dataset.action = 'remove-array-item';
 
-        if (Array.isArray(item.options)) {
-            item.options.forEach(option => {
-                const optionEl = document.createElement('option');
-                optionEl.value = option;
-                optionEl.textContent = option;
-                if (option === item.value) {
-                    optionEl.selected = true;
-                }
-                select.appendChild(optionEl);
-            });
-        }
+    arrayItem.appendChild(itemContent);
+    arrayItem.appendChild(removeButton);
+    return arrayItem;
+}
 
-        container.appendChild(label);
-        container.appendChild(select);
+function renderComplexArrayInput(container, item) {
+    const header = document.createElement('div');
+    header.className = 'array-header';
+    header.textContent = item.description || item.key;
+    container.appendChild(header);
+
+    const arrayContainer = document.createElement('div');
+    arrayContainer.className = 'array-container';
+    arrayContainer.dataset.key = item.key;
+    arrayContainer.dataset.type = 'complex-array';
+    arrayContainer.dataset.itemType = item.itemType;
+    arrayContainer.dataset.itemSchema = JSON.stringify(item.itemSchema);
+
+    if (Array.isArray(item.value)) {
+        item.value.forEach((value, index) => {
+            const complexItem = createComplexArrayItem(item.key, index, value, item.itemSchema);
+            arrayContainer.appendChild(complexItem);
+        });
     }
 
-    function renderArrayInput(container, item) {
-        const header = document.createElement('div');
-        header.className = 'array-header';
-        header.textContent = item.description || item.key;
-        container.appendChild(header);
+    const addButton = document.createElement('button');
+    addButton.className = 'add-array-item btn';
+    addButton.textContent = '添加项';
+    addButton.dataset.action = 'add-complex-array-item';
+    addButton.dataset.target = item.key;
 
-        const arrayContainer = document.createElement('div');
-        arrayContainer.className = 'array-container';
-        arrayContainer.dataset.key = item.key;
-        arrayContainer.dataset.type = 'array';
-        arrayContainer.dataset.itemType = item.itemType || 'string';
+    const controls = document.createElement('div');
+    controls.className = 'array-controls';
+    controls.appendChild(addButton);
 
-        if (Array.isArray(item.value)) {
-            item.value.forEach(value => {
-                const arrayItem = createArrayItem(value, item.itemType || 'string');
-                arrayContainer.appendChild(arrayItem);
-            });
-        }
+    container.appendChild(arrayContainer);
+    container.appendChild(controls);
+}
 
-        const addButton = document.createElement('button');
-        addButton.className = 'add-array-item';
-        addButton.textContent = '添加项';
-        addButton.dataset.action = 'add-array-item';
-        addButton.dataset.target = item.key;
+function createComplexArrayItem(arrayKey, index, value, itemSchema) {
+    const complexItem = document.createElement('div');
+    complexItem.className = 'complex-array-item';
+    complexItem.dataset.index = index;
 
-        const controls = document.createElement('div');
-        controls.className = 'array-controls';
-        controls.appendChild(addButton);
+    const header = document.createElement('div');
+    header.className = 'complex-array-item-header';
 
-        container.appendChild(arrayContainer);
-        container.appendChild(controls);
-    }
+    const title = document.createElement('div');
+    title.className = 'complex-array-item-title';
+    title.textContent = `项 ${index + 1}`;
 
-    function createArrayItem(value, itemType) {
-        const arrayItem = document.createElement('div');
-        arrayItem.className = 'array-item';
+    const removeButton = document.createElement('button');
+    removeButton.className = 'remove-array-item btn';
+    removeButton.textContent = '删除';
+    removeButton.dataset.action = 'remove-complex-array-item';
 
-        const itemContent = document.createElement('div');
-        itemContent.className = 'array-item-content';
+    header.appendChild(title);
+    header.appendChild(removeButton);
+    complexItem.appendChild(header);
 
-        let input;
-        if (itemType === 'number') {
-            input = document.createElement('input');
-            input.type = 'number';
-            input.value = value !== null && value !== undefined ? value : 0;
-            input.className = 'array-item-input';
-        } else if (itemType === 'boolean') {
-            const switchLabel = document.createElement('label');
-            switchLabel.className = 'switch';
+    const content = document.createElement('div');
+    content.className = 'complex-array-item-content';
 
-            input = document.createElement('input');
-            input.type = 'checkbox';
-            input.checked = !!value;
-            input.className = 'array-item-input';
+    if (itemSchema.type === 'object' && itemSchema.properties) {
+        Object.entries(itemSchema.properties).forEach(([propKey, propSchema]) => {
+            const propValue = value?.[propKey];
+            const finalValue = propValue !== undefined ? propValue :
+                (propSchema.default ?? (propSchema.type === 'object' ? {} : (propSchema.type === 'array' ? [] : '')));
 
-            const slider = document.createElement('span');
-            slider.className = 'slider round';
-
-            switchLabel.appendChild(input);
-            switchLabel.appendChild(slider);
-            itemContent.appendChild(switchLabel);
-        } else {
-            input = document.createElement('input');
-            input.type = 'text';
-            input.value = value !== null && value !== undefined ? value : '';
-            input.className = 'array-item-input';
-            itemContent.appendChild(input);
-        }
-
-        if (itemType !== 'boolean') {
-            itemContent.appendChild(input);
-        }
-
-        const removeButton = document.createElement('button');
-        removeButton.className = 'remove-array-item';
-        removeButton.textContent = '删除';
-        removeButton.dataset.action = 'remove-array-item';
-
-        arrayItem.appendChild(itemContent);
-        arrayItem.appendChild(removeButton);
-
-        return arrayItem;
-    }
-
-    function renderComplexArrayInput(container, item) {
-        const header = document.createElement('div');
-        header.className = 'array-header';
-        header.textContent = item.description || item.key;
-        container.appendChild(header);
-
-        const arrayContainer = document.createElement('div');
-        arrayContainer.className = 'array-container';
-        arrayContainer.dataset.key = item.key;
-        arrayContainer.dataset.type = 'complex-array';
-        arrayContainer.dataset.itemType = item.itemType;
-        arrayContainer.dataset.itemSchema = JSON.stringify(item.itemSchema);
-
-        if (Array.isArray(item.value)) {
-            item.value.forEach((value, index) => {
-                const complexItem = createComplexArrayItem(item.key, index, value, item.itemSchema);
-                arrayContainer.appendChild(complexItem);
-            });
-        }
-
-        const addButton = document.createElement('button');
-        addButton.className = 'add-array-item';
-        addButton.textContent = '添加项';
-        addButton.dataset.action = 'add-complex-array-item';
-        addButton.dataset.target = item.key;
-
-        const controls = document.createElement('div');
-        controls.className = 'array-controls';
-        controls.appendChild(addButton);
-
-        container.appendChild(arrayContainer);
-        container.appendChild(controls);
-    }
-
-    function createComplexArrayItem(arrayKey, index, value, itemSchema) {
-        const complexItem = document.createElement('div');
-        complexItem.className = 'complex-array-item';
-        complexItem.dataset.index = index;
-
-        const header = document.createElement('div');
-        header.className = 'complex-array-item-header';
-
-        const title = document.createElement('div');
-        title.className = 'complex-array-item-title';
-        title.textContent = `项 ${index + 1}`;
-
-        const removeButton = document.createElement('button');
-        removeButton.className = 'remove-array-item';
-        removeButton.textContent = '删除';
-        removeButton.dataset.action = 'remove-complex-array-item';
-
-        header.appendChild(title);
-        header.appendChild(removeButton);
-        complexItem.appendChild(header);
-
-        const content = document.createElement('div');
-        content.className = 'complex-array-item-content';
-
-        if (itemSchema.type === 'object' && itemSchema.properties) {
-            Object.entries(itemSchema.properties).forEach(([propKey, propSchema]) => {
-                const propValue = value && typeof value === 'object' ? value[propKey] : undefined;
-                const finalValue = propValue !== undefined ? propValue :
-                    (propSchema.default !== undefined ? propSchema.default :
-                        (propSchema.type === 'object' ? {} :
-                            (propSchema.type === 'array' ? [] : '')));
-
-                const propItem = {
-                    key: `${arrayKey}[${index}].${propKey}`,
-                    value: finalValue,
-                    description: propSchema.description || propKey,
-                    type: propSchema.enum ? 'select' : propSchema.type,
-                    options: propSchema.enum
-                };
-
-                const propDiv = document.createElement('div');
-                propDiv.className = 'config-item';
-                propDiv.dataset.key = propItem.key;
-
-                switch (propItem.type) {
-                    case 'text':
-                    case 'string':
-                        renderTextInput(propDiv, propItem);
-                        break;
-                    case 'number':
-                        renderNumberInput(propDiv, propItem);
-                        break;
-                    case 'boolean':
-                        renderBooleanInput(propDiv, propItem);
-                        break;
-                    case 'select':
-                        renderSelectInput(propDiv, propItem);
-                        break;
-                    default:
-                        renderTextInput(propDiv, propItem);
-                }
-
-                content.appendChild(propDiv);
-            });
-        } else if (itemSchema.type === 'array' && itemSchema.items) {
-            const arrayItem = {
-                key: `${arrayKey}[${index}]`,
-                value: Array.isArray(value) ? value : [],
-                description: itemSchema.description || `项 ${index + 1}`,
-                type: 'array',
-                itemType: itemSchema.items.type
+            const propItem = {
+                key: `${arrayKey}[${index}].${propKey}`,
+                value: finalValue,
+                description: propSchema.description || propKey,
+                type: propSchema.enum ? 'select' : propSchema.type,
+                options: propSchema.enum
             };
 
-            renderArrayInput(content, arrayItem);
-        } else {
-            const basicItem = {
-                key: `${arrayKey}[${index}]`,
-                value: value,
-                description: itemSchema.description || `项 ${index + 1}`,
-                type: itemSchema.type === 'boolean' ? 'boolean' :
-                    (itemSchema.type === 'number' ? 'number' : 'text')
-            };
+            const propDiv = document.createElement('div');
+            propDiv.className = 'config-item';
+            propDiv.dataset.key = propItem.key;
 
-            switch (basicItem.type) {
-                case 'boolean':
-                    renderBooleanInput(content, basicItem);
+            switch (propItem.type) {
+                case 'text':
+                case 'string':
+                    renderTextInput(propDiv, propItem);
                     break;
                 case 'number':
-                    renderNumberInput(content, basicItem);
+                    renderNumberInput(propDiv, propItem);
+                    break;
+                case 'boolean':
+                    renderBooleanInput(propDiv, propItem);
+                    break;
+                case 'select':
+                    renderSelectInput(propDiv, propItem);
+                    break;
+                case 'object':
+                    renderObjectHeader(propDiv, propItem);
+                    break;
+                case 'array':
+                    renderArrayInput(propDiv, propItem);
                     break;
                 default:
-                    renderTextInput(content, basicItem);
+                    renderTextInput(propDiv, propItem);
             }
-        }
 
-        complexItem.appendChild(content);
-        return complexItem;
+            content.appendChild(propDiv);
+        });
     }
 
-    function renderObjectHeader(container, item) {
-        const header = document.createElement('div');
-        header.className = 'object-header';
-        header.textContent = item.description || item.key;
+    complexItem.appendChild(content);
+    return complexItem;
+}
 
-        const objectContainer = document.createElement('div');
-        objectContainer.className = 'object-container';
-        objectContainer.dataset.key = item.key;
-        objectContainer.dataset.type = 'object';
+function renderObjectHeader(container, item) {
+    const header = document.createElement('div');
+    header.className = 'object-header';
+    header.textContent = item.description || item.key;
 
-        if (item.properties && typeof item.properties === 'object') {
-            Object.entries(item.properties).forEach(([propKey, propSchema]) => {
-                const propValue = item.value && typeof item.value === 'object' ? item.value[propKey] : undefined;
-                const propItem = {
-                    key: `${item.key}.${propKey}`,
-                    value: propValue !== undefined ? propValue :
-                        (propSchema.default !== undefined ? propSchema.default : ''),
-                    description: propSchema.description || propKey,
-                    type: propSchema.enum ? 'select' : propSchema.type,
-                    options: propSchema.enum
-                };
+    const objectContainer = document.createElement('div');
+    objectContainer.className = 'object-container object-content';
+    objectContainer.dataset.key = item.key;
+    objectContainer.dataset.type = 'object';
 
-                const propDiv = document.createElement('div');
-                propDiv.className = 'config-item';
-                propDiv.dataset.key = propItem.key;
+    if (item.properties) {
+        Object.entries(item.properties).forEach(([propKey, propSchema]) => {
+            const propValue = item.value?.[propKey];
+            const propItem = {
+                key: `${item.key}.${propKey}`,
+                value: propValue ?? (propSchema.default ?? ''),
+                description: propSchema.description || propKey,
+                type: propSchema.enum ? 'select' : propSchema.type,
+                options: propSchema.enum
+            };
 
-                switch (propItem.type) {
-                    case 'number':
-                        renderNumberInput(propDiv, propItem);
-                        break;
-                    case 'boolean':
-                        renderBooleanInput(propDiv, propItem);
-                        break;
-                    case 'select':
-                        renderSelectInput(propDiv, propItem);
-                        break;
-                    case 'object':
-                        renderObjectHeader(propDiv, propItem);
-                        break;
-                    case 'array':
-                        renderArrayInput(propDiv, propItem);
-                        break;
-                    default:
-                        renderTextInput(propDiv, propItem);
-                }
+            const propDiv = document.createElement('div');
+            propDiv.className = 'config-item';
+            propDiv.dataset.key = propItem.key;
 
-                objectContainer.appendChild(propDiv);
-            });
-        }
+            switch (propItem.type) {
+                case 'number':
+                    renderNumberInput(propDiv, propItem);
+                    break;
+                case 'boolean':
+                    renderBooleanInput(propDiv, propItem);
+                    break;
+                case 'select':
+                    renderSelectInput(propDiv, propItem);
+                    break;
+                case 'object':
+                    renderObjectHeader(propDiv, propItem);
+                    break;
+                case 'array':
+                    renderArrayInput(propDiv, propItem);
+                    break;
+                default:
+                    renderTextInput(propDiv, propItem);
+            }
 
-        container.appendChild(header);
-        container.appendChild(objectContainer);
+            objectContainer.appendChild(propDiv);
+        });
     }
+
+    container.appendChild(header);
+    container.appendChild(objectContainer);
+}
 
     function bindEventListeners() {
         document.querySelectorAll('[data-action="add-array-item"]').forEach(button => {
@@ -743,7 +741,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const items = [];
 
             container.querySelectorAll('.array-item').forEach(item => {
-                const input = item.querySelector('.array-item-input');
+                const input = item.querySelector('input');
                 if (input) {
                     let value;
                     if (itemType === 'number') {
