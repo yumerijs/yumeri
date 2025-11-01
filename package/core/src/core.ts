@@ -59,7 +59,6 @@ export class Core {
       staticDir: this.coreConfig.staticDir || 'public',
     });
     await this.server.start();
-    this.logger.info(`Yumeri server started at ${this.coreConfig.host}:${this.coreConfig.port}`);
   }
 
   public getShortPluginName(pluginName: string): string {
