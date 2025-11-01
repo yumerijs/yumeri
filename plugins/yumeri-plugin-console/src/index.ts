@@ -84,11 +84,20 @@ export async function apply(ctx: Context, config: Config) {
     const consoleHtmlPath = path.join(staticDir, 'home.html');
     if (fs.existsSync(consoleHtmlPath)) {
       const parseone = await getHook(ctx, 'console:home', fs.readFileSync(consoleHtmlPath, 'utf8'));
-      const parsetwo = await getHook(ctx, 'console:homejs', parseone);
-      session.body = parsetwo;
+      // const parsetwo = await getHook(ctx, 'console:homejs', parseone);
+      session.body = parseone;
       session.setMime('html');
     }
   }));
+
+  ctx.route(`/${basePath}/home/script.js`).action((session) => requireLogin(session, async () => {
+    const consoleHtmlPath = path.join(staticDir, 'home.js');
+    if (fs.existsSync(consoleHtmlPath)) {
+      const parseone = await getHook(ctx, 'console:homejs', fs.readFileSync(consoleHtmlPath, 'utf8'));
+      session.body = parseone;
+      session.setMime('application/javascript');
+    }
+  }))
 
   ctx.route(`/api/console/loginpass`).action(async (session, params) => {
     session.setMime('json');
