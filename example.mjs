@@ -1,11 +1,10 @@
 import pkg from 'yumeri';
-const { Core, Loader, Context, Config } = pkg;
-const loader = new Loader()
+const { Core, Context } = pkg;
 const serverconfig = {
     port: 8080,
     host: '0.0.0.0'
 }
-const core = new Core(loader, serverconfig)
+const core = new Core(null , serverconfig)
 const ctx = new Context(core, 'MyAPP')
 let count = 0
 core.runCore()
