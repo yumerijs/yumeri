@@ -83,9 +83,6 @@ document.addEventListener('DOMContentLoaded', function () {
         // Set the message inside a <p> tag
         notification.innerHTML = `<p>${message}</p>`;
 
-        // Base class is 'notification'
-        notification.className = 'notification';
-
         // Add the type class ('success', 'danger', etc.)
         if (type === 'error') {
             notification.classList.add('danger'); // yumeri-ui uses 'danger' for errors

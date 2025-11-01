@@ -285,14 +285,30 @@ export class PluginLoader {
      * @param pluginName The name of the plugin to reload.
      */
     public async reloadPlugin(pluginName: string): Promise<void> {
-        this.logger.info(`Reloading plugin code for "${pluginName}"...`);
-        this.clearRequireCache(pluginName, new Set());
-        await this.unloadPlugin(pluginName);
+        this.logger.info(`Reloading plugin: "${pluginName}"...`);
+
+        // Clear the module cache for the plugin. This is critical for hot-reloading.
+        try {
+            const resolvedPath = require.resolve(pluginName);
+            this.clearRequireCache(resolvedPath, new Set());
+            this.logger.info(`Cache cleared for plugin "${pluginName}".`);
+        } catch (e) {
+            this.logger.error(`Could not resolve path for plugin ${pluginName} to clear cache.`, e);
+        }
+        
+        // Reload the configuration from disk to catch any changes.
+        await this.reloadConfigFile();
+
+        // Unload the plugin and its dependents.
+        await this.unloadPlugin(pluginName, true);
+
+        // Load the plugin again. This will also trigger a check for other pending plugins.
         const success = await this.loadSinglePlugin(pluginName);
         if (success) {
+            this.logger.info(`Plugin "${pluginName}" reloaded successfully.`);
             this.core.emit('plugin-reloaded', pluginName);
         } else {
-            this.logger.error(`Failed to reload plugin "${pluginName}". It may have unmet dependencies.`);
+            this.logger.error(`Failed to reload plugin "${pluginName}". It may have unmet dependencies or other errors.`);
         }
     }
 
