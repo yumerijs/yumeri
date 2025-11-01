@@ -1,8 +1,14 @@
-import { Context, Config, Logger, ConfigSchema } from 'yumeri';
+import { Context, Config, Logger, ConfigSchema, Session } from 'yumeri';
 import { Database } from '@yumerijs/types';
 import './types';
 
 const logger = new Logger("analyse");
+
+interface OperateConsole {
+  addconsoleitem: (name: string, icon: string, displayname: string, htmlpath: string, staticpath: string) => void;
+  removeconsoleitem: (name: string) => void;
+  getloginstatus: (session: Session) => boolean;
+}
 
 export const depend = ['database'];
 
@@ -72,6 +78,19 @@ loadStats();`;
 
 export async function apply(ctx: Context, config: Config) {
   const db = ctx.getComponent('database') as Database
+  const consoleApi: OperateConsole = ctx.getComponent('console');
+  const requireLogin = (
+    handler: (session: Session, params: URLSearchParams, ...others: any[]) => Promise<void>
+  ) => {
+    return async (session: Session, params: URLSearchParams, ...others: any[]) => {
+      if (consoleApi.getloginstatus(session)) {
+        await handler(session, params, ...others);
+      } else {
+        session.setMime('json');
+        session.body = JSON.stringify({ success: false, message: '请先登录' });
+      }
+    };
+  };
 
   await db.extend('analyse', {
     day: 'unsigned', // Use a more specific type
@@ -90,7 +109,7 @@ export async function apply(ctx: Context, config: Config) {
     await next();
     if (getStartWith(session.pathname) && session.head['Content-Type'] === 'text/html') {
       const day = (new Date().getDate()) + 100 * (new Date().getMonth()) + 10000 * (new Date().getFullYear());
-      
+
       // Use the new type-safe API
       const record = await db.selectOne('analyse', { day });
       if (record) {
@@ -101,7 +120,7 @@ export async function apply(ctx: Context, config: Config) {
     }
   });
 
-  ctx.route('/api/analyse/:range').action(async (session, _, range) => {
+  ctx.route('/api/analyse/:range').action(requireLogin(async (session, _, range) => {
     try {
       const ranges = parseInt(range, 10) - 1;
       const today = new Date();
@@ -125,9 +144,9 @@ export async function apply(ctx: Context, config: Config) {
       logger.error(error);
       session.status = 500;
     }
-  });
+  }));
 
-  ctx.route('/api/analyse-total').action(async (session) => {
+  ctx.route('/api/analyse-total').action(requireLogin(async (session) => {
     try {
       // Use select() to get all records
       const analyses = await db.select('analyse', {});
@@ -138,5 +157,5 @@ export async function apply(ctx: Context, config: Config) {
       logger.error(error);
       session.status = 500;
     }
-  });
+  }));
 }

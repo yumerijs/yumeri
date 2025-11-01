@@ -381,7 +381,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@yumerijs/core@npm:^2.0.1, @yumerijs/core@workspace:package/core":
+"@yumerijs/core@npm:^2.0.1, @yumerijs/core@npm:^2.0.2, @yumerijs/core@workspace:package/core":
   version: 0.0.0-use.local
   resolution: "@yumerijs/core@workspace:package/core"
   dependencies:
@@ -400,7 +400,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@yumerijs/loader@npm:^2.0.1, @yumerijs/loader@workspace:package/loader":
+"@yumerijs/loader@npm:^2.0.2, @yumerijs/loader@workspace:package/loader":
   version: 0.0.0-use.local
   resolution: "@yumerijs/loader@workspace:package/loader"
   dependencies:
@@ -412,6 +412,8 @@ __metadata:
     esbuild-register: "npm:^3.6.0"
     js-yaml: "npm:^4.1.0"
     typescript: "npm:^5.8.2"
+  peerDependencies:
+    "@yumerijs/core": ^2.0.2
   languageName: unknown
   linkType: soft
 
@@ -2648,7 +2650,7 @@ __metadata:
     typescript: "npm:^5.8.2"
     yumeri-plugin-authority: "npm:^1.2.0"
     yumeri-plugin-pages: "npm:^1.0.0"
-    yumeri-plugin-permission: "npm:^1.0.3"
+    yumeri-plugin-permission: "npm:^1.0.4"
     yumeri-plugin-user: "npm:^1.1.0"
   peerDependencies:
     yumeri: ^2.0.0
@@ -2737,6 +2739,17 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"yumeri-plugin-manage@workspace:plugins/yumeri-plugin-manage":
+  version: 0.0.0-use.local
+  resolution: "yumeri-plugin-manage@workspace:plugins/yumeri-plugin-manage"
+  dependencies:
+    "@types/node": "npm:^22.14.1"
+    typescript: "npm:^5.8.2"
+  peerDependencies:
+    yumeri: ^2.0.0
+  languageName: unknown
+  linkType: soft
+
 "yumeri-plugin-market@workspace:plugins/yumeri-plugin-market":
   version: 0.0.0-use.local
   resolution: "yumeri-plugin-market@workspace:plugins/yumeri-plugin-market"
@@ -2772,7 +2785,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"yumeri-plugin-permission@npm:^1.0.3, yumeri-plugin-permission@workspace:plugins/yumeri-plugin-permission":
+"yumeri-plugin-permission@npm:^1.0.4, yumeri-plugin-permission@workspace:plugins/yumeri-plugin-permission":
   version: 0.0.0-use.local
   resolution: "yumeri-plugin-permission@workspace:plugins/yumeri-plugin-permission"
   dependencies:
@@ -2841,8 +2854,8 @@ __metadata:
   dependencies:
     "@types/formidable": "npm:^3.4.5"
     "@types/node": "npm:^22.13.10"
-    "@yumerijs/core": "npm:^2.0.1"
-    "@yumerijs/loader": "npm:^2.0.1"
+    "@yumerijs/core": "npm:^2.0.2"
+    "@yumerijs/loader": "npm:^2.0.2"
     cac: "npm:^6.7.14"
     typescript: "npm:^5.8.2"
   bin:
