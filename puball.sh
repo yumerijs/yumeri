@@ -19,6 +19,7 @@ publish_package() {
 
     if [ "$version" != "$latest" ]; then
         echo "发布 $name@$version (当前 npm 最新: $latest)"
+        rm tsconfig.tsbuildinfo
         npm publish --tag latest --access public --registry https://registry.npmjs.org/
     else
         echo "$name@$version 已经是最新版本，跳过"
