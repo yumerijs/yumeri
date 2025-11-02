@@ -1,8 +1,10 @@
-import { Context, Config, Session, Logger, ConfigSchema } from 'yumeri';
+import { Context, Config, Session, Logger, ConfigSchema, Route } from 'yumeri';
 import { WebSocketServer, WebSocket } from 'ws';
 import path from 'path';
 
 const logger = new Logger("logger");
+
+export const depend = ['console'];
 
 export const config = {} as Record<string, ConfigSchema>
 
@@ -12,8 +14,9 @@ interface OperateConsole {
   getloginstatus: (session: Session) => boolean;
 }
 
+let route: Route;
+
 export async function apply(ctx: Context, config: Config) {
-  const wsclients: WebSocket[] = [];
   const consoleApi: OperateConsole = ctx.getComponent('console');
   consoleApi.addconsoleitem('logger', 'fa-solid fa-file', '日志', path.join(__dirname, '../static/index.html'), path.join(__dirname, '../static'));
   const requireLogin = (session: Session) => {
@@ -23,7 +26,7 @@ export async function apply(ctx: Context, config: Config) {
       return false
     }
   };
-  ctx.route('/api/logger')
+  route = ctx.route('/api/logger')
     .action(async (session: Session) => {
       if (!requireLogin(session)) {
         session.status = 401;
@@ -36,15 +39,19 @@ export async function apply(ctx: Context, config: Config) {
       if (!requireLogin(session)) {
         ws.close();
       }
-      wsclients.push(ws);
     })
   ctx.on('log', async (msg) => {
-    wsclients.forEach((ws) => {
+    route.ws.clients.forEach((ws) => {
       try {
         ws.send(JSON.stringify(msg));
       } catch (e) {
-        wsclients.splice(wsclients.indexOf(ws), 1);
       }
     });
   })
+}
+
+export async function disable(ctx: Context) {
+  const consoleApi: OperateConsole = ctx.getComponent('console');
+  consoleApi.removeconsoleitem('logger');
+  route.ws.close();
 }

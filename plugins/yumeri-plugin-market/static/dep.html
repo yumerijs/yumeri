@@ -15,7 +15,7 @@
             margin-bottom: 10px;
         }
 
-        .scroll-container {
+        .table-wrapper {
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
         }
@@ -126,7 +126,7 @@
     </div>
     <div class="status" id="status"></div>
     <div class="notification" id="notification"></div>
-    <div class="scroll-container">
+    <div class="table-wrapper">
         <table>
             <thead>
                 <tr>
@@ -173,18 +173,25 @@
                 notification.classList.remove(type);
             }, 3000);
         }
-        let dependencies = []; // [{name, version, allVersions: [], changed:false}]
+        // Data structure: {name, version, allVersions: [], selectedVersion: string, changed: boolean}
+        let dependencies = [];
+
+        // Close all dropdowns
+        document.addEventListener('click', () => {
+            document.querySelectorAll('.dropdown.active').forEach(dropdown => {
+                dropdown.classList.remove('active');
+            });
+        });
 
         // 获取依赖列表
         async function fetchDependencies() {
             const res = await fetch('/api/market/dependencies');
             const data = await res.json();
             if (data.success) {
-                dependencies = data.dependencies.map(dep => ({ ...dep, allVersions: [], changed: false }));
+                dependencies = data.dependencies.map(dep => ({ ...dep, allVersions: [], changed: false, selectedVersion: dep.version }));
                 await fetchAllVersions();
                 renderTable();
             } else {
-                // statusEl.textContent = '获取依赖失败: ' + data.message;
                 notificate('获取依赖失败: ' + data.message, 'danger');
             }
         }
@@ -213,26 +220,43 @@
             depsBody.innerHTML = '';
             dependencies.forEach((dep) => {
                 const tr = document.createElement('tr');
+                // "当前版本" now always shows the original version
                 tr.innerHTML = `
-            <td>${dep.changed ? '<span class="changed-dot"></span>' : ''}${dep.name}</td>
-            <td>${dep.version}</td>
-            <td>
-                <select>
-                    ${dep.allVersions.map(v => `<option value="${v}" ${v === dep.version ? 'selected' : ''}>${v}</option>`).join('')}
-                    <option value="__REMOVE__">移除依赖</option>
-                </select>
-            </td>
-        `;
-                const select = tr.querySelector('select');
-                select.addEventListener('change', () => {
-                    if (select.value === '__REMOVE__') {
-                        dep.changed = true;
-                        dep.version = 'null';
-                    } else {
-                        dep.changed = select.value !== dep.version && dep.version !== 'null';
-                        dep.version = select.value;
-                    }
-                    renderTable();
+                    <td>${dep.changed ? '<span class="changed-dot"></span>' : ''}${dep.name}</td>
+                    <td>${dep.version}</td>
+                    <td>
+                        <div class="dropdown">
+                            <button class="btn dropdown-toggle">${dep.selectedVersion === '__REMOVE__' ? '移除依赖' : dep.selectedVersion}</button>
+                            <div class="dropdown-content">
+                                ${dep.allVersions.map(v => `<a href="#" data-value="${v}" class="${v === dep.selectedVersion ? 'selected' : ''}">${v}</a>`).join('')}
+                                <a href="#" data-value="__REMOVE__" class="${dep.selectedVersion === '__REMOVE__' ? 'selected' : ''}">移除依赖</a>
+                            </div>
+                        </div>
+                    </td>
+                `;
+
+                const dropdown = tr.querySelector('.dropdown');
+                const dropdownToggle = tr.querySelector('.dropdown-toggle');
+                const dropdownContent = tr.querySelector('.dropdown-content');
+
+                dropdownToggle.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent document click from closing immediately
+                    // Close other dropdowns
+                    document.querySelectorAll('.dropdown.active').forEach(d => {
+                        if (d !== dropdown) d.classList.remove('active');
+                    });
+                    dropdown.classList.toggle('active');
+                });
+
+                dropdownContent.querySelectorAll('a').forEach(item => {
+                    item.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const newValue = item.dataset.value;
+                        dep.selectedVersion = newValue;
+                        dep.changed = (dep.selectedVersion !== dep.version);
+                        dropdown.classList.remove('active'); // Close dropdown
+                        renderTable(); // Re-render to update button text and changed dot
+                    });
                 });
                 depsBody.appendChild(tr);
             });
@@ -247,7 +271,8 @@
                 alert('依赖已存在');
                 return;
             }
-            dependencies.push({ name, version, allVersions: [version], changed: true });
+            // Add with selectedVersion initialized
+            dependencies.push({ name, version, allVersions: [version], changed: true, selectedVersion: version });
             renderTable();
             addName.value = ''; addVer.value = '';
         });
@@ -257,9 +282,9 @@
             dependencies.forEach(dep => {
                 if (dep.allVersions && dep.allVersions.length > 0) {
                     const latest = dep.allVersions[dep.allVersions.length - 1];
-                    if (latest !== dep.version) {
-                        dep.version = latest;
-                        dep.changed = true;
+                    if (latest !== dep.selectedVersion) {
+                        dep.selectedVersion = latest;
+                        dep.changed = (dep.selectedVersion !== dep.version);
                     }
                 }
             });
@@ -273,7 +298,8 @@
                 notificate('没有更改');
                 return;
             }
-            modalBody.innerHTML = '<ul>' + changedDeps.map(d => `<li>${d.name}: ${d.version}</li>`).join('') + '</ul>';
+            // Use selectedVersion for the confirmation modal
+            modalBody.innerHTML = '<ul>' + changedDeps.map(d => `<li>${d.name}: ${d.selectedVersion === '__REMOVE__' ? '移除' : d.selectedVersion}</li>`).join('') + '</ul>';
             modal.classList.add('active');
         });
 
@@ -283,7 +309,8 @@
             modal.classList.remove('active');
             const changedDeps = dependencies.filter(d => d.changed);
             const params = new URLSearchParams();
-            params.set('deps', changedDeps.map(d => `${d.name}@${d.version}`).join(','));
+            // Use selectedVersion to build the request
+            params.set('deps', changedDeps.map(d => `${d.name}@${d.selectedVersion}`).join(','));
             notificate('正在保存');
             try {
                 const res = await fetch('/api/market/savever?' + params.toString(), { method: 'POST' });
