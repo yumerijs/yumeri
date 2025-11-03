@@ -316,6 +316,16 @@ export async function apply(ctx: Context, config: Config) {
 
                 await fsp.writeFile(packageJsonPath, JSON.stringify(pkg, null, 2) + '\n');
 
+                // 删除 yarn.lock 文件
+                const yarnLockPath = path.join(projectPath, 'yarn.lock');
+                try {
+                    await fsp.unlink(yarnLockPath);
+                } catch (error: any) {
+                    if (error.code !== 'ENOENT') { // 如果文件不存在则忽略错误
+                        throw error;
+                    }
+                }
+
                 // 执行 yarn install
                 await new Promise<void>((resolve, reject) => {
                     const child = spawn('yarn', ['install', `--registry=${config.get('npmregistry', 'https://registry.npmmirror.com')}`], { cwd: projectPath });

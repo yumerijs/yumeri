@@ -481,39 +481,29 @@ export class PluginConfigManager {
      * @returns 是否启用成功
      */
     async enablePlugin(pluginName: string): Promise<boolean> {
-        // 如果插件名不以~开头，则已经是启用状态
-        // if (!pluginName.startsWith('~')) {
-        //     return true;
-        // }
-
-        // const actualPluginName = pluginName.substring(1);
-        const actualPluginName = pluginName;
-        pluginName = `~${pluginName}`
-        // logger.info(`actualPluginName: ${actualPluginName}, `, `pluginName : ${pluginName}`)
+        const actualPluginName = pluginName.startsWith('~') ? pluginName.substring(1) : pluginName;
 
         try {
             const configTmpYmlPath = this.configPath + '.tmp';
-
             const configFileContent = fs.readFileSync(this.configPath, 'utf8');
             let configData: any = yaml.load(configFileContent);
-
-            // 确保plugins对象存在
             configData.plugins = configData.plugins || {};
 
-            // 检查插件是否存在（若已为禁用键则视为已禁用）
-            if (!(pluginName in configData.plugins)) {
-                if ((`~${pluginName}`) in configData.plugins) {
-                    return true;
-                }
-                logger.error(`Plugin ${pluginName} not found in configuration.`);
+            // 如果插件已经启用，则直接返回
+            if (actualPluginName in configData.plugins && !( `~${actualPluginName}` in configData.plugins)) {
+                return true;
+            }
+
+            // 检查禁用状态的插件是否存在以启用它
+            if (!( `~${actualPluginName}` in configData.plugins)) {
                 return false;
             }
 
             // 保存插件配置
-            const pluginConfig = configData.plugins[pluginName];
+            const pluginConfig = configData.plugins[`~${actualPluginName}`];
 
             // 删除禁用的插件配置
-            delete configData.plugins[pluginName];
+            delete configData.plugins[`~${actualPluginName}`];
 
             // 添加启用的插件配置
             configData.plugins[actualPluginName] = pluginConfig;
@@ -536,7 +526,7 @@ export class PluginConfigManager {
             // 触发配置变更事件
             if (this.core) {
                 try {
-                    await this.core.loader.loadSinglePlugin(actualPluginName)
+                    await this.core.loader.loadSinglePlugin(actualPluginName);
                 } catch (loadError) {
                     logger.error(`Failed to load plugin ${actualPluginName} after being enabled:`, loadError);
                 }
