@@ -148,13 +148,21 @@ export class Core {
       const route = this.routes[routePath];
       const result = route.match(pathname);
       if (result) {
-        const middlewares = [...Object.values(this.globalMiddlewares), ...(route.middlewares || [])];
-        let index = 0;
-        const runner = async (): Promise<void> => {
-          if (index < middlewares.length) await middlewares[index++](session, runner);
-          else await route.executeHandler(session, queryParams, result.pathParams);
-        };
-        await runner();
+        try {
+          const middlewares = [...Object.values(this.globalMiddlewares), ...(route.middlewares || [])];
+          let index = 0;
+          const runner = async (): Promise<void> => {
+            if (index < middlewares.length) await middlewares[index++](session, runner);
+            else await route.executeHandler(session, queryParams, result.pathParams);
+          };
+          await runner();
+        } catch (error) {
+          this.logger.error(`Unhandled error in route execution for path "${pathname}":`, error);
+          if (session && session.client.res && !session.client.res.writableEnded) {
+            session.client.res.statusCode = 500;
+            session.client.res.end('Internal Server Error');
+          }
+        }
         return true;
       }
     }
