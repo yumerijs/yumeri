@@ -252,6 +252,7 @@ export class Session {
   }
 
   public endsession(message: any): any {
+    this.responseHandled = true;
     return this.client.res.end(message);
   }
 
