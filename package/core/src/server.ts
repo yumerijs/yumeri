@@ -95,68 +95,72 @@ export class Server {
                 if (!matched) {
                     this.serveStaticFile(pathname, res);
                 } else {
-                    let head = session.head;
-                    head['Set-Cookie'] = Object.entries(session.newCookie).map(([name, cookie]) => {
-                        let cookieString = `${name}=${cookie.value}`;
-                        if (cookie.options.expires) {
-                            cookieString += `; Expires=${cookie.options.expires.toUTCString()}`;
+                    if (!session.responseHandled) {
+                        let head = session.head;
+                        head['Set-Cookie'] = Object.entries(session.newCookie).map(([name, cookie]) => {
+                            let cookieString = `${name}=${cookie.value}`;
+                            if (cookie.options.expires) {
+                                cookieString += `; Expires=${cookie.options.expires.toUTCString()}`;
+                            }
+                            if (cookie.options.path) {
+                                cookieString += `; Path=${cookie.options.path}`;
+                            }
+                            if (cookie.options.domain) {
+                                cookieString += `; Domain=${cookie.options.domain}`;
+                            }
+                            if (cookie.options.secure) {
+                                cookieString += `; Secure`;
+                            }
+                            if (cookie.options.httpOnly) {
+                                cookieString += `; HttpOnly`;
+                            }
+                            if (cookie.options.sameSite) {
+                                cookieString += `; SameSite=${cookie.options.sameSite}`;
+                            }
+                            return cookieString;
+                        });
+                        if (this.enableCors) {
+                            head['Access-Control-Allow-Origin'] = '*';
                         }
-                        if (cookie.options.path) {
-                            cookieString += `; Path=${cookie.options.path}`;
-                        }
-                        if (cookie.options.domain) {
-                            cookieString += `; Domain=${cookie.options.domain}`;
-                        }
-                        if (cookie.options.secure) {
-                            cookieString += `; Secure`;
-                        }
-                        if (cookie.options.httpOnly) {
-                            cookieString += `; HttpOnly`;
-                        }
-                        if (cookie.options.sameSite) {
-                            cookieString += `; SameSite=${cookie.options.sameSite}`;
-                        }
-                        return cookieString;
-                    });
-                    if (this.enableCors) {
-                        head['Access-Control-Allow-Origin'] = '*';
+                        res.writeHead(session.status ?? 200, head);
+                        res.end(session.body)
                     }
-                    res.writeHead(session.status ?? 200, head);
-                    res.end(session.body)
                 }
             } else if (rootroute && rootroute.allowedMethods.includes(req.method ?? 'GET')) {
                 const matched = await this.core.executeRoute('root', session, queryParams);
                 if (!matched) {
                     this.serveStaticFile(pathname, res);
                 } else {
-                    let head = session.head;
-                    head['Set-Cookie'] = Object.entries(session.newCookie).map(([name, cookie]) => {
-                        let cookieString = `${name}=${cookie.value}`;
-                        if (cookie.options.expires) {
-                            cookieString += `; Expires=${cookie.options.expires.toUTCString()}`;
+                    if (!session.responseHandled) {
+                        let head = session.head;
+                        head['Set-Cookie'] = Object.entries(session.newCookie).map(([name, cookie]) => {
+                            let cookieString = `${name}=${cookie.value}`;
+                            if (cookie.options.expires) {
+                                cookieString += `; Expires=${cookie.options.expires.toUTCString()}`;
+                            }
+                            if (cookie.options.path) {
+                                cookieString += `; Path=${cookie.options.path}`;
+                            }
+                            if (cookie.options.domain) {
+                                cookieString += `; Domain=${cookie.options.domain}`;
+                            }
+                            if (cookie.options.secure) {
+                                cookieString += `; Secure`;
+                            }
+                            if (cookie.options.httpOnly) {
+                                cookieString += `; HttpOnly`;
+                            }
+                            if (cookie.options.sameSite) {
+                                cookieString += `; SameSite=${cookie.options.sameSite}`;
+                            }
+                            return cookieString;
+                        });
+                        if (this.enableCors) {
+                            head['Access-Control-Allow-Origin'] = '*';
                         }
-                        if (cookie.options.path) {
-                            cookieString += `; Path=${cookie.options.path}`;
-                        }
-                        if (cookie.options.domain) {
-                            cookieString += `; Domain=${cookie.options.domain}`;
-                        }
-                        if (cookie.options.secure) {
-                            cookieString += `; Secure`;
-                        }
-                        if (cookie.options.httpOnly) {
-                            cookieString += `; HttpOnly`;
-                        }
-                        if (cookie.options.sameSite) {
-                            cookieString += `; SameSite=${cookie.options.sameSite}`;
-                        }
-                        return cookieString;
-                    });
-                    if (this.enableCors) {
-                        head['Access-Control-Allow-Origin'] = '*';
+                        res.writeHead(session.status ?? 200, head);
+                        res.end(session.body)
                     }
-                    res.writeHead(session.status ?? 200, head);
-                    res.end(session.body)
                 }
             } else {
                 this.serveStaticFile(pathname, res);

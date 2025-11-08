@@ -42,6 +42,7 @@ export class Session {
   public protocol: string = 'http';
   public pathname: string;
   public languages: string[];
+  public responseHandled: boolean = false;
 
   /**
    * @constructor
