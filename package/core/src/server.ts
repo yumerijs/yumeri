@@ -96,7 +96,28 @@ export class Server {
                     this.serveStaticFile(pathname, res);
                 } else {
                     let head = session.head;
-                    head['Set-Cookie'] = Object.entries(session.newCookie).map(([k, v]) => `${k}=${v}`);
+                    head['Set-Cookie'] = Object.entries(session.newCookie).map(([name, cookie]) => {
+                        let cookieString = `${name}=${cookie.value}`;
+                        if (cookie.options.expires) {
+                            cookieString += `; Expires=${cookie.options.expires.toUTCString()}`;
+                        }
+                        if (cookie.options.path) {
+                            cookieString += `; Path=${cookie.options.path}`;
+                        }
+                        if (cookie.options.domain) {
+                            cookieString += `; Domain=${cookie.options.domain}`;
+                        }
+                        if (cookie.options.secure) {
+                            cookieString += `; Secure`;
+                        }
+                        if (cookie.options.httpOnly) {
+                            cookieString += `; HttpOnly`;
+                        }
+                        if (cookie.options.sameSite) {
+                            cookieString += `; SameSite=${cookie.options.sameSite}`;
+                        }
+                        return cookieString;
+                    });
                     if (this.enableCors) {
                         head['Access-Control-Allow-Origin'] = '*';
                     }
@@ -109,7 +130,28 @@ export class Server {
                     this.serveStaticFile(pathname, res);
                 } else {
                     let head = session.head;
-                    head['Set-Cookie'] = Object.entries(session.newCookie).map(([k, v]) => `${k}=${v}`);
+                    head['Set-Cookie'] = Object.entries(session.newCookie).map(([name, cookie]) => {
+                        let cookieString = `${name}=${cookie.value}`;
+                        if (cookie.options.expires) {
+                            cookieString += `; Expires=${cookie.options.expires.toUTCString()}`;
+                        }
+                        if (cookie.options.path) {
+                            cookieString += `; Path=${cookie.options.path}`;
+                        }
+                        if (cookie.options.domain) {
+                            cookieString += `; Domain=${cookie.options.domain}`;
+                        }
+                        if (cookie.options.secure) {
+                            cookieString += `; Secure`;
+                        }
+                        if (cookie.options.httpOnly) {
+                            cookieString += `; HttpOnly`;
+                        }
+                        if (cookie.options.sameSite) {
+                            cookieString += `; SameSite=${cookie.options.sameSite}`;
+                        }
+                        return cookieString;
+                    });
                     if (this.enableCors) {
                         head['Access-Control-Allow-Origin'] = '*';
                     }

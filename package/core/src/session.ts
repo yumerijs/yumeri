@@ -17,13 +17,22 @@ export interface Client {
   headers?: Record<string, string>;
 }
 
+export interface CookieOptions {
+  expires?: Date;
+  path?: string;
+  domain?: string;
+  secure?: boolean;
+  httpOnly?: boolean;
+  sameSite?: 'Strict' | 'Lax' | 'None';
+}
+
 export class Session {
   public ip: string;
   public cookie: Record<string, string>;
   public query: Record<string, string> | undefined;
   public sessionid: string;
   public data: Record<string, any> = {};
-  public newCookie: Record<string, string> = {};
+  public newCookie: Record<string, { value: string, options: CookieOptions }> = {};
   public head: Record<string, any> = {};
   public status: number = 200;
   public body: any;
@@ -56,14 +65,21 @@ export class Session {
     }
     else {
       this.sessionid = this.generateId(this.ip);
-      this.newCookie.sessionid = this.sessionid;
+      this.setCookie('sessionid', this.sessionid);
     }
     if (cookie.lang) {
       this.languages = cookie.lang.split(',');
     } else if (req.headers['accept-language']) {
       this.languages = this.parseAcceptLanguages(req.headers['accept-language']);
-      this.newCookie.lang = this.languages.join(',');
+      this.setCookie('lang', this.languages.join(','));
     }
+  }
+
+  public setCookie(name: string, value: string, options: CookieOptions = {}): void {
+    if (options.path === undefined) {
+      options.path = '/';
+    }
+    this.newCookie[name] = { value, options };
   }
 
   /**
