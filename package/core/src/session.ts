@@ -8,6 +8,7 @@ import crypto from 'crypto';
 import { Server } from './server';
 import { IncomingMessage, ServerResponse } from 'http';
 import * as formidable from 'formidable';
+import fs from 'fs';
 type ParsedParams = Record<string, string | string[] | undefined>;
 
 
@@ -24,6 +25,23 @@ export interface CookieOptions {
   secure?: boolean;
   httpOnly?: boolean;
   sameSite?: 'Strict' | 'Lax' | 'None';
+}
+
+export interface CacheOptions {
+  etag?: string;
+  modified?: Date;
+  maxAge?: number;
+  smaxAge?: number;
+  isImmutable?: boolean;
+  expires?: Date,
+  cacheControl?: 'public' | 'private' | 'no-cache' | 'no-store' | 'must-revalidate' | 'proxy-revalidate';
+}
+
+export interface StaticCacheOptions {
+  etag?: boolean;
+  maxAge?: number;
+  smaxAge?: number;
+  etagType?: 'md5' | 'sha1' | 'sha256' | 'sha512';
 }
 
 export class Session {
@@ -56,9 +74,21 @@ export class Session {
     this.query = query;
     this.server = server;
     this.pathname = pathname;
+    let header: Record<string, string> = {};
+    for (let key in req.headers) {
+      const value = req.headers[key];
+      if (typeof value === 'string') {
+        header[key] = value;
+      } else if (Array.isArray(value)) {
+        header[key] = value.join(', ');
+      } else if (value !== undefined) {
+        header[key] = String(value);
+      }
+    }
     this.client = {
       req: req,
-      res: res
+      res: res,
+      headers: header
     }
     this.head['Content-Type'] = 'text/plain';
     if (cookie.sessionid) {
@@ -262,5 +292,69 @@ export class Session {
    */
   public text(name: string): any {
     return this.server.core.i18n.get(name, this.languages);
+  }
+
+  /**
+   * 设置缓存标头
+   * @param option 选项
+   */
+  setCache(option: CacheOptions) {
+    if (option.etag) this.head['ETag'] = `${option.etag}`;
+    if (option.modified) this.head['Last-Modified'] = option.modified.toUTCString();
+    let control = []
+    if (option.cacheControl !== undefined) control.push(option.cacheControl);
+    if (option.maxAge !== undefined) control.push(`max-age=${option.maxAge}`);
+    if (option.smaxAge !== undefined) control.push(`s-maxage=${option.smaxAge}`);
+    if (option.isImmutable) control.push('immutable');
+    if (control.length > 0) this.head['Cache-Control'] = control.join(', ');
+    if (option.expires) this.head['Expires'] = option.expires.toUTCString();
+  }
+
+  static(content: string, option: CacheOptions) {
+    // 先查看用户是否在询问文件修改情况
+    if (this.client.headers['If-Modified-Since']) {
+      const modified = new Date(this.client.headers['If-Modified-Since']);
+      if (modified.getTime() === option.modified?.getTime()) {
+        this.status = 304;
+        return;
+      }
+    }
+    if (this.client.headers['If-None-Match']) {
+      if (this.client.headers['If-None-Match'] === option.etag) {
+        this.status = 304;
+        return;
+      }
+    }
+    this.setCache(option);
+    this.body = content;
+  }
+
+  file(path: string, option: StaticCacheOptions) {
+    if (this.client.headers['If-Modified-Since']) {
+      const modified = new Date(this.client.headers['If-Modified-Since']);
+
+      const moditime = fs.statSync(path).mtime;
+      if (modified.getTime() === moditime.getTime()) {
+        this.status = 304;
+        return;
+      }
+    }
+    const etag = crypto.createHash(option.etagType || 'md5').update(fs.readFileSync(path)).digest('hex');
+    if (this.client.headers['If-None-Match']) {
+      if (option.etag) {
+        if (this.client.headers['If-None-Match'] === etag) {
+          this.status = 304;
+          return;
+        }
+      }
+    }
+    this.setCache({
+      modified: fs.statSync(path).mtime,
+      etag,
+      maxAge: option.maxAge,
+      smaxAge: option.smaxAge,
+      cacheControl: 'public'
+    });
+    this.body = fs.readFileSync(path, 'utf-8');
   }
 }
