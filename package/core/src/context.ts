@@ -13,6 +13,8 @@ interface Plugin {
     provide: Array<string>;
 }
 
+export interface Components {}
+
 /**
  * 插件上下文对象
  * 每个插件一个 Context，用于管理插件注册的命令、路由、事件、组件和中间件
@@ -27,6 +29,7 @@ export class Context {
     private childContexts: Context[] = [];
     private childPlugins: Map<Context, Plugin> = new Map();
     private i18ns: string[] = [];
+    public component: Components;
 
     /** 插件名称 */
     public pluginname: string;
@@ -36,10 +39,20 @@ export class Context {
      * @param core Core 实例
      * @param pluginname 插件名称
      */
-    constructor(core: Core, pluginname: string) {
+    constructor(core: Core, pluginname: string, injections: Record<string, any> = {}) {
         this.core = core;
         this.pluginname = pluginname;
         this.childPlugins = new Map();
+        (this as any).component = injections;
+    }
+
+    /**
+     * 注入依赖
+     * @param name 依赖名称
+     * @param value 依赖值
+     */
+    inject(name: string, value: any) {
+        (this as any).component[name] = value;
     }
 
     /**
@@ -118,6 +131,7 @@ export class Context {
 
     /**
      * 获取组件实例
+     * @deprecated
      * @param name 组件名称
      */
     getComponent(name: string) {

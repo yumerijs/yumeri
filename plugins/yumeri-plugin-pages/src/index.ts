@@ -92,7 +92,7 @@ export class PagesComponent {
 }
 
 export async function apply(ctx: Context, config: Config) {
-  const db = ctx.getComponent('database') as Database;
+  const db = ctx.component.database;
   db.extend(
     'pages',
     {

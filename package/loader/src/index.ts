@@ -57,9 +57,9 @@ export class PluginLoader {
         return this.core;
     }
 
-    getContext(pluginName: string): Context {
+    getContext(pluginName: string, injections: Record<string, any> = {}): Context {
         if (!this.pluginContexts[pluginName]) {
-            this.pluginContexts[pluginName] = new Context(this.core, pluginName);
+            this.pluginContexts[pluginName] = new Context(this.core, pluginName, injections);
         }
         return this.pluginContexts[pluginName];
     }
@@ -172,9 +172,13 @@ export class PluginLoader {
             }
 
             this.plugins[pluginName] = pluginInstance;
-            
+            const depend = pluginInstance.depend || [];
+            let injections: Record<string, any> = {};
+            for (const injection of depend) {
+                injections[injection] = this.core.getComponent(injection);
+            }
             const pluginConfig = await this.getPluginConfig(pluginName);
-            const context = this.getContext(pluginName);
+            const context = this.getContext(pluginName, injections);
 
             await this.core.plugin(pluginInstance, context, pluginConfig);
 

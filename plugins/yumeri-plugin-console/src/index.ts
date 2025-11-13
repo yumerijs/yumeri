@@ -4,6 +4,12 @@ import * as path from 'path';
 import mime from 'mime';
 import { PluginConfigManager, ConsoleItem } from './utils';
 
+declare module 'yumeri' {
+    interface Components {
+      console: Console
+    }
+}
+
 export const logger = new Logger("console");
 
 export const provide = ['console'];
@@ -13,6 +19,20 @@ export interface ConsoleConfig {
   path: string;
   adminname: string;
   adminpassword: string;
+}
+
+export interface Console {
+  addconsoleitem: (
+    name: string,
+    icon: string,
+    displayname: string,
+    htmlpath: string,
+    staticpath: string
+  ) => void;
+  
+  removeconsoleitem: (name: string) => void;
+  
+  getloginstatus: (session: Session) => boolean;
 }
 
 export const config = {
@@ -35,7 +55,7 @@ const operateconsole = {
     delete consoleitem[name];
   },
   getloginstatus: (session: Session) => !!loginstatus[session.sessionid]
-};
+} as Console
 
 async function getHook(ctx: Context, hookname: string, originString: string) {
   const result: string[] = await ctx.executeHook(hookname);

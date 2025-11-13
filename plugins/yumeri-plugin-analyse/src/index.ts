@@ -1,14 +1,8 @@
 import { Context, Config, Logger, ConfigSchema, Session } from 'yumeri';
-import { Database } from '@yumerijs/types';
+import 'yumeri-plugin-console';
 import './types';
 
 const logger = new Logger("analyse");
-
-interface OperateConsole {
-  addconsoleitem: (name: string, icon: string, displayname: string, htmlpath: string, staticpath: string) => void;
-  removeconsoleitem: (name: string) => void;
-  getloginstatus: (session: Session) => boolean;
-}
 
 export const depend = ['database'];
 
@@ -77,8 +71,8 @@ const analyseJs = `async function loadStats() {
 loadStats();`;
 
 export async function apply(ctx: Context, config: Config) {
-  const db = ctx.getComponent('database') as Database
-  const consoleApi: OperateConsole = ctx.getComponent('console');
+  const db = ctx.component.database;
+  const consoleApi = ctx.component.console;
   const requireLogin = (
     handler: (session: Session, params: URLSearchParams, ...others: any[]) => Promise<void>
   ) => {

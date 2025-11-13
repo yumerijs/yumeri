@@ -1,5 +1,4 @@
-import { Context, Config, Logger, ConfigSchema } from 'yumeri'
-import { Database } from '@yumerijs/types'
+import { Context, Config, Logger, ConfigSchema, Database } from 'yumeri'
 import * as crypto from 'crypto'
 
 const logger = new Logger('user')
@@ -18,7 +17,7 @@ interface UserTable {
   updateAt: Date
 }
 
-declare module '@yumerijs/types' {
+declare module 'yumeri' {
   interface Tables {
     user: UserTable
   }
@@ -105,7 +104,7 @@ export class User {
 }
 
 export async function apply(ctx: Context, config: Config) {
-  const db = ctx.getComponent('database') as Database
+  const db = ctx.component.database;
 
   const schema: Record<string, any> = {
     id: { type: 'unsigned', autoIncrement: true },
