@@ -240,7 +240,7 @@ export async function apply(ctx: Context, config: Config) {
       if (fs.existsSync(assetPath) && fs.statSync(assetPath).isFile()) {
         const mimeType = asset ? (mime.getType(assetPath) || 'application/octet-stream') : 'text/html';
         session.setMime(mimeType);
-        session.body = fs.readFileSync(assetPath);
+        session.body = fs.readFileSync(assetPath, 'utf-8');
       }
     }
   }

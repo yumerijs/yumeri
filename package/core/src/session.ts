@@ -9,6 +9,7 @@ import { Server } from './server';
 import { IncomingMessage, ServerResponse } from 'http';
 import * as formidable from 'formidable';
 import fs from 'fs';
+import { Stream } from "stream";
 type ParsedParams = Record<string, string | string[] | undefined>;
 
 
@@ -44,6 +45,14 @@ export interface StaticCacheOptions {
   etagType?: 'md5' | 'sha1' | 'sha256' | 'sha512';
 }
 
+type ResType = "plain" | "json" | "stream";
+
+interface BodyMap {
+  plain: string;
+  json: Record<string, any>;
+  stream: Stream;
+}
+
 export class Session {
   public ip: string;
   public cookie: Record<string, string>;
@@ -53,7 +62,8 @@ export class Session {
   public newCookie: Record<string, { value: string, options: CookieOptions }> = {};
   public head: Record<string, any> = {};
   public status: number = 200;
-  public body: any;
+  private _restype: ResType = "plain";
+  private _body: any;
   public properties?: Record<string, any> = {};
   public client: Client = null;
   public server: Server;
@@ -104,6 +114,24 @@ export class Session {
       this.languages = this.parseAcceptLanguages(req.headers['accept-language']);
       this.setCookie('lang', this.languages.join(','));
     }
+  }
+
+  response<T extends ResType>(body: BodyMap[T], type: T = 'text' as T): void {
+    this._restype = type;
+    this._body = body;
+  }
+
+  get restype() {
+    return this._restype;
+  }
+
+  get body() {
+    return this._body;
+  }
+
+  set body(value: string) {
+    this._body = value as any;
+    this._restype = "plain";  // 自动把 restype 设成 plain
   }
 
   public setCookie(name: string, value: string, options: CookieOptions = {}): void {
@@ -326,7 +354,7 @@ export class Session {
       }
     }
     this.setCache(option);
-    this.body = content;
+    this.response(content)
   }
 
   file(path: string, option: StaticCacheOptions) {
@@ -355,6 +383,6 @@ export class Session {
       smaxAge: option.smaxAge,
       cacheControl: 'public'
     });
-    this.body = fs.readFileSync(path, 'utf-8');
+    this.response(fs.createReadStream(path), 'stream');
   }
 }
