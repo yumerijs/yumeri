@@ -1,7 +1,7 @@
 import { Context, Config, Session, Logger, ConfigSchema } from 'yumeri'
 import path from 'path'
 import fse from 'fs-extra'
-import { PagesComponent } from 'yumeri-plugin-pages' // 仅类型引用
+import 'yumeri-plugin-pages' // 仅类型引用
 
 const logger = new Logger('frontend')
 export const depend = ['pages']
@@ -90,7 +90,7 @@ export async function apply(ctx: Context, config: Config) {
       const parsed = parseRoute(pathname, config)
       const templateCfg = getTemplateConfig(templateName)
 
-      const pages = ctx.getComponent('pages') as PagesComponent | undefined
+      const pages = ctx.component.pages;
       let pageData: any = null
       let metas: any[] = []
       if (parsed.type == '404') {

@@ -21,6 +21,9 @@ declare module 'yumeri' {
   interface Tables {
     user: UserTable
   }
+  interface Components {
+    user: User
+  }
 }
 
 export const config = {

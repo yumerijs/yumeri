@@ -1,8 +1,8 @@
 import { Context, Config, Session, Logger, ConfigSchema } from 'yumeri';
-import { User } from 'yumeri-plugin-user';
-import { Authority } from 'yumeri-plugin-authority';
-import { PagesComponent } from 'yumeri-plugin-pages';
-import { Permit } from 'yumeri-plugin-permission';
+import 'yumeri-plugin-user';
+import 'yumeri-plugin-authority';
+import 'yumeri-plugin-pages';
+import 'yumeri-plugin-permission';
 import path from 'path';
 import fs from 'fs';
 
@@ -26,10 +26,10 @@ export const config = {
 };
 
 export async function apply(ctx: Context, config: Config) {
-  const user = ctx.getComponent('user') as User;
-  const authority = ctx.getComponent('authority') as Authority;
-  const pages = ctx.getComponent('pages') as PagesComponent;
-  const permit = ctx.getComponent('permission') as Permit;
+  const user = ctx.component.user;
+  const authority = ctx.component.authority;
+  const pages = ctx.component.pages;
+  const permit = ctx.component.permission;
 
   // 包装身份验证
   const requireLogin = (

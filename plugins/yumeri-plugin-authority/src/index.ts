@@ -1,13 +1,19 @@
 import { Context, Config, Session, Logger, ConfigSchema } from 'yumeri';
 import * as path from 'path';
 import fs from 'fs';
-import { User } from 'yumeri-plugin-user'
+import 'yumeri-plugin-user'
 
 const logger = new Logger("authority");
 
 export const depend = ['user']; // 需要的服务
 export const provide = ['authority']; // 提供的服务
 export const usage = `用户登陆验证服务<br>依赖于yumeri-plugin-user（用户模型）`
+
+declare module 'yumeri' {
+  interface Components {
+    authority: Authority;
+  }
+}
 
 export const config = {
   schema: {
@@ -73,7 +79,7 @@ export async function apply(ctx: Context, config: Config) {
       }
     }
   } as Authority)
-  const user = ctx.getComponent('user') as User;
+  const user = ctx.component.user;
 
   // HTML Pages
   ctx.route('/auth/login').action(async (session) => {

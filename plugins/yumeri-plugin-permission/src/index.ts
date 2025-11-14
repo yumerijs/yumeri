@@ -1,6 +1,5 @@
-import { Database } from '@yumerijs/types';
-import { Context, Config, Logger, ConfigSchema } from 'yumeri';
-import { User } from 'yumeri-plugin-user';
+import { Context, Config, Logger, ConfigSchema, Database } from 'yumeri';
+import 'yumeri-plugin-user';
 import './types'; // Import for declaration merging
 
 const logger = new Logger("permission");
@@ -24,8 +23,14 @@ export interface Permit {
   getPermit(id: number): Promise<number>;
 }
 
+declare module 'yumeri' {
+  interface Components {
+    permission: Permit;
+  }
+}
+
 export async function apply(ctx: Context, config: Config) {
-  const db = ctx.getComponent('database') as Database;
+  const db = ctx.component.database;
 
   // Use extend() to define the table schema. This is idempotent.
   await db.extend('permission', {

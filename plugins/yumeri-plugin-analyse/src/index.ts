@@ -4,7 +4,7 @@ import './types';
 
 const logger = new Logger("analyse");
 
-export const depend = ['database'];
+export const depend = ['database', 'console'];
 
 export const config = {
   schema: {

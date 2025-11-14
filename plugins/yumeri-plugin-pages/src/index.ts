@@ -1,5 +1,4 @@
-import { Context, Config, Session, Logger, ConfigSchema } from 'yumeri';
-import { Database } from '@yumerijs/types';
+import { Context, Config, Session, Logger, ConfigSchema, Database } from 'yumeri';
 
 const logger = new Logger("pages");
 
@@ -27,10 +26,13 @@ interface Pagesmeta {
   meta_value: string;
 }
 
-declare module '@yumerijs/types' {
+declare module 'yumeri' {
   interface Tables {
     pages: Pages;
     pagesmeta: Pagesmeta;
+  }
+  interface Components {
+    pages: PagesComponent;
   }
 }
 

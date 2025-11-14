@@ -48,7 +48,7 @@ const tools = {
 }
 
 export async function apply(ctx: Context, config: Config) {
-  const pages = ctx.getComponent('pages') as PagesComponent;
+  const pages = ctx.component.pages;
 
   ctx.hook('frontend:render', 'tinytools', async (info) => {
     const result: Record<string, string> = {};

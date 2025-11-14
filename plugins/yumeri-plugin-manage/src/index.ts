@@ -1,12 +1,7 @@
 import { Context, Logger, Session } from 'yumeri'
+import 'yumeri-plugin-console'
 
 const logger = new Logger("manage")
-
-interface OperateConsole {
-  addconsoleitem: (name: string, icon: string, displayname: string, htmlpath: string, staticpath: string) => void
-  removeconsoleitem: (name: string) => void
-  getloginstatus: (session: Session) => boolean
-}
 
 export const depend = ['console']
 
@@ -44,7 +39,7 @@ window.manageAction = async function(action) {
 `
 
 export async function apply(ctx: Context) {
-  const consoleApi: OperateConsole = ctx.getComponent('console')
+  const consoleApi = ctx.component.console
 
   const requireLogin = (
     handler: (session: Session, params: URLSearchParams) => Promise<void>
