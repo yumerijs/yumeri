@@ -381,7 +381,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@yumerijs/core@npm:^2.0.1, @yumerijs/core@npm:^2.0.2, @yumerijs/core@workspace:package/core":
+"@yumerijs/core@npm:^2.0.1, @yumerijs/core@npm:^2.0.14, @yumerijs/core@workspace:package/core":
   version: 0.0.0-use.local
   resolution: "@yumerijs/core@workspace:package/core"
   dependencies:
@@ -400,7 +400,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@yumerijs/loader@npm:^2.0.2, @yumerijs/loader@workspace:package/loader":
+"@yumerijs/loader@npm:^2.0.5, @yumerijs/loader@workspace:package/loader":
   version: 0.0.0-use.local
   resolution: "@yumerijs/loader@workspace:package/loader"
   dependencies:
@@ -429,7 +429,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@yumerijs/types@npm:^2.0.0, @yumerijs/types@workspace:package/types":
+"@yumerijs/types@npm:^2.0.0, @yumerijs/types@workspace:^, @yumerijs/types@workspace:package/types":
   version: 0.0.0-use.local
   resolution: "@yumerijs/types@workspace:package/types"
   dependencies:
@@ -2638,7 +2638,7 @@ __metadata:
     "@yumerijs/types": "npm:^2.0.0"
     typescript: "npm:^5.8.2"
   peerDependencies:
-    yumeri: ^2.0.0
+    yumeri: ^2.0.5
   languageName: unknown
   linkType: soft
 
@@ -2653,7 +2653,7 @@ __metadata:
     yumeri-plugin-permission: "npm:^1.0.4"
     yumeri-plugin-user: "npm:^1.1.0"
   peerDependencies:
-    yumeri: ^2.0.0
+    yumeri: ^2.0.5
   languageName: unknown
   linkType: soft
 
@@ -2666,8 +2666,8 @@ __metadata:
     typescript: "npm:^5.8.2"
     yumeri-plugin-user: "npm:^1.1.0"
   peerDependencies:
-    yumeri: ^2.0.0
-    yumeri-plugin-user: ^1.1.0
+    yumeri: ^2.0.5
+    yumeri-plugin-user: ^1.1.1
   languageName: unknown
   linkType: soft
 
@@ -2683,7 +2683,7 @@ __metadata:
     mime: "npm:^4.0.7"
     typescript: "npm:^5.8.2"
   peerDependencies:
-    yumeri: ^2.0.1
+    yumeri: ^2.0.5
   languageName: unknown
   linkType: soft
 
@@ -2707,11 +2707,11 @@ __metadata:
     mime: "npm:^4.1.0"
     typescript: "npm:^5.8.2"
   peerDependencies:
-    yumeri: ^2.0.0
+    yumeri: ^2.0.5
   languageName: unknown
   linkType: soft
 
-"yumeri-plugin-frontend@npm:^1.0.0, yumeri-plugin-frontend@workspace:plugins/yumeri-plugin-frontend":
+"yumeri-plugin-frontend@npm:^1.0.1, yumeri-plugin-frontend@workspace:plugins/yumeri-plugin-frontend":
   version: 0.0.0-use.local
   resolution: "yumeri-plugin-frontend@workspace:plugins/yumeri-plugin-frontend"
   dependencies:
@@ -2722,8 +2722,8 @@ __metadata:
     typescript: "npm:^5.8.2"
     yumeri-plugin-pages: "npm:^1.0.0"
   peerDependencies:
-    yumeri: ^2.0.0
-    yumeri-plugin-pages: ^1.0.0
+    yumeri: ^2.0.5
+    yumeri-plugin-pages: ^1.0.1
   languageName: unknown
   linkType: soft
 
@@ -2735,7 +2735,7 @@ __metadata:
     typescript: "npm:^5.8.2"
     ws: "npm:^8.18.3"
   peerDependencies:
-    yumeri: ^2.0.0
+    yumeri: ^2.0.5
   languageName: unknown
   linkType: soft
 
@@ -2746,7 +2746,7 @@ __metadata:
     "@types/node": "npm:^22.14.1"
     typescript: "npm:^5.8.2"
   peerDependencies:
-    yumeri: ^2.0.0
+    yumeri: ^2.0.5
   languageName: unknown
   linkType: soft
 
@@ -2757,7 +2757,7 @@ __metadata:
     "@types/node": "npm:^22.14.1"
     typescript: "npm:^5.8.2"
   peerDependencies:
-    yumeri: ^2.0.0
+    yumeri: ^2.0.5
   languageName: unknown
   linkType: soft
 
@@ -2781,7 +2781,7 @@ __metadata:
     "@yumerijs/types": "npm:^2.0.0"
     typescript: "npm:^5.8.2"
   peerDependencies:
-    yumeri: ^2.0.0
+    yumeri: ^2.0.5
   languageName: unknown
   linkType: soft
 
@@ -2794,8 +2794,8 @@ __metadata:
     typescript: "npm:^5.8.2"
     yumeri-plugin-user: "npm:^1.1.0"
   peerDependencies:
-    yumeri: ^2.0.0
-    yumeri-plugin-user: ^1.1.0
+    yumeri: ^2.0.5
+    yumeri-plugin-user: ^1.1.1
   languageName: unknown
   linkType: soft
 
@@ -2830,9 +2830,9 @@ __metadata:
   dependencies:
     "@types/node": "npm:^22.14.1"
     typescript: "npm:^5.8.2"
-    yumeri-plugin-frontend: "npm:^1.0.0"
+    yumeri-plugin-frontend: "npm:^1.0.1"
   peerDependencies:
-    yumeri: ^2.0.0
+    yumeri: ^2.0.5
   languageName: unknown
   linkType: soft
 
@@ -2844,7 +2844,7 @@ __metadata:
     "@yumerijs/types": "npm:^2.0.0"
     typescript: "npm:^5.8.2"
   peerDependencies:
-    yumeri: ^2.0.0
+    yumeri: ^2.0.5
   languageName: unknown
   linkType: soft
 
@@ -2854,8 +2854,9 @@ __metadata:
   dependencies:
     "@types/formidable": "npm:^3.4.5"
     "@types/node": "npm:^22.13.10"
-    "@yumerijs/core": "npm:^2.0.2"
-    "@yumerijs/loader": "npm:^2.0.2"
+    "@yumerijs/core": "npm:^2.0.14"
+    "@yumerijs/loader": "npm:^2.0.5"
+    "@yumerijs/types": "workspace:^"
     cac: "npm:^6.7.14"
     typescript: "npm:^5.8.2"
   bin:

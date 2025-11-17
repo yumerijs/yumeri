@@ -1,6 +1,6 @@
 {
   "name": "yumeri-plugin-authority",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Authority module for Yumeri",
   "main": "dist/index.js",
   "dev": "src/index.ts",
@@ -36,7 +36,7 @@
     "yumeri-plugin-user": "^1.1.0"
   },
   "peerDependencies": {
-    "yumeri": "^2.0.0",
-    "yumeri-plugin-user": "^1.1.0"
+    "yumeri": "^2.0.5",
+    "yumeri-plugin-user": "^1.1.1"
   }
 }

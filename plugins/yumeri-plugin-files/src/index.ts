@@ -1,7 +1,9 @@
 import { Context, Config, Logger, Session, ConfigSchema } from 'yumeri';
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import * as fsSync from 'fs';
 import mime from 'mime';
+import 'yumeri-plugin-console'
 
 const logger = new Logger("files");
 
@@ -17,13 +19,8 @@ export const config = {
     } as Record<string, ConfigSchema>
 };
 
-interface OperateConsole {
-    addconsoleitem: (name: string, icon: string, displayname: string, htmlpath: string, staticpath: string) => void;
-    getloginstatus: (session: Session) => boolean;
-}
-
 export async function apply(ctx: Context, config: Config) {
-    const consoleApi: OperateConsole = ctx.getComponent('console');
+    const consoleApi = ctx.component.console;
 
     if (!consoleApi) {
         logger.error('Console 插件不可用，文件管理无法加载。');
@@ -111,12 +108,11 @@ export async function apply(ctx: Context, config: Config) {
             if (!userPath) throw new Error('必须提供 query 参数 \'path\'。');
             const filePath = resolveSecurePath(userPath);
             const fileName = path.basename(filePath);
-            const fileContent = await fs.readFile(filePath);
             const mimeType = mime.getType(filePath) || 'application/octet-stream';
 
             session.head['Content-Disposition'] = `attachment; filename="${encodeURIComponent(fileName)}"`;
             session.setMime(mimeType);
-            session.body = fileContent;
+            session.response(fsSync.createReadStream(filePath), 'stream');
         } catch (error) {
             handleError(session, error);
         }

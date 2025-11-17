@@ -45,12 +45,13 @@ export interface StaticCacheOptions {
   etagType?: 'md5' | 'sha1' | 'sha256' | 'sha512';
 }
 
-type ResType = "plain" | "json" | "stream";
+type ResType = "plain" | "json" | "stream" | "buffer";
 
 interface BodyMap {
   plain: string;
   json: Record<string, any>;
   stream: Stream;
+  buffer: Buffer;
 }
 
 export class Session {
@@ -338,6 +339,11 @@ export class Session {
     if (option.expires) this.head['Expires'] = option.expires.toUTCString();
   }
 
+  /**
+   * 设置静态文件
+   * @param content 文件内容
+   * @param option 选项
+   */
   static(content: string, option: CacheOptions) {
     // 先查看用户是否在询问文件修改情况
     if (this.client.headers['If-Modified-Since']) {
@@ -357,6 +363,13 @@ export class Session {
     this.response(content)
   }
 
+
+  /**
+   * 发送静态文件
+   * @param path 文件路径
+   * @param option 缓存选项
+   * @returns void
+   */
   file(path: string, option: StaticCacheOptions) {
     if (this.client.headers['If-Modified-Since']) {
       const modified = new Date(this.client.headers['If-Modified-Since']);
@@ -384,5 +397,19 @@ export class Session {
       cacheControl: 'public'
     });
     this.response(fs.createReadStream(path), 'stream');
+  }
+
+  /**
+   * 发送普通文件
+   * @param path 文件路径
+   * @param isStream 是否流式传输
+   */
+  sendFile(path: string, isStream: boolean = false) {
+    if (isStream) {
+      this.setMime('application/octet-stream')
+      this.response(fs.createReadStream(path), 'stream');
+    } else {
+      this.response(fs.readFileSync(path), 'buffer');
+    }
   }
 }

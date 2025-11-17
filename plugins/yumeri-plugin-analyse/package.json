@@ -1,6 +1,6 @@
 {
   "name": "yumeri-plugin-analyse",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Add an analyse section to console",
   "main": "dist/index.js",
   "dev": "src/index.ts",
@@ -24,6 +24,6 @@
     "typescript": "^5.8.2"
   },
   "peerDependencies": {
-    "yumeri": "^2.0.0"
+    "yumeri": "^2.0.5"
   }
 }

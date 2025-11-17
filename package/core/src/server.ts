@@ -128,6 +128,9 @@ export class Server {
                     case 'plain':
                         res.end(session.body as string);
                         break;
+                    case 'buffer':
+                        res.end(session.body);
+                        break;
                     case 'json':
                         res.end(JSON.stringify(session.body));
                         break;

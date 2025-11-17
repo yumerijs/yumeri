@@ -1,6 +1,7 @@
 import { Context, Config, Session, Logger, ConfigSchema, Route } from 'yumeri';
 import { WebSocketServer, WebSocket } from 'ws';
 import path from 'path';
+import 'yumeri-plugin-console'
 
 const logger = new Logger("logger");
 
@@ -8,16 +9,10 @@ export const depend = ['console'];
 
 export const config = {} as Record<string, ConfigSchema>
 
-interface OperateConsole {
-  addconsoleitem: (name: string, icon: string, displayname: string, htmlpath: string, staticpath: string) => void;
-  removeconsoleitem: (name: string) => void;
-  getloginstatus: (session: Session) => boolean;
-}
-
 let route: Route;
 
 export async function apply(ctx: Context, config: Config) {
-  const consoleApi: OperateConsole = ctx.getComponent('console');
+  const consoleApi = ctx.component.console;
   consoleApi.addconsoleitem('logger', 'fa-solid fa-file', '日志', path.join(__dirname, '../static/index.html'), path.join(__dirname, '../static'));
   const requireLogin = (session: Session) => {
     if (consoleApi.getloginstatus(session)) {
@@ -51,7 +46,7 @@ export async function apply(ctx: Context, config: Config) {
 }
 
 export async function disable(ctx: Context) {
-  const consoleApi: OperateConsole = ctx.getComponent('console');
+  const consoleApi = ctx.component.console;
   consoleApi.removeconsoleitem('logger');
   route.ws.close();
 }

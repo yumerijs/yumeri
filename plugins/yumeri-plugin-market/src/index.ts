@@ -4,6 +4,7 @@ import { exec, spawn } from 'child_process';
 import * as fs from 'fs';
 import { promises as fsp } from 'fs';
 import path from 'path';
+import 'yumeri-plugin-console'
 
 const logger = new Logger("market");
 
@@ -54,7 +55,7 @@ async function fetchPluginsDataFromUrl(url: string): Promise<PluginInfo[] | null
 }
 
 export async function apply(ctx: Context, config: Config) {
-    const consoleApi: OperateConsole = ctx.getComponent('console');
+    const consoleApi: OperateConsole = ctx.component.console;
     const requireLogin = (
         handler: (session: Session, params: URLSearchParams) => Promise<void>
     ) => {
