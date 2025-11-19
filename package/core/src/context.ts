@@ -13,7 +13,7 @@ interface Plugin {
     provide: Array<string>;
 }
 
-export interface Components {}
+export interface Components { }
 
 /**
  * 插件上下文对象
@@ -22,7 +22,7 @@ export interface Components {}
 export class Context {
     private core: Core;
     private routes: string[] = [];
-    private eventlisteners: { name: string; listener: Function }[] = [];
+    private eventlisteners: { name: string; listener: (...args: any[]) => Promise<void> }[] = [];
     private components: string[] = [];
     private middlewares: string[] = [];
     private hooks: Record<string, string[]> = {};
@@ -226,10 +226,7 @@ export class Context {
 
         // 删除事件监听器
         this.eventlisteners.forEach(({ name, listener }) => {
-            const listeners = this.core.eventListeners?.[name];
-            if (listeners) {
-                this.core.eventListeners[name] = listeners.filter(l => l !== listener);
-            }
+            this.core.off(name, listener);
         });
 
         // 删除钩子

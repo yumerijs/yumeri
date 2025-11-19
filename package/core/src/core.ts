@@ -1,4 +1,4 @@
-
+import { EventEmitter } from 'events';
 import { Config } from './config';
 import { Logger } from './logger';
 import { Session } from './session';
@@ -33,7 +33,7 @@ export const enum PluginStatus {
 }
 
 export class Core {
-  public eventListeners: { [event: string]: ((...args: any[]) => Promise<void>)[] } = {};
+  public emitter = new EventEmitter();
   public components: { [name: string]: any } = {};
   public routes: Record<string, Route> = {};
   public logger = new Logger('core');
@@ -68,7 +68,7 @@ export class Core {
     const nameWithoutScope = pluginName.replace(scopeRegex, '');
 
     if (nameWithoutScope.startsWith('yumeri-plugin-')) {
-        return `${scope}${nameWithoutScope.substring('yumeri-plugin-'.length)}`;
+      return `${scope}${nameWithoutScope.substring('yumeri-plugin-'.length)}`;
     }
     return pluginName;
   }
@@ -77,7 +77,7 @@ export class Core {
     const shortName = this.getShortPluginName(context.pluginname);
     this.logger.info(`apply plugin ${shortName}`);
     if (pluginInstance.apply) {
-        await pluginInstance.apply(context, config);
+      await pluginInstance.apply(context, config);
     }
   }
 
@@ -94,20 +94,31 @@ export class Core {
   }
 
   on(event: string, listener: (...args: any[]) => Promise<void>): void {
-    if (!this.eventListeners[event]) {
-      this.eventListeners[event] = [];
-    }
-    this.eventListeners[event].push(listener);
+    this.emitter.on(event, (...args) => {
+      // 包一层保证 async 可以被捕获
+      Promise.resolve(listener(...args)).catch((err) => {
+        console.error(`Error in event listener for "${event}":`, err);
+      });
+    });
   }
 
+  // 删除监听器
+  off(event: string, listener: (...args: any[]) => Promise<void>): void {
+    // 原生 EventEmitter 必须删“同一个函数引用”
+    // 所以必须包装一致，这里我们直接用 listener 本体删
+    this.emitter.off(event, listener as any);
+  }
+
+  // 触发事件
   async emit(event: string, ...args: any[]): Promise<void> {
-    if (this.eventListeners[event]) {
-      for (const listener of this.eventListeners[event]) {
-        try {
-          await listener(...args);
-        } catch (err) {
-          this.logger.error(`Error in event listener for "${event}":`, err);
-        }
+    // EventEmitter 的 emit 不支持 await，所以自己来
+    const listeners = this.emitter.listeners(event);
+
+    for (const l of listeners) {
+      try {
+        await (l as (...args: any[]) => Promise<void>)(...args);
+      } catch (err) {
+        console.error(`Error in event listener for "${event}":`, err);
       }
     }
   }
