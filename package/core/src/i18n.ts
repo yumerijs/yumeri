@@ -73,8 +73,13 @@ export class I18n {
    * 替换模板字符串中的文本点
    * e.g. "Hello {{app.title}}" -> "Hello 世界"
    */
-  replaceAll(input: string, langs?: string[]): string {
-    return input.replace(/\{\{(.*?)\}\}/g, (_, key) => this.get(key.trim(), langs))
+  replaceAll(
+    input: string,
+    langs?: string[],
+    customRegex?: RegExp
+  ): string {
+    const regex = customRegex || /\{\{\s*([\w.]+)\s*\}\}/g;
+    return input.replace(regex, (_, key) => this.get(key.trim(), langs));
   }
 
   all() {

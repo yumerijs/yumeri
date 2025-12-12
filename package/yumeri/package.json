@@ -37,5 +37,6 @@
     "@yumerijs/core": "^2.0.14",
     "@yumerijs/loader": "^2.0.5",
     "@yumerijs/types": "^2.0.0",
-    "cac": "^6.7.14"  }
+    "cac": "^6.7.14"
+  }
 }

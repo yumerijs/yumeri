@@ -10,7 +10,9 @@ import { IncomingMessage, ServerResponse } from 'http';
 import * as formidable from 'formidable';
 import fs from 'fs';
 import { Stream } from "stream";
+
 type ParsedParams = Record<string, string | string[] | undefined>;
+type MissingMode = 'keep-template' | 'keep-key' | 'remove';
 
 
 export interface Client {
@@ -411,5 +413,37 @@ export class Session {
     } else {
       this.response(fs.readFileSync(path), 'buffer');
     }
+  }
+
+  /**
+   * 渲染模板
+   * @template 模板字符串
+   * @data 数据
+   * @missing 缺失值处理方式，keep-template: 保留模板，keep-key: 保留键，remove: 移除
+   * @regex 模板匹配正则，默认为{{ xxx.xxx }}
+   */
+  render(
+    template: string,
+    data: Record<string, any>,
+    missing: MissingMode = 'keep-template',
+    regex: RegExp = /\{\{\s*([\w.]+)\s*\}\}/g
+  ): string {
+    const getValue = (obj: any, path: string) => {
+      return path.split('.').reduce((acc, key) => acc?.[key], obj);
+    };
+
+    return template.replace(regex, (_, key) => {
+      const value = getValue(data, key);
+      if (value !== undefined) return String(value);
+      switch (missing) {
+        case 'keep-key':
+          return key;
+        case 'remove':
+          return '';
+        case 'keep-template':
+        default:
+          return _;
+      }
+    });
   }
 }

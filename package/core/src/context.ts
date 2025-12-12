@@ -1,4 +1,3 @@
-
 import { Core } from './core';
 import { Route } from './route';
 import { HookHandler } from './hook';
