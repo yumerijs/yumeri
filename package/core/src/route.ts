@@ -6,6 +6,7 @@
 import { Session } from './session';
 import { Middleware } from './middleware';
 import { WebSocketServer } from 'ws';
+import { Context } from './context';
 
 export type RouteHandler = (
   session: Session,
@@ -63,13 +64,16 @@ export class Route {
   public middlewares: Middleware[] = [];
   public allowedMethods: string[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD'];
   public ws: WebSocketServer = null;
+  public context: Context;
 
 
   /**
    * 创建路由
    * @param path 路由路径
+   * @param context 插件上下文
    */
-  constructor(public path: string) {
+  constructor(public path: string, context: Context) {
+    this.context = context;
     const { segments, params } = parsePatternToSegments(path);
     this.segments = segments;
     this.paramsInfo = params;

@@ -29,6 +29,7 @@ export class Context {
     private childPlugins: Map<Context, Plugin> = new Map();
     private i18ns: string[] = [];
     public component: Components;
+    public instance: any;
 
     /** 插件名称 */
     public pluginname: string;
@@ -38,8 +39,9 @@ export class Context {
      * @param core Core 实例
      * @param pluginname 插件名称
      */
-    constructor(core: Core, pluginname: string, injections: Record<string, any> = {}) {
+    constructor(core: Core, pluginname: string, instance?: any, injections: Record<string, any> = {}) {
         this.core = core;
+        this.instance = instance;
         this.pluginname = pluginname;
         this.childPlugins = new Map();
         (this as any).component = injections;
@@ -64,10 +66,10 @@ export class Context {
             this.core.logger.warn(
                 `Plugin "${this.pluginname}" attempt to register route "${path}", but it has already been registered.`
             );
-            return new Route(path);
+            return new Route(path, this);
         }
         this.routes.push(path);
-        return this.core.route(path);
+        return this.core.route(path, this);
     }
 
     /**

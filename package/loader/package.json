@@ -29,12 +29,13 @@
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.13.10",
     "@yumerijs/core": "^2.0.1",
-    "esbuild": "^0.25.9",
     "esbuild-register": "^3.6.0",
     "typescript": "^5.8.2"
   },
   "dependencies": {
     "@types/js-yaml": "^4.0.9",
+    "@vue/compiler-sfc": "^3.5.25",
+    "esbuild": "^0.25.9",
     "chokidar": "^4.0.3",
     "js-yaml": "^4.1.0"
   },

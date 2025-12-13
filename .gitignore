@@ -17,3 +17,4 @@ temp/
 data/database.db
 *.tsbuildinfo
 yarn.lock
+yumeri-plugin-test/

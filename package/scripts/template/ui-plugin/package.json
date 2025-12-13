@@ -1,0 +1,29 @@
+{
+  "name": "yumeri-plugin-{{name}}",
+  "version": "1.0.0",
+  "description": "{{description}}",
+  "main": "dist/index.js",
+  "dev": "src/index.ts",
+  "scripts": {
+    "build": "vite build --ssr",
+    "dev": "vite"
+  },
+  "keywords": [
+    "yumeri",
+    "plugin"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@yumerijs/vue-renderer": "workspace:^"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.0",
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0",
+    "vue": "^3.3.0"
+  },
+  "peerDependencies": {
+    "yumeri": "^2.0.0"
+  }
+}

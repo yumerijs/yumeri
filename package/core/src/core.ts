@@ -8,6 +8,7 @@ import { Context } from './context';
 import { HookHandler, Hook } from './hook';
 import { Server as CoreServer } from './server';
 import { I18n } from './i18n';
+import { IRenderer } from '@yumerijs/types';
 
 // This interface should probably be in @yumerijs/types
 interface Plugin {
@@ -43,11 +44,24 @@ export class Core {
   public server: CoreServer;
   public i18n: I18n;
   public loader: any;
+  public renderers: Map<string, IRenderer> = new Map();
+  public pluginRenderers: Map<string, string> = new Map(); // Stores which plugin uses which renderer
 
   constructor(loader?: any, coreConfig?: CoreOptions, setCore = true) {
     this.coreConfig = coreConfig || ({} as CoreOptions);
     this.loader = loader;
     if (setCore) Logger.setCore(this);
+  }
+
+  public addRenderer(renderer: IRenderer): void {
+    if (this.renderers.has(renderer.name)) {
+      this.logger.warn(`Renderer "${renderer.name}" is already registered and will be overwritten.`);
+    }
+    this.renderers.set(renderer.name, renderer);
+  }
+
+  public getRendererForPlugin(pluginName: string): string | undefined {
+    return this.pluginRenderers.get(pluginName);
   }
 
   async runCore(): Promise<void> {
@@ -75,6 +89,7 @@ export class Core {
 
   public async plugin(pluginInstance: Plugin, context: Context, config: Config): Promise<void> {
     const shortName = this.getShortPluginName(context.pluginname);
+    context.instance = pluginInstance;
     this.logger.info(`apply plugin ${shortName}`);
     if (pluginInstance.apply) {
       await pluginInstance.apply(context, config);
@@ -128,8 +143,8 @@ export class Core {
     return this;
   }
 
-  route(path: string): Route {
-    const route = new Route(path);
+  route(path: string, context: Context): Route {
+    const route = new Route(path, context);
     this.routes[path] = route;
     return route;
   }

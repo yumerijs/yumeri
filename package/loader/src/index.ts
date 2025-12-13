@@ -1,4 +1,3 @@
-
 import * as path from 'path';
 import { Core, Config, Logger, Context, PluginStatus } from '@yumerijs/core';
 import * as fs from 'fs';
@@ -7,6 +6,7 @@ import { exec } from 'child_process';
 import { pathToFileURL } from 'url';
 import * as yaml from 'js-yaml';
 import * as chokidar from 'chokidar';
+import { registerVueRuntimeLoader } from './runtime/vueLoader';
 
 const execAsync = promisify(exec);
 
@@ -16,6 +16,7 @@ interface Plugin {
     disable: (ctx: Context) => Promise<void>;
     depend: Array<string>;
     provide: Array<string>;
+    render?: string;
 }
 
 export class PluginLoader {
@@ -34,6 +35,7 @@ export class PluginLoader {
         this.core = core || new Core(this, undefined, false);
         this.isDev = process.env.NODE_ENV === 'development';
         Logger.setCore(this.core);
+        registerVueRuntimeLoader();
     }
 
     /**
@@ -59,7 +61,7 @@ export class PluginLoader {
 
     getContext(pluginName: string, injections: Record<string, any> = {}): Context {
         if (!this.pluginContexts[pluginName]) {
-            this.pluginContexts[pluginName] = new Context(this.core, pluginName, injections);
+            this.pluginContexts[pluginName] = new Context(this.core, pluginName, null, injections);
         }
         return this.pluginContexts[pluginName];
     }
@@ -162,6 +164,39 @@ export class PluginLoader {
             const pluginInstance = await this.loadModule(pluginName);
             if (!pluginInstance) {
                 throw new Error('Plugin loader returned no instance.');
+            }
+
+            // Auto-load and register renderer if declared
+            if (pluginInstance.render && typeof pluginInstance.render === 'string') {
+                const rendererName = pluginInstance.render;
+                this.logger.info(`Plugin "${pluginName}" requires renderer "${rendererName}".`);
+                
+                this.core.pluginRenderers.set(pluginName, rendererName);
+
+                if (!this.core.renderers.has(rendererName)) {
+                    this.logger.info(`Renderer "${rendererName}" is not registered. Attempting to auto-load...`);
+                    try {
+                        const rendererPackageMap: Record<string, string> = {
+                            'vue': '@yumerijs/vue-renderer',
+                            'react': '@yumerijs/react-renderer'
+                        };
+                        
+                        const rendererPackageName = rendererPackageMap[rendererName] || rendererName;
+                        
+                        this.logger.info(`Loading renderer package: "${rendererPackageName}"...`);
+                        const RendererClass = require(rendererPackageName);
+                        // Handle both ES modules (default export) and CommonJS modules
+                        const ActualRendererClass = RendererClass.default || RendererClass;
+                        const rendererInstance = new ActualRendererClass();
+                        
+                        this.core.addRenderer(rendererInstance);
+                        this.logger.info(`Successfully loaded and registered renderer "${rendererName}".`);
+
+                    } catch (err) {
+                        this.logger.error(`Failed to auto-load renderer package for "${rendererName}". Please make sure the renderer package is installed.`);
+                        this.logger.error(err);
+                    }
+                }
             }
 
             const deps = pluginInstance.depend || [];

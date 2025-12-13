@@ -4,7 +4,8 @@
   "private": true,
   "workspaces": [
     "package/*",
-    "plugins/*"
+    "plugins/*",
+    "renderer/*"
   ],
   "scripts": {
     "start": "yumeri start",

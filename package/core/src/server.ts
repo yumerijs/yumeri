@@ -7,6 +7,8 @@ import * as path from 'path';
 import { URL } from 'url';
 import * as mime from 'mime-types';
 import { Stream } from 'stream';
+import { Context } from './context';
+import { resolveVirtualAsset } from '@yumerijs/types';
 
 
 const logger = new Logger('server');
@@ -39,8 +41,12 @@ export class Server {
         this.staticDir = config.staticDir ?? 'static';
     }
 
-    private createSession(ip: string, cookies: Record<string, string>, res?: ServerResponse, req?: IncomingMessage, pathname?: string, extra: Record<string, any> = {}) {
-        const session = new Session(ip, cookies, this, req, res, pathname);
+    public getStaticDir(): string {
+        return this.staticDir;
+    }
+
+    private createSession(ip: string, cookies: Record<string, string>, res?: ServerResponse, req?: IncomingMessage, pathname?: string, pluginContext?: Context, extra: Record<string, any> = {}) {
+        const session = new Session(ip, cookies, this, req, res, pathname, undefined, pluginContext);
         Object.assign(session.properties, extra);
         session.protocol = extra.protocol ?? 'http';
         return session;
@@ -92,10 +98,23 @@ export class Server {
             const queryParams = url.searchParams;
             const ip = this.getClientIP(req);
             const cookies = this.parseCookies(req);
-            const session = this.createSession(ip, cookies, res, req, pathname, { protocol: 'http', header: req.headers });
+
+            if (req.method === 'GET' || req.method === 'HEAD') {
+                const virtualAsset = await resolveVirtualAsset(pathname);
+                if (virtualAsset) {
+                    const headers = virtualAsset.headers || {};
+                    headers['Content-Type'] = headers['Content-Type'] || virtualAsset.contentType || 'application/octet-stream';
+                    res.writeHead(200, headers);
+                    res.end(virtualAsset.body);
+                    return;
+                }
+            }
 
             const route = this.core.getRoute(pathname);
             const rootroute = this.core.getRoute('root');
+            const pluginContext = route ? route.context : (rootroute ? rootroute.context : undefined);
+
+            const session = this.createSession(ip, cookies, res, req, pathname, pluginContext, { protocol: 'http', header: req.headers });
 
             const handleRoute = async (routePath: string) => {
                 const matched = await this.core.executeRoute(routePath, session, queryParams);
@@ -160,8 +179,10 @@ export class Server {
             const queryParams = url.searchParams;
             const ip = this.getClientIP(req);
             const cookies = this.parseCookies(req);
-            const session = this.createSession(ip, cookies, null, req, pathname, { protocol: 'http', header: req.headers });
             const route = this.core.getRoute(pathname);
+            const pluginContext = route ? route.context : undefined;
+
+            const session = this.createSession(ip, cookies, null, req, pathname, pluginContext, { protocol: 'http', header: req.headers });
             if (route && route.ws != null) {
                 const matched = await this.core.executeRoute(pathname, session, queryParams);
                 if (!matched) {

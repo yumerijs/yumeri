@@ -1,6 +1,7 @@
 import { cac } from 'cac'
 import * as path from 'path'
 import { promises as fs } from 'fs'
+import prompts from 'prompts'
 
 async function ensureDir(dir: string) {
   await fs.mkdir(dir, { recursive: true })
@@ -34,24 +35,34 @@ async function copyTemplate(templateDir: string, targetDir: string, name: string
   }
 }
 
-function prompt(question: string): Promise<string> {
-  return new Promise((resolve) => {
-    process.stdout.write(question)
-    process.stdin.resume()
-    process.stdin.setEncoding('utf8')
-    process.stdin.once('data', (data) => {
-      process.stdin.pause()
-      resolve(data.toString().trim())
-    })
-  })
-}
-
 const cli = cac('yumeri-scripts')
 
 cli
   .command('setup <name>', 'Create a new plugin')
   .action(async (rawName: string) => {
-    const description = await prompt('Description: ')
+    const responses = await prompts([
+      {
+        type: 'select',
+        name: 'templateType',
+        message: 'Select a template for your plugin:',
+        choices: [
+          { title: 'Standard Plugin (backend only)', value: 'standard' },
+          { title: 'UI Plugin (Vue + Vite)', value: 'ui-plugin' },
+        ],
+      },
+      {
+        type: 'text',
+        name: 'description',
+        message: 'Description:',
+      },
+    ]);
+
+    if (!responses.templateType || !responses.description) {
+      console.log('Plugin setup cancelled.');
+      return;
+    }
+
+    const { templateType, description } = responses;
     const cwd = process.cwd()
 
     const isScoped = rawName.startsWith('@')
@@ -62,7 +73,10 @@ cli
     const folderName = baseName.startsWith('yumeri-plugin-') ? baseName : `yumeri-plugin-${baseName}`
     const pluginDir = path.join(cwd, 'plugins', folderName)
 
-    const templateDir = path.resolve(__dirname, '../template')
+    const templateDir = path.resolve(__dirname, '../template', templateType)
+
+    console.log(`Creating plugin at: ${pluginDir}`);
+    console.log(`Using template: ${templateType}`);
 
     await copyTemplate(templateDir, pluginDir, cleanName, description)
 
@@ -74,10 +88,14 @@ cli
 
     await fs.writeFile(pkgPath, JSON.stringify(pkg, null, 2))
 
+    console.log('Running yarn to install dependencies...');
     await new Promise((resolve, reject) => {
       const child = require('child_process').spawn('yarn', [], { stdio: 'inherit', cwd })
       child.on('exit', (code: number) => {
-        if (code === 0) resolve(undefined)
+        if (code === 0) {
+          console.log('Plugin setup complete!');
+          resolve(undefined)
+        }
         else reject(new Error(`yarn exited with code ${code}`))
       })
     })

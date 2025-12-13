@@ -10,6 +10,7 @@ import { IncomingMessage, ServerResponse } from 'http';
 import * as formidable from 'formidable';
 import fs from 'fs';
 import { Stream } from "stream";
+import { Context } from './context';
 
 type ParsedParams = Record<string, string | string[] | undefined>;
 type MissingMode = 'keep-template' | 'keep-key' | 'remove';
@@ -74,6 +75,7 @@ export class Session {
   public pathname: string;
   public languages: string[];
   public responseHandled: boolean = false;
+  public pluginContext: Context | undefined;
 
   /**
    * @constructor
@@ -81,12 +83,13 @@ export class Session {
    * @param cookie 会话cookie
    * @param query 请求字符串
    */
-  constructor(ip: string, cookie: Record<string, string>, server: Server, req?: IncomingMessage, res?: ServerResponse, pathname?: string, query?: Record<string, string>) {
+  constructor(ip: string, cookie: Record<string, string>, server: Server, req?: IncomingMessage, res?: ServerResponse, pathname?: string, query?: Record<string, string>, pluginContext?: Context) {
     this.ip = ip;
     this.cookie = cookie;
     this.query = query;
     this.server = server;
     this.pathname = pathname;
+    this.pluginContext = pluginContext;
     let header: Record<string, string> = {};
     for (let key in req.headers) {
       const value = req.headers[key];
@@ -445,5 +448,42 @@ export class Session {
           return _;
       }
     });
+  }
+
+  /**
+   * Renders a UI component using the plugin's declared renderer.
+   * @param component The component object to render.
+   * @param data The data/props to pass to the component.
+   */
+  async renderView(component: any, data: Record<string, any> = {}) {
+    if (!this.pluginContext) {
+      throw new Error(`Cannot call 'renderView' because the session is not associated with a plugin context.`);
+    }
+    const rendererName = this.pluginContext.instance.render;
+    const pluginName = this.pluginContext.pluginname;
+    
+    if (!rendererName) {
+      this.server.core.logger.error(`Plugin "${pluginName}" uses 'renderView' but did not declare a renderer. Please add 'export const render = "your-renderer-name";' to your plugin's entry file.`);
+      // throw new Error(`Plugin "${pluginName}" did not declare a renderer.`);
+    }
+
+    const renderer = this.server.core.renderers.get(rendererName);
+    if (!renderer) {
+      this.server.core.logger.error(`Renderer "${rendererName}" declared by plugin "${pluginName}" is not registered. Have you installed the renderer package (e.g., '@yumerijs/vue-renderer')?`);
+      // throw new Error(`Renderer "${rendererName}" is not registered.`);
+    }
+    
+    const renderOptions = {
+      pluginName,
+    };
+
+    try {
+      const html = await renderer.render(component, data, renderOptions);
+      this.setMime('text/html');
+      this.response(html, 'plain');
+    } catch (error) {
+      this.server.core.logger.error(`Error while rendering view for plugin "${pluginName}":`, error);
+      throw error;
+    }
   }
 }
