@@ -1,11 +1,8 @@
 import { Core, Context, Config, Session, Logger, ConfigSchema } from 'yumeri';
-import { registerVirtualAssetResolver } from '@yumerijs/types';
 import * as fs from 'fs';
 import * as path from 'path';
 import mime from 'mime';
-import { PluginConfigManager } from './utils';
-import App from './views/App.vue';
-import Login from './views/Login.vue';
+import { PluginConfigManager, ConsoleItem } from './utils';
 
 declare module 'yumeri' {
     interface Components {
@@ -33,14 +30,6 @@ export interface Console {
     staticpath: string
   ) => void;
   
-  addvueconsoleitem: (
-    name: string,
-    icon: string,
-    displayname: string,
-    component: any,
-    options?: { pluginName?: string; entry?: string }
-  ) => void;
-
   removeconsoleitem: (name: string) => void;
   
   getloginstatus: (session: Session) => boolean;
@@ -56,27 +45,29 @@ export const config = {
 
 let loginstatus: Record<string, string> = {};
 
-type ConsoleView =
-  | { type: 'iframe'; icon: string; name: string; htmlpath: string; staticpath: string }
-  | { type: 'vue'; icon: string; name: string; entry?: string };
-
-let consoleitem: Record<string, ConsoleView> = {};
-
-export const render = 'vue';
+let consoleitem: Record<string, ConsoleItem> = {};
 
 const operateconsole = {
   addconsoleitem: (name: string, icon: string, displayname: string, htmlpath: string, staticpath: string) => {
-    consoleitem[name] = { type: 'iframe', icon, name: displayname, htmlpath, staticpath };
-  },
-  addvueconsoleitem: (name: string, icon: string, displayname: string, component: any, options?: { pluginName?: string; entry?: string }) => {
-    const entry = resolveVueEntry(component, options?.pluginName, options?.entry);
-    consoleitem[name] = { type: 'vue', icon, name: displayname, entry };
+    consoleitem[name] = new ConsoleItem(icon, displayname, htmlpath, staticpath);
   },
   removeconsoleitem: (name: string) => {
     delete consoleitem[name];
   },
   getloginstatus: (session: Session) => !!loginstatus[session.sessionid]
 } as Console
+
+async function getHook(ctx: Context, hookname: string, originString: string) {
+  const result: string[] = await ctx.executeHook(hookname);
+  let item = '';
+  if (result) {
+    result.forEach((items) => {
+      item = item + items;
+    })
+  }
+  const newString = originString.replace(`{{${hookname}}}`, item);
+  return newString;
+}
 
 export async function apply(ctx: Context, config: Config) {
   const configManager = new PluginConfigManager();
@@ -85,36 +76,48 @@ export async function apply(ctx: Context, config: Config) {
   const staticDir = path.join(__dirname, '..', 'static');
   const basePath = config.get<string>('path', 'console');
 
-  consoleitem['config'] = { type: 'iframe', icon: 'fa-cog', name: '配置', htmlpath: path.join(staticDir, 'config.html'), staticpath: path.join(staticDir, 'files') };
+  consoleitem['config'] = new ConsoleItem('fa-cog', '配置', path.join(staticDir, 'config.html'), path.join(staticDir, 'files'));
 
   const requireLogin = async (session: Session, next: () => Promise<void>) => {
     if (loginstatus[session.sessionid]) {
       await next();
     } else {
       session.setMime('html');
-      session.body = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>请先登录</title></head><body><script>window.location.href = "/${basePath}/login";</script><p>正在重定向</p></body></html>`;
+      session.body = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>请先登录</title></head><body><script>window.onload = function() {alert(\"请先登录\");window.location.href = \"/${basePath}/login\";};</script><p>正在重定向</p></body></html>`;
     }
   };
 
-  ctx.route(`/${basePath}`).action(async (session) => {
-    session.setMime('html');
+  ctx.route(`/${basePath}`).action((session) => {
     session.body = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>重定向</title></head><body><script>window.location.href = "/${basePath}/home";</script><p>正在重定向</p></body></html>`;
+    session.setMime('html');
   });
 
-  ctx.route(`/${basePath}/login`).action(async (session) => {
-    await session.renderView(Login, { basePath });
+  ctx.route(`/${basePath}/login`).action((session) => {
+    const loginHtmlPath = path.join(staticDir, 'login.html');
+    if (fs.existsSync(loginHtmlPath)) {
+      session.body = fs.readFileSync(loginHtmlPath, 'utf8');
+      session.setMime('html');
+    }
   });
 
   ctx.route(`/${basePath}/home`).action((session) => requireLogin(session, async () => {
-    const items = Object.entries(consoleitem).map(([key, item]) => {
-      if (item.type === 'iframe') {
-        return { name: key, displayName: item.name, icon: item.icon, type: 'iframe' as const, path: `/${basePath}/${key}` };
-      }
-      return { name: key, displayName: item.name, icon: item.icon, type: 'vue' as const, entry: item.entry };
-    });
-
-    await session.renderView(App, { items, basePath });
+    const consoleHtmlPath = path.join(staticDir, 'home.html');
+    if (fs.existsSync(consoleHtmlPath)) {
+      const parseone = await getHook(ctx, 'console:home', fs.readFileSync(consoleHtmlPath, 'utf8'));
+      // const parsetwo = await getHook(ctx, 'console:homejs', parseone);
+      session.body = parseone;
+      session.setMime('html');
+    }
   }));
+
+  ctx.route(`/${basePath}/home/script.js`).action((session) => requireLogin(session, async () => {
+    const consoleHtmlPath = path.join(staticDir, 'home.js');
+    if (fs.existsSync(consoleHtmlPath)) {
+      const parseone = await getHook(ctx, 'console:homejs', fs.readFileSync(consoleHtmlPath, 'utf8'));
+      session.body = parseone;
+      session.setMime('application/javascript');
+    }
+  }))
 
   ctx.route(`/api/console/loginpass`).action(async (session, params) => {
     session.setMime('json');
@@ -208,54 +211,31 @@ export async function apply(ctx: Context, config: Config) {
       }
     },
     consoleitem: () => {
-      return Object.entries(consoleitem).map(([key, item]) => {
-        if (item.type === 'iframe') {
-          return {
-            type: 'iframe',
-            item: item.icon,
-            name: item.name,
-            path: `/${basePath}/${key}`
-          };
-        }
-        return {
-          type: 'vue',
-          item: item.icon,
-          name: item.name,
-          entry: item.entry || null
-        };
-      });
-    },
-    logout: async (params: URLSearchParams, session?: Session) => {
-      if (session) {
-        delete loginstatus[session.sessionid];
-      }
-      return { success: true };
+      return Object.entries(consoleitem).map(([key, item]) => ({
+        item: item.icon,
+        name: item.name,
+        path: `/${basePath}/${key}`
+      }));
     }
   };
 
   for (const [routeName, handler] of Object.entries(apiRoutes)) {
     ctx.route(`/api/console/${routeName}`).action(async (session, params) => {
-      const needLogin = routeName !== 'loginpass';
-      const exec = async () => {
+      await requireLogin(session, async () => {
         try {
           session.setMime('json');
-          const result = await (handler as any)(params, session);
+          const result = await handler(params);
           session.body = JSON.stringify(result);
         } catch (err) {
           session.setMime('json');
           session.body = JSON.stringify({ success: false, error: String(err) });
         }
-      };
-      if (needLogin) {
-        await requireLogin(session, exec);
-      } else {
-        await exec();
-      }
+      });
     });
   }
   ctx.route(`/${basePath}/:item/:asset*`).action((session, params, item, asset) => requireLogin(session, async () => {
     const consoleItem = consoleitem[item];
-    if (consoleItem && consoleItem.type === 'iframe') {
+    if (consoleItem) {
       const assetPath = asset ? path.join(consoleItem.staticpath, asset) : consoleItem.htmlpath;
       if (fs.existsSync(assetPath) && fs.statSync(assetPath).isFile()) {
         const mimeType = asset ? (mime.getType(assetPath) || 'application/octet-stream') : 'text/html';
@@ -268,107 +248,4 @@ export async function apply(ctx: Context, config: Config) {
 
 
   ctx.registerComponent('console', operateconsole);
-}
-
-type ManifestEntry = { entry: string; file: string; css?: string[] }
-type ManifestRecord = { plugin: string; entries: Record<string, ManifestEntry> }
-const manifestCache = new Map<string, ManifestRecord | null>();
-const manifestResolvers = new Set<string>();
-
-function resolveVueEntry(component: any, pluginName?: string, directEntry?: string): string | undefined {
-  if (directEntry) return directEntry;
-  const file = component?.__file;
-  const inferredPlugin = pluginName || inferPluginFromFile(file);
-  if (!inferredPlugin) return undefined;
-  const manifest = loadManifest(inferredPlugin);
-  if (!manifest) return undefined;
-
-  const pluginRoot = getPluginRoot(inferredPlugin);
-  const relId = file && pluginRoot ? toPosixPath(path.relative(pluginRoot, file)) : null;
-  const entry = (relId && manifest.entries[relId]) || (file && manifest.entries[file]);
-  if (entry && pluginRoot) {
-    ensureManifestResolver(inferredPlugin, manifest, pluginRoot);
-    return entry.entry;
-  }
-  return undefined;
-}
-
-function loadManifest(pluginName: string): ManifestRecord | null {
-  if (manifestCache.has(pluginName)) return manifestCache.get(pluginName)!;
-  const root = getPluginRoot(pluginName);
-  if (!root) {
-    manifestCache.set(pluginName, null);
-    return null;
-  }
-  const manifestPath = path.join(root, 'dist', 'ui-manifest.json');
-  if (!fs.existsSync(manifestPath)) {
-    manifestCache.set(pluginName, null);
-    return null;
-  }
-  try {
-    const json = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-    manifestCache.set(pluginName, json);
-    return json;
-  } catch (err) {
-    logger.error('[console] Failed to load ui-manifest', err);
-    manifestCache.set(pluginName, null);
-    return null;
-  }
-}
-
-function ensureManifestResolver(pluginName: string, manifest: ManifestRecord, pluginRoot: string) {
-  if (manifestResolvers.has(pluginName)) return;
-  const prefix = `/__yumeri_vue_prebuilt/${pluginName}`;
-  registerVirtualAssetResolver(async (pathname) => {
-    if (!pathname.startsWith(prefix)) return null;
-    const fileName = pathname.slice(prefix.length + 1);
-    for (const entry of Object.values(manifest.entries)) {
-      const fileCandidates = [entry.file];
-      if (entry.css) fileCandidates.push(...entry.css.map((css) => css.replace(prefix + '/', 'client/')));
-      for (const fileRel of fileCandidates) {
-        if (fileRel.endsWith(fileName)) {
-          const abs = path.join(pluginRoot, 'dist', fileRel);
-          if (!fs.existsSync(abs)) return null;
-          const body = await fs.promises.readFile(abs);
-          const contentType = fileRel.endsWith('.css') ? 'text/css' : 'application/javascript';
-          return { body, contentType };
-        }
-      }
-    }
-    return null;
-  });
-  manifestResolvers.add(pluginName);
-}
-
-function getPluginRoot(pluginName: string): string | null {
-  try {
-    const pkgPath = require.resolve(`${pluginName}/package.json`);
-    return path.dirname(pkgPath);
-  } catch {
-    return null;
-  }
-}
-
-function inferPluginFromFile(file?: string): string | null {
-  if (!file) return null;
-  let dir = path.dirname(file);
-  for (let i = 0; i < 5; i++) {
-    const pkgPath = path.join(dir, 'package.json');
-    if (fs.existsSync(pkgPath)) {
-      try {
-        const json = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-        if (json?.name) return json.name as string;
-      } catch {
-        return null;
-      }
-    }
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return null;
-}
-
-function toPosixPath(p: string): string {
-  return p.split(path.sep).join('/');
 }
