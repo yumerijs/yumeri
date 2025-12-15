@@ -115,6 +115,7 @@ export class Server {
             const pluginContext = route ? route.context : (rootroute ? rootroute.context : undefined);
 
             const session = this.createSession(ip, cookies, res, req, pathname, pluginContext, { protocol: 'http', header: req.headers });
+            (session as any)._startAt = Date.now();
 
             const handleRoute = async (routePath: string) => {
                 const matched = await this.core.executeRoute(routePath, session, queryParams);
