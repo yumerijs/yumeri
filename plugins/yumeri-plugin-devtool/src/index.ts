@@ -1,5 +1,6 @@
 import { Context, Config, Session, Logger, ConfigSchema } from 'yumeri';
 import path from 'path';
+import { registerRoutes, attachCoreEvents } from './server/router';
 
 const logger = new Logger("devtool");
 
@@ -7,6 +8,10 @@ export const config = {} as Record<string, ConfigSchema>
 
 export async function apply(ctx: Context, config: Config) {
   const version = readVersion();
+
+  // 监听核心事件，推送到 devtool 内部缓冲
+  attachCoreEvents(ctx);
+  registerRoutes(ctx);
 
   // 后置中间件：仅在路由执行完且响应为 HTML 时追加调试面板
   ctx.use('devtool-overlay', async (session: Session, next: () => Promise<void>) => {
@@ -116,6 +121,11 @@ function buildPanel(info: Record<string, string>) {
     <div class="ydev-inspect-tip">点击页面高亮元素，显示 tag/id/class/尺寸</div>
     <div id="ydev-inspect-info" class="ydev-inspect-tip"></div>
   </div>
+  <div class="ydev-section">
+    <div class="ydev-sub">服务端事件</div>
+    <button id="ydev-events-btn" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(148,163,184,.2);background:rgba(255,255,255,.04);color:#e2e8f0;cursor:pointer;margin-bottom:6px;">刷新事件</button>
+    <div id="ydev-events" class="ydev-list"></div>
+  </div>
   <div class="ydev-sub">点击下方按钮隐藏</div>
 </div>
 <button id="ydev-btn">Dev</button>
@@ -125,13 +135,15 @@ function buildPanel(info: Record<string, string>) {
   const maxItems = 20;
   const state = { net: [], inspectOn: false, highlight: null };
   const btn = document.getElementById('ydev-btn');
-  const panel = document.getElementById('ydev-panel');
-  const list = document.getElementById('ydev-netlist');
-  const inspectBtn = document.getElementById('ydev-inspect');
-  const inspectInfo = document.getElementById('ydev-inspect-info');
+    const panel = document.getElementById('ydev-panel');
+    const list = document.getElementById('ydev-netlist');
+    const inspectBtn = document.getElementById('ydev-inspect');
+    const inspectInfo = document.getElementById('ydev-inspect-info');
+    const eventBtn = document.getElementById('ydev-events-btn');
+    const eventList = document.getElementById('ydev-events');
 
-  if (!btn || !panel) return;
-  btn.addEventListener('click', () => panel.classList.toggle('ydev-show'));
+    if (!btn || !panel) return;
+    btn.addEventListener('click', () => panel.classList.toggle('ydev-show'));
 
   function addNet(entry) {
     state.net.unshift(entry);
@@ -245,6 +257,28 @@ function buildPanel(info: Record<string, string>) {
       if (state.inspectOn) disableInspect(); else enableInspect();
     });
   }
+
+      // devtool events polling
+    async function fetchEvents() {
+      try {
+        const res = await fetch('/devtool/events');
+        const json = await res.json();
+        renderEvents(json.events || []);
+      } catch (e) {
+        // ignore
+      }
+    }
+    function renderEvents(events) {
+      if (!eventList) return;
+      eventList.innerHTML = events.slice(0,20).map(ev => {
+        const payload = typeof ev.payload === 'object' ? JSON.stringify(ev.payload) : String(ev.payload);
+        return '<div class="ydev-net"><div class="ydev-row"><span class="ydev-key">' + ev.type + '</span><span class="ydev-val">' + new Date(ev.time).toLocaleTimeString() + '</span></div><div class="ydev-sub">' + escapeHtml(payload) + '</div></div>'
+      }).join('');
+    }
+    if (eventBtn) {
+      eventBtn.addEventListener('click', () => fetchEvents());
+      fetchEvents();
+    }
 })();
 </script>
 `;
