@@ -28,7 +28,7 @@ publish_package() {
 }
 
 # 遍历目录并后台执行
-for dir in package/*/ plugins/*/; do
+for dir in package/*/ plugins/*/ renderer/*/ common/*/; do
     publish_package "$dir" &
 done
 

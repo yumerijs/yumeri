@@ -2,7 +2,7 @@
 
 set -e
 
-for dir in package/*/ plugins/*/; do
+for dir in package/*/ plugins/*/ renderer/*/ common/*/; do
     if [ ! -f "$dir/package.json" ]; then
         echo "跳过 $dir, 没有 package.json"
         continue
