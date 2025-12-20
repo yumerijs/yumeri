@@ -45,15 +45,27 @@ export class PluginLoader {
     public async reloadConfigFile(): Promise<void> {
         this.logger.info('Reloading config file...');
         try {
-            const doc = yaml.load(fs.readFileSync(this.configPath, 'utf8'));
+            const ext = path.extname(this.configPath).toLowerCase();
+            const fileContent = fs.readFileSync(this.configPath, 'utf8');
+            let doc: any;
+
+            if (ext === '.yaml' || ext === '.yml') {
+                doc = yaml.load(fileContent);
+            } else if (ext === '.json') {
+                doc = JSON.parse(fileContent);
+            } else {
+                throw new Error(`Unsupported config file extension: ${ext}`);
+            }
+
             this.config = doc;
             this.core.coreConfig = this.config.core || {};
             this.core.emit('config-reloaded', this.config);
-            this.logger.info('Config file reloaded.');
+            this.logger.info('Config file reloaded successfully.');
         } catch (e) {
             this.logger.error('Failed to reload config file:', e);
         }
     }
+
 
     getCore(): Core {
         return this.core;
@@ -77,7 +89,15 @@ export class PluginLoader {
     async loadConfig(configPath: string): Promise<void> {
         try {
             this.configPath = configPath;
-            const doc = yaml.load(fs.readFileSync(configPath, 'utf8'));
+            const fileContents = fs.readFileSync(configPath, 'utf8');
+
+            let doc: any;
+            if (path.extname(configPath) === '.json') {
+                doc = JSON.parse(fileContents);
+            } else {
+                doc = yaml.load(fileContents);
+            }
+
             this.config = doc;
             this.logger.info('Config loaded.');
 
@@ -170,7 +190,7 @@ export class PluginLoader {
             if (pluginInstance.render && typeof pluginInstance.render === 'string') {
                 const rendererName = pluginInstance.render;
                 this.logger.info(`Plugin "${pluginName}" requires renderer "${rendererName}".`);
-                
+
                 this.core.pluginRenderers.set(pluginName, rendererName);
 
                 if (!this.core.renderers.has(rendererName)) {
@@ -180,15 +200,15 @@ export class PluginLoader {
                             'vue': '@yumerijs/vue-renderer',
                             'react': '@yumerijs/react-renderer'
                         };
-                        
+
                         const rendererPackageName = rendererPackageMap[rendererName] || rendererName;
-                        
+
                         this.logger.info(`Loading renderer package: "${rendererPackageName}"...`);
                         const RendererClass = require(rendererPackageName);
                         // Handle both ES modules (default export) and CommonJS modules
                         const ActualRendererClass = RendererClass.default || RendererClass;
                         const rendererInstance = new ActualRendererClass();
-                        
+
                         this.core.addRenderer(rendererInstance);
                         this.logger.info(`Successfully loaded and registered renderer "${rendererName}".`);
 
@@ -334,7 +354,7 @@ export class PluginLoader {
         } catch (e) {
             this.logger.error(`Could not resolve path for plugin ${pluginName} to clear cache.`, e);
         }
-        
+
         // Reload the configuration from disk to catch any changes.
         await this.reloadConfigFile();
 

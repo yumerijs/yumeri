@@ -1,0 +1,73 @@
+{
+  "core": {
+    "port": 14511,
+    "host": "0.0.0.0"
+  },
+  "plugins": {
+    "yumeri-plugin-console": {
+      "path": "console",
+      "adminname": "admin",
+      "adminpassword": "admin"
+    },
+    "yumeri-plugin-echo": {
+      "path": "echo",
+      "content": {
+        "join": "<br>",
+        "content": [
+          "shshsn11",
+          "shshd"
+        ]
+      },
+      "type": "file",
+      "filepath": "/root/dev/yumeri/yarn.lock",
+      "isstream": true
+    },
+    "yumeri-plugin-market": null,
+    "yumeri-plugin-proxy-agent": {
+      "proxyUrl": "http://192.168.1.131:7890"
+    },
+    "yumeri-plugin-user": {
+      "name": "user",
+      "isEmailopen": true,
+      "isPhoneopen": true,
+      "encryptType": "md5"
+    },
+    "yumeri-plugin-authority": null,
+    "yumeri-plugin-analyse": {
+      "paths": [
+        "api",
+        "console"
+      ]
+    },
+    "yumeri-plugin-logger": {},
+    "yumeri-plugin-files": null,
+    "yumeri-plugin-pages": null,
+    "yumeri-plugin-frontend": {
+      "template": "default",
+      "urlStyle": "id",
+      "postPrefix": "post",
+      "pagePrefix": "page"
+    },
+    "yumeri-plugin-permission": {
+      "defaultpermit": 3
+    },
+    "~yumeri-plugin-sqlite": {
+      "path": "data/database.db"
+    },
+    "yumeri-plugin-mysql": {
+      "host": "localhost",
+      "port": 3306,
+      "user": "yumeri",
+      "password": "susnskzuamakhz",
+      "database": "yumeri",
+      "connectionLimit": 10,
+      "charset": "utf8mb4"
+    },
+    "yumeri-plugin-tinytools": {},
+    "yumeri-plugin-author-center": null,
+    "yumeri-plugin-manage": null,
+    "yumeri-plugin-test": null,
+    "yumeri-plugin-devtool": null,
+    "~yumeri-plugin-metadata": null
+  }
+}
