@@ -1,4 +1,4 @@
-import { Context, Config, Session, Logger, ConfigSchema } from 'yumeri';
+import { Context, Session, Logger, Schema } from 'yumeri';
 import { getSpecificPackageVersion, getPackageManager, PackageManager } from './util';
 import { exec, spawn } from 'child_process';
 import * as fs from 'fs';
@@ -17,20 +17,15 @@ interface OperateConsole {
     getloginstatus: (session: Session) => boolean;
 }
 
-export const config = {
-    schema: {
-        url: {
-            type: 'string',
-            default: 'https://registry.yumeri.dev',
-            description: '插件市场 Registry 地址'
-        },
-        npmregistry: {
-            type: 'string',
-            default: 'https://registry.npmmirror.com',
-            description: 'npm Registry 地址'
-        }
-    } as Record<string, ConfigSchema>
-};
+export interface MarketConfig {
+    url: string;
+    npmregistry: string;
+}
+
+export const config: Schema<MarketConfig> = Schema.object({
+    url: Schema.string('插件市场 Registry 地址').default('https://registry.yumeri.dev'),
+    npmregistry: Schema.string('npm Registry 地址').default('https://registry.npmmirror.com'),
+});
 
 interface PluginInfo {
     name: string;
@@ -54,7 +49,7 @@ async function fetchPluginsDataFromUrl(url: string): Promise<PluginInfo[] | null
     }
 }
 
-export async function apply(ctx: Context, config: Config) {
+export async function apply(ctx: Context, config: MarketConfig) {
     const consoleApi: OperateConsole = ctx.component.console;
     const requireLogin = (
         handler: (session: Session, params: URLSearchParams) => Promise<void>
@@ -72,7 +67,7 @@ export async function apply(ctx: Context, config: Config) {
 
     const routes = {
         '/list': async (session: Session, params: URLSearchParams) => {
-            const plugins = await fetchPluginsDataFromUrl(config.get<string>('url', 'https://registry.yumeri.dev'));
+            const plugins = await fetchPluginsDataFromUrl(config.url);
             session.body = JSON.stringify(plugins || { success: false, message: 'Failed to fetch plugins' });
         },
         '/search': async (session: Session, params: URLSearchParams) => {
@@ -81,7 +76,7 @@ export async function apply(ctx: Context, config: Config) {
                 session.body = JSON.stringify({ success: false, message: 'Missing search query' });
                 return;
             }
-            const pluginsData = await fetchPluginsDataFromUrl(config.get<string>('url', 'https://registry.yumeri.dev'));
+            const pluginsData = await fetchPluginsDataFromUrl(config.url);
             if (pluginsData) {
                 const filteredPlugins = pluginsData.filter(plugin => plugin.name.toLowerCase().includes(content.toLowerCase()));
                 session.body = JSON.stringify(filteredPlugins);
@@ -108,7 +103,7 @@ export async function apply(ctx: Context, config: Config) {
                     if (visited.has(name)) return;
                     visited.add(name);
 
-                    const registryUrl = `${config.get('npmregistry', 'https://registry.npmmirror.com')}/${encodeURIComponent(name)}`;
+                    const registryUrl = `${config.npmregistry}/${encodeURIComponent(name)}`;
                     const res = await fetch(registryUrl);
                     if (!res.ok) {
                         logger.warn(`获取 ${name} 信息失败：${res.statusText}`);
@@ -138,7 +133,7 @@ export async function apply(ctx: Context, config: Config) {
 
                 // 安装依赖
                 await new Promise<void>((resolve, reject) => {
-                    const child = spawn('yarn', ['install', `--registry=${config.get('npmregistry', 'https://registry.npmmirror.com')}`], { cwd: process.cwd() });
+                    const child = spawn('yarn', ['install', `--registry=${config.npmregistry}`], { cwd: process.cwd() });
                     let stderr = '';
                     child.stdout.on('data', data => logger.info(data.toString()));
                     child.stderr.on('data', data => { logger.error(data.toString()); stderr += data.toString(); });
@@ -160,7 +155,7 @@ export async function apply(ctx: Context, config: Config) {
                 session.body = JSON.stringify({ success: false, message: 'Invalid package name' });
                 return;
             }
-            const response = await fetch(`${config.get<string>('npmregistry', 'https://registry.npmmirror.com')}/${packageName}`);
+            const response = await fetch(`${config.npmregistry}/${packageName}`);
             if (response.ok) {
                 const data = await response.json();
                 session.body = JSON.stringify(data.versions);
@@ -224,7 +219,7 @@ export async function apply(ctx: Context, config: Config) {
                     // 获取 npm 上的版本
                     let npmVersions: string[] = [];
                     try {
-                        const registryUrl = `${config.get('npmregistry', 'https://registry.npmmirror.com')}/${encodeURIComponent(depName)}`;
+                        const registryUrl = `${config.npmregistry}/${encodeURIComponent(depName)}`;
                         const res = await fetch(registryUrl);
                         if (res.ok) {
                             const data = await res.json();
@@ -329,7 +324,7 @@ export async function apply(ctx: Context, config: Config) {
 
                 // 执行 yarn install
                 await new Promise<void>((resolve, reject) => {
-                    const child = spawn('yarn', ['install', `--registry=${config.get('npmregistry', 'https://registry.npmmirror.com')}`], { cwd: projectPath });
+                    const child = spawn('yarn', ['install', `--registry=${config.npmregistry}`], { cwd: projectPath });
                     let stderr = '';
                     child.stdout.on('data', data => logger.info(data.toString()));
                     child.stderr.on('data', data => { logger.error(data.toString()); stderr += data.toString(); });

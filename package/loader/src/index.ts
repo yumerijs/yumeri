@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { Core, Config, Logger, Context, PluginStatus } from '@yumerijs/core';
+import { Core, Config, Logger, Context, PluginStatus, fallback, Schema } from '@yumerijs/core';
 import * as fs from 'fs';
 import { promisify } from 'util';
 import { exec } from 'child_process';
@@ -17,6 +17,7 @@ interface Plugin {
     depend: Array<string>;
     provide: Array<string>;
     render?: string;
+    config?: Schema<any>;
 }
 
 export class PluginLoader {
@@ -43,26 +44,22 @@ export class PluginLoader {
      * This does NOT reload any plugins.
      */
     public async reloadConfigFile(): Promise<void> {
-        this.logger.info('Reloading config file...');
+        this.logger.info('Config reloaded from memory.');
+        // The file is not re-read from disk, we use the in-memory config.
+        // Re-apply core config and emit event.
+        this.core.coreConfig = this.config.core || {};
+        this.core.emit('config-reloaded', this.config);
+    }
+
+    public async saveConfig(): Promise<void> {
+        this.logger.info(`Saving config to ${this.configPath}...`);
         try {
-            const ext = path.extname(this.configPath).toLowerCase();
-            const fileContent = fs.readFileSync(this.configPath, 'utf8');
-            let doc: any;
-
-            if (ext === '.yaml' || ext === '.yml') {
-                doc = yaml.load(fileContent);
-            } else if (ext === '.json') {
-                doc = JSON.parse(fileContent);
-            } else {
-                throw new Error(`Unsupported config file extension: ${ext}`);
-            }
-
-            this.config = doc;
-            this.core.coreConfig = this.config.core || {};
-            this.core.emit('config-reloaded', this.config);
-            this.logger.info('Config file reloaded successfully.');
+            // Ensure we save as JSON, which is the new standard format.
+            const jsonConfig = JSON.stringify(this.config, null, 2);
+            fs.writeFileSync(this.configPath, jsonConfig, 'utf8');
+            this.logger.info('Config saved successfully.');
         } catch (e) {
-            this.logger.error('Failed to reload config file:', e);
+            this.logger.error('Failed to save config file:', e);
         }
     }
 
@@ -109,13 +106,7 @@ export class PluginLoader {
         }
     }
 
-    async getPluginConfig(pluginName: string): Promise<Config> {
-        const actualPluginName = pluginName.startsWith('~') ? pluginName.substring(1) : pluginName;
-        if (!this.config.plugins[actualPluginName]) {
-            return new Config(actualPluginName);
-        }
-        return new Config(actualPluginName, this.config.plugins[actualPluginName]);
-    }
+
 
     async loadPlugins(): Promise<void> {
         if (!this.config || typeof this.config.plugins !== 'object' || this.config.plugins === null) {
@@ -232,10 +223,18 @@ export class PluginLoader {
             for (const injection of depend) {
                 injections[injection] = this.core.getComponent(injection);
             }
-            const pluginConfig = await this.getPluginConfig(pluginName);
+
+            // ### NEW CONFIG LOGIC ###
+            const rawConfig = (this.config.plugins && this.config.plugins[pluginName]) || {};
+            const schema = pluginInstance.config; // The schema is exported as 'config'
+            const finalConfig = fallback(schema, rawConfig);
+            // Update the in-memory config with the fully resolved one
+            this.config.plugins[pluginName] = finalConfig;
+            // ### END NEW CONFIG LOGIC ###
+
             const context = this.getContext(pluginName, injections);
 
-            await this.core.plugin(pluginInstance, context, pluginConfig);
+            await this.core.plugin(pluginInstance, context, finalConfig);
 
             this.pluginStatus[pluginName] = PluginStatus.ENABLED;
 

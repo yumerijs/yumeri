@@ -1,4 +1,4 @@
-import { Context, Config, Session, Logger, ConfigSchema, Route } from 'yumeri';
+import { Context, Session, Logger, Route } from 'yumeri';
 import { WebSocketServer, WebSocket } from 'ws';
 import path from 'path';
 import 'yumeri-plugin-console'
@@ -7,11 +7,11 @@ const logger = new Logger("logger");
 
 export const depend = ['console'];
 
-export const config = {} as Record<string, ConfigSchema>
+export const config = {};
 
 let route: Route;
 
-export async function apply(ctx: Context, config: Config) {
+export async function apply(ctx: Context, config: {}) {
   const consoleApi = ctx.component.console;
   consoleApi.addconsoleitem('logger', 'fa-solid fa-file', '日志', path.join(__dirname, '../static/index.html'), path.join(__dirname, '../static'));
   const requireLogin = (session: Session) => {

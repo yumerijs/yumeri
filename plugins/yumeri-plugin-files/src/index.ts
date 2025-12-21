@@ -1,4 +1,4 @@
-import { Context, Config, Logger, Session, ConfigSchema } from 'yumeri';
+import { Context, Logger, Session, Schema } from 'yumeri';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
@@ -9,17 +9,15 @@ const logger = new Logger("files");
 
 export const depend = ['console'];
 
-export const config = {
-    schema: {
-        root: {
-            type: 'string',
-            default: '.',
-            description: '文件管理的根目录 (默认为项目根目录)'
-        }
-    } as Record<string, ConfigSchema>
-};
+export interface FilesConfig {
+  root: string;
+}
 
-export async function apply(ctx: Context, config: Config) {
+export const config: Schema<FilesConfig> = Schema.object({
+  root: Schema.string('文件管理的根目录 (默认为项目根目录)').default('.'),
+});
+
+export async function apply(ctx: Context, config: FilesConfig) {
     const consoleApi = ctx.component.console;
 
     if (!consoleApi) {
@@ -35,7 +33,7 @@ export async function apply(ctx: Context, config: Config) {
         path.join(__dirname, '../static/')
     );
 
-    const rootDir = config.get('root', '.');
+    const rootDir = config.root;
     const safeBaseDir = path.resolve(process.cwd(), rootDir);
     await fs.mkdir(safeBaseDir, { recursive: true });
 

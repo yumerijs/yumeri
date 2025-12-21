@@ -1,4 +1,4 @@
-import { Core, Context, Config, Session, Logger, ConfigSchema } from 'yumeri';
+import { Core, Context, Session, Logger, Schema } from 'yumeri';
 import * as fs from 'fs';
 import * as path from 'path';
 import mime from 'mime';
@@ -35,13 +35,11 @@ export interface Console {
   getloginstatus: (session: Session) => boolean;
 }
 
-export const config = {
-  schema: {
-    path: { type: 'string', default: 'console', description: '监听路径（命令）' },
-    adminname: { type: 'string', default: 'admin', description: '管理员用户名' },
-    adminpassword: { type: 'string', default: 'admin', description: '管理员密码' }
-  } as Record<string, ConfigSchema>
-};
+export const config: Schema<ConsoleConfig> = Schema.object({
+  path: Schema.string('监听路径（命令）').default('console'),
+  adminname: Schema.string('管理员用户名').default('admin'),
+  adminpassword: Schema.string('管理员密码').default('admin'),
+});
 
 let loginstatus: Record<string, string> = {};
 
@@ -69,12 +67,12 @@ async function getHook(ctx: Context, hookname: string, originString: string) {
   return newString;
 }
 
-export async function apply(ctx: Context, config: Config) {
+export async function apply(ctx: Context, config: ConsoleConfig) {
   const configManager = new PluginConfigManager();
   const core = ctx.getCore();
   configManager.setCore(core);
   const staticDir = path.join(__dirname, '..', 'static');
-  const basePath = config.get<string>('path', 'console');
+  const basePath = config.path;
 
   consoleitem['config'] = new ConsoleItem('fa-cog', '配置', path.join(staticDir, 'config.html'), path.join(staticDir, 'files'));
 
@@ -122,7 +120,7 @@ export async function apply(ctx: Context, config: Config) {
   ctx.route(`/api/console/loginpass`).action(async (session, params) => {
     session.setMime('json');
     const reqst = await session.parseRequestBody();
-    if (reqst.username === config.get<string>('adminname', 'admin') && reqst.password === config.get<string>('adminpassword', 'admin')) {
+    if (reqst.username === config.adminname && reqst.password === config.adminpassword) {
       loginstatus[session.sessionid] = reqst.username!;
       session.body = JSON.stringify({ success: true });
     } else {

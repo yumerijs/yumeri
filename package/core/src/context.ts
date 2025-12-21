@@ -6,7 +6,7 @@ import { Config } from './config';
 import { I18n } from './i18n';
 
 interface Plugin {
-    apply: (ctx: Context, config: Config) => Promise<void>;
+    apply: (ctx: Context, config: any) => any;
     disable: (ctx: Context) => Promise<void>;
     depend: Array<string>;
     provide: Array<string>;
@@ -171,7 +171,7 @@ export class Context {
      * @param plugin 插件实例
      * @param config 插件配置
      */
-    async apply(plugin: Plugin, config: Config) {
+    async apply(plugin: Plugin, config: any) {
         if (!plugin || !plugin.apply) return;
         const ctx = this.fork();
         await plugin.apply(ctx, config);

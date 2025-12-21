@@ -1,12 +1,12 @@
-import { Context, Config, Session, Logger, ConfigSchema } from 'yumeri';
+import { Context, Session, Logger } from 'yumeri';
 import path from 'path';
 import { registerRoutes, attachCoreEvents } from './server/router';
 
 const logger = new Logger("devtool");
 
-export const config = {} as Record<string, ConfigSchema>
+export const config = {};
 
-export async function apply(ctx: Context, config: Config) {
+export async function apply(ctx: Context, config: {}) {
   const version = readVersion();
 
   // 监听核心事件，推送到 devtool 内部缓冲
