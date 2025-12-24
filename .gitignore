@@ -4,6 +4,7 @@ build/
 *.log
 .env
 config.yml
+yumeri.json
 .DS_Store
 .idea/
 .vscode/
