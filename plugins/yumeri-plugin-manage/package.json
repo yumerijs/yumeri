@@ -1,6 +1,6 @@
 {
   "name": "yumeri-plugin-manage",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "管理 Yumeri 服务",
   "main": "dist/index.js",
   "dev": "src/index.ts",
@@ -23,6 +23,6 @@
     "typescript": "^5.8.2"
   },
   "peerDependencies": {
-    "yumeri": "^2.0.5"
+    "yumeri": "^2.1.2"
   }
 }

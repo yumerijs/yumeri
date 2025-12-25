@@ -1,6 +1,6 @@
 {
   "name": "yumeri-plugin-files",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Console File Manager for Yumeri",
   "main": "dist/index.js",
   "dev": "src/index.ts",
@@ -28,6 +28,6 @@
     "mime": "^4.1.0"
   },
   "peerDependencies": {
-    "yumeri": "^2.0.5"
+    "yumeri": "^2.1.2"
   }
 }

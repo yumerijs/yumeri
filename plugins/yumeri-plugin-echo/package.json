@@ -1,6 +1,6 @@
 {
   "name": "yumeri-plugin-echo",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Echo something with Yumeri",
   "main": "dist/index.js",
   "dev": "src/index.ts",
@@ -32,6 +32,6 @@
     "typescript": "^5.8.2"
   },
   "peerDependencies": {
-    "yumeri": "^2.0.0"
+    "yumeri": "^2.1.2"
   }
 }
