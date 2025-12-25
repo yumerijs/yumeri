@@ -7,7 +7,7 @@ export function fallback<T>(schema: Schema<T>, config: T): T {
 
   let result = config;
   if (isNullable(result)) {
-    result = schema.defaultValue; // Using new property name
+    result = schema.defaultValue;
   }
 
   if (schema.type === 'object') {
@@ -22,7 +22,6 @@ export function fallback<T>(schema: Schema<T>, config: T): T {
     if (!Array.isArray(result)) {
       result = [] as any;
     }
-    // Cast to any[] to satisfy the compiler for the .map call
     result = (result as any[]).map((item: any) => fallback(schema.items!, item)) as any;
   }
   return result;
@@ -31,19 +30,21 @@ export function fallback<T>(schema: Schema<T>, config: T): T {
 export class Schema<T = any> {
   _type?: T; // Phantom type
   type: string;
-  isRequired?: boolean; // New property name
+  isRequired?: boolean;
   description?: string;
-  defaultValue?: any; // New property name
+  defaultValue?: any;
   properties?: Record<string, Schema<any>>;
   items?: Schema<any>;
+  enum?: T[];
 
-  constructor(definition: Omit<Schema<T>, '_type' | 'required' | 'default'>) {
+  constructor(definition: Omit<Schema<T>, '_type' | 'required' | 'default'> & { enum?: T[] }) {
     this.type = definition.type;
     this.isRequired = (definition as any).isRequired;
     this.description = definition.description;
     this.defaultValue = (definition as any).defaultValue;
     this.properties = definition.properties;
     this.items = definition.items;
+    this.enum = definition.enum;
   }
 
   static string(description?: string): Schema<string> {
@@ -69,6 +70,11 @@ export class Schema<T = any> {
   static extend<T extends {}, U extends {}>(base: Schema<T>, extension: { [K in keyof U]: Schema<U[K]> }, description?: string): Schema<T & U> {
     const combinedProperties = { ...base.properties, ...extension } as { [K in keyof (T & U)]: Schema<(T & U)[K]> };
     return new Schema({ type: 'object', properties: combinedProperties, description: description || base.description });
+  }
+
+  static enum<L extends string | number>(values: L[], description?: string): Schema<L> {
+    const type = typeof values[0] === 'string' ? 'string' : typeof values[0] === 'number' ? 'number' : 'string'; // Infer type based on first value
+    return new Schema({ type, enum: values, description });
   }
 
   required(this: this): this {

@@ -44,20 +44,14 @@ export class PluginLoader {
      * This does NOT reload any plugins.
      */
     public async reloadConfigFile(): Promise<void> {
-        this.logger.info('Config reloaded from memory.');
-        // The file is not re-read from disk, we use the in-memory config.
-        // Re-apply core config and emit event.
         this.core.coreConfig = this.config.core || {};
         this.core.emit('config-reloaded', this.config);
     }
 
     public async saveConfig(): Promise<void> {
-        this.logger.info(`Saving config to ${this.configPath}...`);
         try {
-            // Ensure we save as JSON, which is the new standard format.
             const jsonConfig = JSON.stringify(this.config, null, 2);
             fs.writeFileSync(this.configPath, jsonConfig, 'utf8');
-            this.logger.info('Config saved successfully.');
         } catch (e) {
             this.logger.error('Failed to save config file:', e);
         }
@@ -345,22 +339,14 @@ export class PluginLoader {
     public async reloadPlugin(pluginName: string): Promise<void> {
         this.logger.info(`Reloading plugin: "${pluginName}"...`);
 
-        // Clear the module cache for the plugin. This is critical for hot-reloading.
         try {
             const resolvedPath = require.resolve(pluginName);
             this.clearRequireCache(resolvedPath, new Set());
-            this.logger.info(`Cache cleared for plugin "${pluginName}".`);
         } catch (e) {
             this.logger.error(`Could not resolve path for plugin ${pluginName} to clear cache.`, e);
         }
-
-        // Reload the configuration from disk to catch any changes.
         await this.reloadConfigFile();
-
-        // Unload the plugin and its dependents.
         await this.unloadPlugin(pluginName, true);
-
-        // Load the plugin again. This will also trigger a check for other pending plugins.
         const success = await this.loadSinglePlugin(pluginName);
         if (success) {
             this.logger.info(`Plugin "${pluginName}" reloaded successfully.`);
