@@ -1,4 +1,4 @@
-import { Logger, Core } from 'yumeri'
+import { Logger, Core, Schema, fallback } from 'yumeri'
 
 const logger = new Logger('console');
 
@@ -29,10 +29,7 @@ export class PluginConfigManager {
     async getPluginConfig(pluginName: string): Promise<any> {
         const actualPluginName = pluginName.startsWith('~') ? pluginName.substring(1) : pluginName;
         const config = this.loader.config.plugins[actualPluginName] || {};
-        
-        // The schema parsing logic from the old implementation is complex and seems to be for UI generation.
-        // For now, we will return the raw config, as the loader now handles defaults.
-        // A future refactoring could move the UI generation logic here, reading the schema from the plugin instance.
+
         const pluginInstance = this.loader.plugins[actualPluginName];
         const schema = pluginInstance?.config;
 
@@ -40,16 +37,13 @@ export class PluginConfigManager {
             return [];
         }
 
-        // A simplified version of the old schema parser to return a format the UI expects.
+        // 将用户配置与 schema 默认值合并，避免缺少默认值导致前端结构错误
+        const mergedValue = fallback(schema, config);
+
         const mergedConfig: any[] = [];
         for (const key in schema.properties) {
-            const prop = schema.properties[key];
-            mergedConfig.push({
-                key: key,
-                value: config[key],
-                description: prop.description,
-                type: prop.type, // This is a simplification
-            });
+            const propSchema = schema.properties[key];
+            mergedConfig.push(this.schemaToConfigItem(key, propSchema, mergedValue?.[key]));
         }
         return mergedConfig;
     }
@@ -167,6 +161,108 @@ export class PluginConfigManager {
         // This method requires scanning node_modules, which is outside the scope of config management.
         // It can be kept, but it should not read the config file itself.
         return []; // Placeholder, as the original logic is complex and filesystem-dependent.
+    }
+
+    /**
+     * 将 Schema 描述转换为前端可消费的配置项结构
+     */
+    private schemaToConfigItem(key: string, schema: Schema<any>, value: any) {
+        const description = schema.description || key;
+        const currentValue = value === undefined ? schema.defaultValue : value;
+
+        // 枚举转下拉
+        if (schema.enum && schema.enum.length) {
+            return {
+                key,
+                value: currentValue ?? '',
+                description,
+                type: 'select',
+                options: schema.enum,
+            };
+        }
+
+        switch (schema.type) {
+            case 'number':
+                return {
+                    key,
+                    value: currentValue ?? 0,
+                    description,
+                    type: 'number',
+                };
+            case 'boolean':
+                return {
+                    key,
+                    value: !!currentValue,
+                    description,
+                    type: 'boolean',
+                };
+            case 'array':
+                // 对象数组 -> 复杂数组
+                if (schema.items?.type === 'object') {
+                    return {
+                        key,
+                        value: Array.isArray(currentValue) ? currentValue : [],
+                        description,
+                        type: 'complex-array',
+                        itemType: 'object',
+                        itemSchema: this.normalizeSchema(schema.items),
+                    };
+                }
+                return {
+                    key,
+                    value: Array.isArray(currentValue) ? currentValue : [],
+                    description,
+                    type: 'array',
+                    itemType: schema.items?.type || 'string',
+                };
+            case 'object':
+                return {
+                    key,
+                    value: currentValue ?? {},
+                    description,
+                    type: 'object-header',
+                    properties: this.normalizeSchemaProperties(schema.properties),
+                };
+            default:
+                return {
+                    key,
+                    value: currentValue ?? '',
+                    description,
+                    type: 'text',
+                };
+        }
+    }
+
+    /**
+     * 将 Schema 属性中的 defaultValue/enum 等字段转换为前端使用的格式
+     */
+    private normalizeSchema(schema: Schema<any>) {
+        const normalized: any = {
+            type: schema.type,
+            description: schema.description,
+            default: schema.defaultValue,
+            enum: schema.enum,
+        };
+
+        if (schema.items) {
+            normalized.items = this.normalizeSchema(schema.items);
+        }
+
+        if (schema.properties) {
+            normalized.properties = this.normalizeSchemaProperties(schema.properties);
+        }
+
+        return normalized;
+    }
+
+    private normalizeSchemaProperties(properties?: Record<string, Schema<any>>) {
+        const normalizedProps: Record<string, any> = {};
+        if (!properties) return normalizedProps;
+
+        for (const [propKey, propSchema] of Object.entries(properties)) {
+            normalizedProps[propKey] = this.normalizeSchema(propSchema as Schema<any>);
+        }
+        return normalizedProps;
     }
 }
 
