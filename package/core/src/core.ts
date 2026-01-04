@@ -1,13 +1,13 @@
 import { EventEmitter } from 'events';
-import { Config } from './config';
-import { Logger } from './logger';
-import { Session } from './session';
-import { Middleware } from './middleware';
-import { Route } from './route';
-import { Context } from './context';
-import { HookHandler, Hook } from './hook';
-import { Server as CoreServer } from './server';
-import { I18n } from './i18n';
+import { Config } from './config.js';
+import { Logger } from './logger.js';
+import { Session } from './session.js';
+import { Middleware } from './middleware.js';
+import { Route } from './route.js';
+import { Context } from './context.js';
+import { HookHandler, Hook } from './hook.js';
+import { Server as CoreServer } from './server.js';
+import { I18n } from './i18n.js';
 import { IRenderer } from '@yumerijs/types';
 
 // This interface should probably be in @yumerijs/types

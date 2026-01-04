@@ -3,7 +3,7 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@yumerijs/*": ["package/*/src"],
+      "@yumerijs/*": ["package/*/src", "renderer/*/src"],
       "*": ["package/*/src"],
       "yumeri-plugin-*": ["plugins/yumeri-plugin-*/src", "common/yumeri-plugin-*/src"]
     }

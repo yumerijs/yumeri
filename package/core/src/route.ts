@@ -3,10 +3,10 @@
  * @author: FireGuo
  * WindyPear-Team All right reserved
  **/
-import { Session } from './session';
-import { Middleware } from './middleware';
+import { Session } from './session.js';
+import { Middleware } from './middleware.js';
 import { WebSocketServer } from 'ws';
-import { Context } from './context';
+import { Context } from './context.js';
 
 export type RouteHandler = (
   session: Session,

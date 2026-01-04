@@ -1,6 +1,6 @@
 {
   "name": "yumeri-plugin-console",
-  "version": "2.0.5",
+  "version": "2.0.7",
   "description": "Web console for yumeri",
   "main": "dist/index.js",
   "dev": "src/index.ts",
@@ -9,10 +9,6 @@
     "dist",
     "static"
   ],
-  "scripts": {
-    "build": "tsc",
-    "prepublishOnly": "yarn build"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/yumerijs/yumeri.git"
@@ -41,5 +37,6 @@
   },
   "peerDependencies": {
     "yumeri": "^2.1.2"
-  }
+  },
+  "type": "module"
 }

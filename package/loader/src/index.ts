@@ -1,12 +1,11 @@
 import * as path from 'path';
-import { Core, Config, Logger, Context, PluginStatus, fallback, Schema } from '@yumerijs/core';
+import { Core, Config, Logger, Context, PluginStatus, fallback, Schema, I18n } from '@yumerijs/core';
 import * as fs from 'fs';
 import { promisify } from 'util';
 import { exec } from 'child_process';
-import { pathToFileURL } from 'url';
+import { fileURLToPath } from 'url';
 import * as yaml from 'js-yaml';
 import * as chokidar from 'chokidar';
-import { registerVueRuntimeLoader } from './runtime/vueLoader';
 
 const execAsync = promisify(exec);
 
@@ -36,7 +35,6 @@ export class PluginLoader {
         this.core = core || new Core(this, undefined, false);
         this.isDev = process.env.NODE_ENV === 'development';
         Logger.setCore(this.core);
-        registerVueRuntimeLoader();
     }
 
     /**
@@ -93,7 +91,7 @@ export class PluginLoader {
             this.logger.info('Config loaded.');
 
             this.core.coreConfig = this.config.core || {};
-            this.core.i18n = new (require('@yumerijs/core').I18n)(this.core.coreConfig.lang || ['zh', 'en']);
+            this.core.i18n = new I18n(this.core.coreConfig.lang || ['zh', 'en']);
         } catch (e) {
             this.logger.error('Failed to load config:', e);
             throw e;
@@ -189,7 +187,7 @@ export class PluginLoader {
                         const rendererPackageName = rendererPackageMap[rendererName] || rendererName;
 
                         this.logger.info(`Loading renderer package: "${rendererPackageName}"...`);
-                        const RendererClass = require(rendererPackageName);
+                        const RendererClass = await import(rendererPackageName);
                         // Handle both ES modules (default export) and CommonJS modules
                         const ActualRendererClass = RendererClass.default || RendererClass;
                         const rendererInstance = new ActualRendererClass();
@@ -239,7 +237,8 @@ export class PluginLoader {
             if (this.isDev) {
                 let pluginPathToWatch: string | null = null;
                 try {
-                    const pkgJsonPath = require.resolve(`${pluginName}/package.json`);
+                    const packageJsonUrl = import.meta.resolve(`${pluginName}/package.json`);
+                    const pkgJsonPath = fileURLToPath(packageJsonUrl);
                     pluginPathToWatch = path.dirname(pkgJsonPath);
                 } catch (e) {
                     const localPluginPath = path.resolve(process.cwd(), pluginName);
@@ -332,22 +331,11 @@ export class PluginLoader {
         }
     }
 
-    /**
-     * Reloads a single plugin's code by clearing the require cache and then reloading it.
-     * @param pluginName The name of the plugin to reload.
-     */
     public async reloadPlugin(pluginName: string): Promise<void> {
         this.logger.info(`Reloading plugin: "${pluginName}"...`);
-
-        try {
-            const resolvedPath = require.resolve(pluginName);
-            this.clearRequireCache(resolvedPath, new Set());
-        } catch (e) {
-            this.logger.error(`Could not resolve path for plugin ${pluginName} to clear cache.`, e);
-        }
         await this.reloadConfigFile();
         await this.unloadPlugin(pluginName, true);
-        const success = await this.loadSinglePlugin(pluginName);
+        const success = await this.loadSinglePlugin(pluginName, true, false);
         if (success) {
             this.logger.info(`Plugin "${pluginName}" reloaded successfully.`);
             this.core.emit('plugin-reloaded', pluginName);
@@ -391,25 +379,8 @@ export class PluginLoader {
     }
 
     async loadModule(pluginName: string): Promise<Plugin> {
-        const plugin = await require(pluginName);
+        const plugin = await import(pluginName);
         return plugin.default || plugin;
-    }
-
-    private clearRequireCache(moduleId: string, visited: Set<string>) {
-        if (visited.has(moduleId)) {
-            return;
-        }
-        visited.add(moduleId);
-
-        const module = require.cache[moduleId];
-        if (!module) return;
-
-        if (module.children) {
-            for (const child of module.children) {
-                this.clearRequireCache(child.id, visited);
-            }
-        }
-        delete require.cache[moduleId];
     }
 
     async checkPluginDependencies(pluginPath: string): Promise<boolean> {

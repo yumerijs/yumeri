@@ -1,9 +1,9 @@
-import { Core } from './core';
-import { Route } from './route';
-import { HookHandler } from './hook';
-import { Middleware } from './middleware';
-import { Config } from './config';
-import { I18n } from './i18n';
+import { Core } from './core.js';
+import { Route } from './route.js';
+import { HookHandler } from './hook.js';
+import { Middleware } from './middleware.js';
+import { Config } from './config.js';
+import { I18n } from './i18n.js';
 
 interface Plugin {
     apply: (ctx: Context, config: any) => any;

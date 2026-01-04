@@ -1,5 +1,5 @@
-export * from './database'
-export * from './virtualAssets'
+export * from './database.js'
+export * from './virtualAssets.js'
 
 export interface IRenderer {
   /**

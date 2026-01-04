@@ -3,11 +3,23 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as fsSync from 'fs';
 import mime from 'mime';
+import { fileURLToPath } from 'url';
 import 'yumeri-plugin-console'
 
 const logger = new Logger("files");
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export const depend = ['console'];
+
+declare module 'yumeri' {
+  interface Components {
+    console: {
+      addconsoleitem: (name: string, icon: string, displayname: string, htmlpath: string, staticpath: string) => void;
+      removeconsoleitem: (name: string) => void;
+      getloginstatus: (session: Session) => boolean;
+    };
+  }
+}
 
 export interface FilesConfig {
   root: string;

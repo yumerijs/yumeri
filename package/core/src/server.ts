@@ -1,13 +1,13 @@
-import { Core } from './core';
-import { Logger } from './logger';
-import { Session } from './session';
+import { Core } from './core.js';
+import { Logger } from './logger.js';
+import { Session } from './session.js';
 import http, { IncomingMessage, ServerResponse } from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
 import { URL } from 'url';
 import * as mime from 'mime-types';
 import { Stream } from 'stream';
-import { Context } from './context';
+import { Context } from './context.js';
 import { resolveVirtualAsset } from '@yumerijs/types';
 
 

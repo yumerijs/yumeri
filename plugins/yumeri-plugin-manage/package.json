@@ -1,6 +1,6 @@
 {
   "name": "yumeri-plugin-manage",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "管理 Yumeri 服务",
   "main": "dist/index.js",
   "dev": "src/index.ts",
@@ -8,10 +8,6 @@
   "files": [
     "dist"
   ],
-  "scripts": {
-    "build": "tsc",
-    "prepublishOnly": "yarn build"
-  },
   "keywords": [
     "yumeri",
     "api",
@@ -23,6 +19,8 @@
     "typescript": "^5.8.2"
   },
   "peerDependencies": {
-    "yumeri": "^2.1.2"
-  }
+    "yumeri": "^2.1.2",
+    "yumeri-plugin-console": "^2.0.7"
+  },
+  "type": "module"
 }

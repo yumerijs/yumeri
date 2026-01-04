@@ -5,6 +5,16 @@ const logger = new Logger("manage")
 
 export const depend = ['console']
 
+declare module 'yumeri' {
+  interface Components {
+    console: {
+      addconsoleitem: (name: string, icon: string, displayname: string, htmlpath: string, staticpath: string) => void
+      removeconsoleitem: (name: string) => void
+      getloginstatus: (session: Session) => boolean
+    }
+  }
+}
+
 // 控制台 HTML
 const manageHtml = `
 <div class="module-section">

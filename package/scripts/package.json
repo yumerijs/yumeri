@@ -1,9 +1,10 @@
 {
   "name": "@yumerijs/scripts",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Development scripts for yumeri",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "type": "commonjs",
   "files": [
     "dist",
     "template"
@@ -32,6 +33,7 @@
   "devDependencies": {
     "@types/node": "^22.14.1",
     "@types/prompts": "^2.4.9",
+    "tsup": "^8.3.0",
     "typescript": "^5.8.2"
   },
   "dependencies": {

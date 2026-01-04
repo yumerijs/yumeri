@@ -1,6 +1,7 @@
 import { Context, Session, Logger, Schema } from 'yumeri';
 import path from 'path';
-import { registerRoutes, attachCoreEvents } from './server/router';
+import fs from 'fs';
+import { registerRoutes, attachCoreEvents } from './server/router.js';
 
 const logger = new Logger("devtool");
 
@@ -542,8 +543,7 @@ function escapeHtml(str: string) {
 function readVersion(): string {
   try {
     const pkgPath = path.resolve(process.cwd(), 'package', 'yumeri', 'package.json');
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const pkg = require(pkgPath);
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
     return pkg.version || 'unknown';
   } catch {
     return 'unknown';

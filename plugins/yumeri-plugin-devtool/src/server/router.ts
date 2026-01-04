@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { EventBuffer } from './eventBuffer';
+import { EventBuffer } from './eventBuffer.js';
 import { Context, Session } from 'yumeri';
 
 const buffer = new EventBuffer();

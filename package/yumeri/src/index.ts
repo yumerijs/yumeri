@@ -1,7 +1,7 @@
 export * from '@yumerijs/core';
 export { default as Loader } from '@yumerijs/loader';
-import { Database } from '@yumerijs/types'
-export {
+import type { Database } from '@yumerijs/types'
+export type {
     Tables,
     FieldType,
     FieldDefinition,
@@ -13,7 +13,7 @@ export {
 } from '@yumerijs/types'
 export type { Database } from '@yumerijs/types'
 
-export {
+export type {
     VirtualAssetResponse,
     VirtualAssetResolver,
     registerVirtualAssetResolver,

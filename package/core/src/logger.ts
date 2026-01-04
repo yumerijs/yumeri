@@ -4,9 +4,10 @@
  * WindyPear-Team All right reserved
  **/
 
-import pc from 'picocolors';
-import { Core } from './core';
-
+import * as pcc from 'picocolors';
+import { Core } from './core.js';
+const { createColors } = pcc;
+const pc = createColors();
 export class Logger {
   private title: string;
   private titleColor: (text: string) => string;

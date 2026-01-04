@@ -2,7 +2,10 @@ import { Core, Context, Session, Logger, Schema } from 'yumeri';
 import * as fs from 'fs';
 import * as path from 'path';
 import mime from 'mime';
-import { PluginConfigManager, ConsoleItem } from './utils';
+import { fileURLToPath } from 'url';
+import { PluginConfigManager, ConsoleItem } from './utils.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 declare module 'yumeri' {
     interface Components {

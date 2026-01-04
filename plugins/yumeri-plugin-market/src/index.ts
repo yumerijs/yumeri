@@ -1,14 +1,22 @@
 import { Context, Session, Logger, Schema } from 'yumeri';
-import { getSpecificPackageVersion, getPackageManager, PackageManager } from './util';
+import { getSpecificPackageVersion, getPackageManager, PackageManager } from './util.js';
 import { exec, spawn } from 'child_process';
 import * as fs from 'fs';
 import { promises as fsp } from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import 'yumeri-plugin-console'
 
 const logger = new Logger("market");
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export const depend = ['console']; // 需要的服务
+
+declare module 'yumeri' {
+    interface Components {
+        console: OperateConsole;
+    }
+}
 export const usage = `Yumeri 插件市场<br>由于插件市场的官方 Registry 是通过 Cloudflare Worker 部署的，可能会出现不稳定的情况<br>可在https://github.com/yumerijs/yumeri-tools找到Registry的部署文件然后自行部署`
 
 interface OperateConsole {

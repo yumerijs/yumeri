@@ -7,8 +7,7 @@ import HelloComponent from './views/Hello.vue';
 export const render = 'vue';
 
 const logger = new Logger('{{name}}');
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const sfcPath = path.resolve(__dirname, '../src/views/Hello.vue');
 (HelloComponent as any).__file ??= sfcPath;
 

@@ -1,6 +1,6 @@
 {
   "name": "yumeri-plugin-devtool",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Yumeri 开发控制台",
   "main": "dist/index.js",
   "dev": "src/index.ts",
@@ -8,10 +8,6 @@
   "files": [
     "dist"
   ],
-  "scripts": {
-    "build": "tsc",
-    "prepublishOnly": "yarn build"
-  },
   "keywords": [
     "yumeri",
     "api",
@@ -24,5 +20,6 @@
   },
   "peerDependencies": {
     "yumeri": "^2.0.0"
-  }
+  },
+  "type": "module"
 }

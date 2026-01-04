@@ -3,5 +3,5 @@
  * @author: FireGuo
  * WindyPear-Team All right reserved
  **/
-import { Session } from './session';
+import { Session } from './session.js';
 export type Middleware = (session: Session, next: () => Promise<void>) => Promise<void>;

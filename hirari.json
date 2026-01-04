@@ -1,0 +1,20 @@
+{
+  "loader": {
+    "format": "esm",
+    "plugins": [
+      "@hirarijs/loader-tsx",
+      "@hirarijs/loader-ts",
+      "@hirarijs/loader-vue"
+    ],
+    "pluginOptions": {
+      "@hirarijs/loader-ts": {
+        "ignoreNodeModules": true,
+        "continue": true
+      },
+      "@hirarijs/loader-tsx": {},
+      "@hirarijs/loader-vue": {}
+    },
+    "autoInstall": true,
+    "debug": false
+  }
+}

@@ -5,12 +5,12 @@
  **/
 
 import crypto from 'crypto';
-import { Server } from './server';
+import { Server } from './server.js';
 import { IncomingMessage, ServerResponse } from 'http';
 import * as formidable from 'formidable';
 import fs from 'fs';
 import { Stream } from "stream";
-import { Context } from './context';
+import { Context } from './context.js';
 
 type ParsedParams = Record<string, string | string[] | undefined>;
 type MissingMode = 'keep-template' | 'keep-key' | 'remove';

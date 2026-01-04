@@ -1,11 +1,23 @@
 import { Context, Session, Logger, Route } from 'yumeri';
 import { WebSocketServer, WebSocket } from 'ws';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import 'yumeri-plugin-console'
 
 const logger = new Logger("logger");
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export const depend = ['console'];
+
+declare module 'yumeri' {
+  interface Components {
+    console: {
+      addconsoleitem: (name: string, icon: string, displayname: string, htmlpath: string, staticpath: string) => void;
+      removeconsoleitem: (name: string) => void;
+      getloginstatus: (session: Session) => boolean;
+    };
+  }
+}
 
 export const config = {};
 

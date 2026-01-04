@@ -1,6 +1,6 @@
 {
   "name": "yumeri-plugin-echo",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Echo something with Yumeri",
   "main": "dist/index.js",
   "dev": "src/index.ts",
@@ -8,10 +8,6 @@
   "files": [
     "dist"
   ],
-  "scripts": {
-    "build": "tsc",
-    "prepublishOnly": "yarn build"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/yumerijs/yumeri.git"
@@ -33,5 +29,6 @@
   },
   "peerDependencies": {
     "yumeri": "^2.1.2"
-  }
+  },
+  "type": "module"
 }

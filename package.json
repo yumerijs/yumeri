@@ -10,10 +10,15 @@
   ],
   "scripts": {
     "start": "yumeri start",
-    "dev": "cross-env NODE_ENV=development yumeri start -r esbuild-register",
-    "setup": "yumeri-scripts setup"
+    "dev": "cross-env NODE_ENV=development yumeri start --import @hirarijs/loader/import",
+    "setup": "yumeri-scripts setup",
+    "build": "yumeri-scripts build"
   },
   "dependencies": {
+    "@hirarijs/loader": "^1.0.19",
+    "@hirarijs/loader-ts": "^1.0.20",
+    "@hirarijs/loader-tsx": "^1.0.0",
+    "@hirarijs/loader-vue": "^1.0.0",
     "@yumerijs/scripts": "workspace:^",
     "yumeri": "workspace:^",
     "yumeri-plugin-console": "workspace:^"
