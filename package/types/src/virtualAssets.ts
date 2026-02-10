@@ -26,7 +26,6 @@ export async function resolveVirtualAsset(pathname: string): Promise<VirtualAsse
         return result;
       }
     } catch (error) {
-      console.error('[yumeri][virtual-asset] Resolver error:', error);
     }
   }
   return null;

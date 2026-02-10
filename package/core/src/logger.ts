@@ -6,6 +6,7 @@
 
 import * as pcc from 'picocolors';
 import { Core } from './core.js';
+type LogLevel = 'info' | 'warn' | 'error' | 'debug';
 const { createColors } = pcc;
 const pc = createColors();
 export class Logger {
@@ -13,12 +14,17 @@ export class Logger {
   private titleColor: (text: string) => string;
   public static coreInstance: Core | null = null;
   public static logs: { level: string; message: string, timestamp: string }[] = [];
+  public static level: LogLevel = 'info';
 
   public static setCore(core: Core) {
     if (Logger.coreInstance !== null) {
       return
     }
     Logger.coreInstance = core;
+  }
+
+  public static setLevel(level: LogLevel) {
+    Logger.level = level;
   }
 
   constructor(title: string) {
@@ -30,7 +36,7 @@ export class Logger {
     const availableColors = [
       pc.red, pc.green, pc.yellow, pc.blue,
       pc.magenta, pc.cyan, pc.white,
-      pc.redBright, pc.greenBright, pc.yellowBright, 
+      pc.redBright, pc.greenBright, pc.yellowBright,
       pc.blueBright, pc.magentaBright, pc.cyanBright
     ];
     // Simple hash function to ensure consistent color for the same title
@@ -57,7 +63,25 @@ export class Logger {
   }
 
 
-  info(...args: any[]) { this.log('I', ...args); }
-  warn(...args: any[]) { this.log('W', ...args); }
-  error(...args: any[]) { this.log('E', ...args); }
+  debug(...args: any[]) {
+    if (Logger.level === 'debug') {
+      this.log('D', ...args);
+    }
+  }
+
+  info(...args: any[]) {
+    if (Logger.level === 'info' || Logger.level === 'debug') {
+      this.log('I', ...args);
+    }
+  }
+
+  warn(...args: any[]) {
+    if (Logger.level !== 'error') {
+      this.log('W', ...args);
+    }
+  }
+
+  error(...args: any[]) {
+    this.log('E', ...args);
+  }
 }
