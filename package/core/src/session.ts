@@ -461,7 +461,7 @@ export class Session {
     }
     const rendererName = this.pluginContext.instance.render;
     const pluginName = this.pluginContext.pluginname;
-    
+
     if (!rendererName) {
       this.server.core.logger.error(`Plugin "${pluginName}" uses 'renderView' but did not declare a renderer. Please add 'export const render = "your-renderer-name";' to your plugin's entry file.`);
       // throw new Error(`Plugin "${pluginName}" did not declare a renderer.`);
@@ -472,7 +472,7 @@ export class Session {
       this.server.core.logger.error(`Renderer "${rendererName}" declared by plugin "${pluginName}" is not registered. Have you installed the renderer package (e.g., '@yumerijs/vue-renderer')?`);
       // throw new Error(`Renderer "${rendererName}" is not registered.`);
     }
-    
+
     const renderOptions = {
       pluginName,
     };
@@ -483,6 +483,27 @@ export class Session {
       this.response(html, 'plain');
     } catch (error) {
       this.server.core.logger.error(`Error while rendering view for plugin "${pluginName}":`, error);
+      throw error;
+    }
+  }
+
+  async renderFile(filePath: string, data?: any) {
+    const rendererName = this.pluginContext.instance.render;
+    const pluginName = this.pluginContext.pluginname;
+    if (!rendererName) {
+      this.server.core.logger.error(`Plugin "${pluginName}" uses 'renderFile' but did not declare a renderer. Please add 'export const render = "your-renderer-name";' to your plugin's entry file.`);
+    }
+    const renderer = this.server.core.renderers.get(rendererName);
+    if (!renderer) {
+      this.server.core.logger.error(`Renderer "${rendererName}" declared by plugin "${pluginName}" is not registered. Have you installed the renderer package (e.g., '@yumerijs/vue-renderer')?`);
+      // throw new Error(`Renderer "${rendererName}" is not registered.`);
+    }
+    try {
+      const html = await renderer.renderFile(filePath, data);
+      this.setMime('text/html');
+      this.response(html, 'plain');
+    } catch (error) {
+      this.server.core.logger.error(`Error while rendering file "${filePath}":`, error);
       throw error;
     }
   }

@@ -38,7 +38,7 @@
   "dependencies": {
     "@yumerijs/core": "^2.2.0",
     "@yumerijs/loader": "^2.2.0",
-    "@yumerijs/types": "^2.2.0",
+    "@yumerijs/types": "^2.1.2",
     "cac": "^6.7.14",
     "js-yaml": "^4.1.1"
   }

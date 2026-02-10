@@ -15,6 +15,8 @@ export interface IRenderer {
    * @returns 返回渲染后的 HTML 字符串的 Promise.
    */
   render(component: any, data: Record<string, any>, options?: RenderOptions): Promise<string>;
+
+  renderFile(path: string, data: Record<string, any>, options?: RenderOptions): Promise<string>;
 }
 
 /**
