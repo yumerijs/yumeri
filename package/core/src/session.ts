@@ -459,17 +459,11 @@ export class Session {
     if (!this.pluginContext) {
       throw new Error(`Cannot call 'renderView' because the session is not associated with a plugin context.`);
     }
-    const rendererName = this.pluginContext.instance.render;
+    const renderer = this.pluginContext.renderer;
     const pluginName = this.pluginContext.pluginname;
 
-    if (!rendererName) {
-      this.server.core.logger.error(`Plugin "${pluginName}" uses 'renderView' but did not declare a renderer. Please add 'export const render = "your-renderer-name";' to your plugin's entry file.`);
-      // throw new Error(`Plugin "${pluginName}" did not declare a renderer.`);
-    }
-
-    const renderer = this.server.core.renderers.get(rendererName);
     if (!renderer) {
-      this.server.core.logger.error(`Renderer "${rendererName}" declared by plugin "${pluginName}" is not registered. Have you installed the renderer package (e.g., '@yumerijs/vue-renderer')?`);
+      this.server.core.logger.error(`Renderer declared by plugin "${pluginName}" is not registered. Have you installed the renderer package (e.g., '@yumerijs/vue-renderer')?`);
       // throw new Error(`Renderer "${rendererName}" is not registered.`);
     }
 
@@ -488,14 +482,10 @@ export class Session {
   }
 
   async renderFile(filePath: string, data?: any) {
-    const rendererName = this.pluginContext.instance.render;
+    const renderer = this.pluginContext.renderer;
     const pluginName = this.pluginContext.pluginname;
-    if (!rendererName) {
-      this.server.core.logger.error(`Plugin "${pluginName}" uses 'renderFile' but did not declare a renderer. Please add 'export const render = "your-renderer-name";' to your plugin's entry file.`);
-    }
-    const renderer = this.server.core.renderers.get(rendererName);
     if (!renderer) {
-      this.server.core.logger.error(`Renderer "${rendererName}" declared by plugin "${pluginName}" is not registered. Have you installed the renderer package (e.g., '@yumerijs/vue-renderer')?`);
+      this.server.core.logger.error(`Renderer declared by plugin "${pluginName}" is not registered. Have you installed the renderer package (e.g., '@yumerijs/vue-renderer')?`);
       // throw new Error(`Renderer "${rendererName}" is not registered.`);
     }
     try {

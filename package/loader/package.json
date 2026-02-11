@@ -1,6 +1,6 @@
 {
   "name": "@yumerijs/loader",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "Module loader for yumeri",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -41,6 +41,6 @@
     "js-yaml": "^4.1.0"
   },
   "peerDependencies": {
-    "@yumerijs/core": "^2.2.0"
+    "@yumerijs/core": "^2.2.1"
   }
 }

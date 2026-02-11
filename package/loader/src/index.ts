@@ -63,6 +63,7 @@ export class PluginLoader {
     getContext(pluginName: string, injections: Record<string, any> = {}): Context {
         if (!this.pluginContexts[pluginName]) {
             this.pluginContexts[pluginName] = new Context(this.core, pluginName, null, injections);
+
         }
         return this.pluginContexts[pluginName];
     }
@@ -181,7 +182,8 @@ export class PluginLoader {
                     try {
                         const rendererPackageMap: Record<string, string> = {
                             'vue': '@yumerijs/vue-renderer',
-                            'react': '@yumerijs/react-renderer'
+                            'react': '@yumerijs/react-renderer',
+                            'ejs': '@yumerijs/ejs-renderer'
                         };
 
                         const rendererPackageName = rendererPackageMap[rendererName] || rendererName;
@@ -225,6 +227,7 @@ export class PluginLoader {
             // ### END NEW CONFIG LOGIC ###
 
             const context = this.getContext(pluginName, injections);
+            context.renderer = this.core.renderers.get(pluginName);
 
             await this.core.plugin(pluginInstance, context, finalConfig);
 

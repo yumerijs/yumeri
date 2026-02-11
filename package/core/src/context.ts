@@ -4,6 +4,7 @@ import { HookHandler } from './hook.js';
 import { Middleware } from './middleware.js';
 import { Config } from './config.js';
 import { I18n } from './i18n.js';
+import { IRenderer } from '@yumerijs/types';
 
 interface Plugin {
     apply: (ctx: Context, config: any) => any;
@@ -29,6 +30,7 @@ export class Context {
     private childPlugins: Map<Context, Plugin> = new Map();
     private i18ns: string[] = [];
     public component: Components;
+    public renderer?: IRenderer;
     public instance: any;
 
     /** 插件名称 */
