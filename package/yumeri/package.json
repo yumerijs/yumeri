@@ -1,6 +1,6 @@
 {
   "name": "yumeri",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "基于nodejs的Web构建平台",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -36,8 +36,8 @@
     "typescript": "^5.8.2"
   },
   "dependencies": {
-    "@yumerijs/core": "^2.2.0",
-    "@yumerijs/loader": "^2.2.0",
+    "@yumerijs/core": "^2.2.1",
+    "@yumerijs/loader": "^2.2.1",
     "@yumerijs/types": "^2.1.2",
     "cac": "^6.7.14",
     "js-yaml": "^4.1.1"
