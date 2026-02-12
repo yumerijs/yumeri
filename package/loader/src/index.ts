@@ -227,8 +227,10 @@ export class PluginLoader {
             // ### END NEW CONFIG LOGIC ###
 
             const context = this.getContext(pluginName, injections);
-            context.renderer = this.core.renderers.get(pluginName);
 
+            if (pluginInstance.render) {
+                context.renderer = this.core.renderers.get(pluginInstance.render || '');
+            }
             await this.core.plugin(pluginInstance, context, finalConfig);
 
             this.pluginStatus[pluginName] = PluginStatus.ENABLED;

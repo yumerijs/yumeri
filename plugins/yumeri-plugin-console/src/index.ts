@@ -1,9 +1,9 @@
 import { Core, Context, Session, Logger, Schema } from 'yumeri';
 import * as fs from 'fs';
 import * as path from 'path';
-import mime from 'mime';
 import { fileURLToPath } from 'url';
 import { PluginConfigManager, ConsoleItem } from './utils.js';
+import mime from 'mime';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -14,7 +14,7 @@ declare module 'yumeri' {
 }
 
 export const logger = new Logger("console");
-
+export const render = 'ejs';
 export const provide = ['console'];
 export const usage = `Yumeri 基础控制台插件<br>请勿直接禁用或重载此插件，这会导致插件在此实例内无法开启。<br>可通过控制台操作API对控制台项进行添加。`;
 
@@ -83,31 +83,32 @@ export async function apply(ctx: Context, config: ConsoleConfig) {
     if (loginstatus[session.sessionid]) {
       await next();
     } else {
-      session.setMime('html');
-      session.body = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>请先登录</title></head><body><script>window.onload = function() {alert(\"请先登录\");window.location.href = \"/${basePath}/login\";};</script><p>正在重定向</p></body></html>`;
+      await session.renderView(
+        `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>请先登录</title></head><body><script>window.onload = function() {alert("请先登录");window.location.href = "/<%= basePath %>/login";};</script><p>正在重定向</p></body></html>`,
+        { basePath }
+      );
     }
   };
 
-  ctx.route(`/${basePath}`).action((session) => {
-    session.body = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>重定向</title></head><body><script>window.location.href = "/${basePath}/home";</script><p>正在重定向</p></body></html>`;
-    session.setMime('html');
+  ctx.route(`/${basePath}`).action(async (session) => {
+    await session.renderView(
+      `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>重定向</title></head><body><script>window.location.href = "/<%= basePath %>/home";</script><p>正在重定向</p></body></html>`,
+      { basePath }
+    );
   });
 
-  ctx.route(`/${basePath}/login`).action((session) => {
+  ctx.route(`/${basePath}/login`).action(async (session) => {
     const loginHtmlPath = path.join(staticDir, 'login.html');
     if (fs.existsSync(loginHtmlPath)) {
-      session.body = fs.readFileSync(loginHtmlPath, 'utf8');
-      session.setMime('html');
+      await session.renderFile(loginHtmlPath, {});
     }
   });
 
   ctx.route(`/${basePath}/home`).action((session) => requireLogin(session, async () => {
     const consoleHtmlPath = path.join(staticDir, 'home.html');
     if (fs.existsSync(consoleHtmlPath)) {
-      const parseone = await getHook(ctx, 'console:home', fs.readFileSync(consoleHtmlPath, 'utf8'));
-      // const parsetwo = await getHook(ctx, 'console:homejs', parseone);
-      session.body = parseone;
-      session.setMime('html');
+      const consoleHome = await getHook(ctx, 'console:home', '{{console:home}}');
+      await session.renderFile(consoleHtmlPath, { consoleHome });
     }
   }));
 
@@ -239,9 +240,14 @@ export async function apply(ctx: Context, config: ConsoleConfig) {
     if (consoleItem) {
       const assetPath = asset ? path.join(consoleItem.staticpath, asset) : consoleItem.htmlpath;
       if (fs.existsSync(assetPath) && fs.statSync(assetPath).isFile()) {
-        const mimeType = asset ? (mime.getType(assetPath) || 'application/octet-stream') : 'text/html';
-        session.setMime(mimeType);
-        session.body = fs.readFileSync(assetPath, 'utf-8');
+        const ext = path.extname(assetPath).toLowerCase();
+        if (!asset || ext === '.html' || ext === '.ejs') {
+          await session.renderFile(assetPath, {});
+        } else {
+          const mimeType = mime.getType(assetPath) || 'application/octet-stream';
+          session.setMime(mimeType);
+          session.body = fs.readFileSync(assetPath, 'utf-8');
+        }
       }
     }
   }

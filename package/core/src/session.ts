@@ -459,7 +459,7 @@ export class Session {
     if (!this.pluginContext) {
       throw new Error(`Cannot call 'renderView' because the session is not associated with a plugin context.`);
     }
-    const renderer = this.pluginContext.renderer;
+    const renderer = this.pluginContext.renderer || null;
     const pluginName = this.pluginContext.pluginname;
 
     if (!renderer) {

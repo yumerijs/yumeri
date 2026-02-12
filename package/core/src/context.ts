@@ -5,6 +5,7 @@ import { Middleware } from './middleware.js';
 import { Config } from './config.js';
 import { I18n } from './i18n.js';
 import { IRenderer } from '@yumerijs/types';
+import path from 'path';
 
 interface Plugin {
     apply: (ctx: Context, config: any) => any;
@@ -32,6 +33,7 @@ export class Context {
     public component: Components;
     public renderer?: IRenderer;
     public instance: any;
+    public childpath: string = '/';
 
     /** 插件名称 */
     public pluginname: string;
@@ -63,15 +65,16 @@ export class Context {
      * @param path 路由路径
      * @returns Route 实例
      */
-    route(path: string): Route {
-        if (this.core.routes[path]) {
+    route(routepath: string): Route {
+        const realpath = path.join(this.childpath, routepath);
+        if (this.core.routes[realpath]) {
             this.core.logger.warn(
                 `Plugin "${this.pluginname}" attempt to register route "${path}", but it has already been registered.`
             );
-            return new Route(path, this);
+            return new Route(realpath, this);
         }
-        this.routes.push(path);
-        return this.core.route(path, this);
+        this.routes.push(realpath);
+        return this.core.route(realpath, this);
     }
 
     /**
@@ -162,8 +165,9 @@ export class Context {
      * 注册子 Context
      * @param name 子 Context 名称
      */
-    fork(name = this.pluginname) {
+    fork(name = this.pluginname, path?: string) {
         const ctx = new Context(this.core, name);
+        ctx.childpath = path;
         this.childContexts.push(ctx);
         return ctx;
     }
