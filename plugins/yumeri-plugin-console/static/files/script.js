@@ -56,8 +56,9 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    let currentPluginName = null; // 显示用短名，例如 "pages"
+    let currentPluginName = null; // 显示用短名，例如 "pages" 或 "core"
     let currentPluginStatus = null; // 用于存储当前插件状态
+    let currentConfigScope = 'plugin'; // 'plugin' | 'core'
 
     // 初始隐藏启用/禁用按钮
     enableButton.style.display = 'none';
@@ -152,6 +153,27 @@ document.addEventListener('DOMContentLoaded', function () {
 
             pluginList.innerHTML = ''; // 清空现有列表
 
+            // 添加固定的 Core 配置入口
+            const coreItem = document.createElement('li');
+            const coreStatus = document.createElement('span');
+            coreStatus.className = 'plugin-status enabled';
+            const coreName = document.createElement('span');
+            coreName.textContent = '核心配置';
+            coreItem.appendChild(coreStatus);
+            coreItem.appendChild(coreName);
+            coreItem.dataset.plugin = 'core';
+            coreItem.dataset.fullname = 'core';
+            coreItem.dataset.status = 'ENABLED';
+            coreItem.addEventListener('click', function () {
+                loadCoreConfiguration();
+                if (window.innerWidth <= 768) {
+                    sidebar.classList.remove('open');
+                    overlay.style.display = 'none';
+                    toggleSidebarButton.style.display = 'block';
+                }
+            });
+            pluginList.appendChild(coreItem);
+
             // 为每个插件获取状态并创建列表项
             for (const pluginRawName of plugins) {
                 const listItem = document.createElement('li');
@@ -226,6 +248,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // 加载插件配置（pluginName 是短名，例如 "pages"）
     async function loadPluginConfiguration(pluginName, pluginStatus) {
         try {
+            currentConfigScope = 'plugin';
             currentPluginName = pluginName;
             currentPluginStatus = pluginStatus;
             updatePluginStatus();
@@ -278,6 +301,56 @@ document.addEventListener('DOMContentLoaded', function () {
             bindEventListeners();
         } catch (error) {
             console.error('Failed to load plugin configuration:', error);
+            configurationArea.innerHTML = `<p>Failed to load configuration: ${error.message}</p>`;
+        }
+    }
+
+    // 加载 Core 配置
+    async function loadCoreConfiguration() {
+        try {
+            currentConfigScope = 'core';
+            currentPluginName = 'core';
+            currentPluginStatus = 'ENABLED';
+            updatePluginStatus();
+
+            const [configRes, metaRes] = await Promise.all([
+                fetch('/api/console/coreconfig'),
+                fetch('/api/console/coremetadata')
+            ]);
+
+            if (!configRes.ok) throw new Error(`HTTP error! status: ${configRes.status}`);
+            if (!metaRes.ok) throw new Error(`HTTP error! status: ${metaRes.status}`);
+
+            const config = await configRes.json();
+            const meta = await metaRes.json();
+
+            pluginUsage.innerHTML = meta.usage || '';
+            const metaArea = document.getElementById('plugin-meta');
+            metaArea.innerHTML = '';
+
+            const dependList = meta.depend && meta.depend.length
+                ? `<div class="meta-box depend">依赖服务：${meta.depend.join('，')}</div>`
+                : '';
+            const provideList = meta.provide && meta.provide.length
+                ? `<div class="meta-box provide">提供服务：${meta.provide.join('，')}</div>`
+                : '';
+
+            metaArea.innerHTML = dependList + provideList;
+
+            configurationArea.innerHTML = '';
+            if (Array.isArray(config)) {
+                renderConfigItems(config);
+            } else if (config.error) {
+                configurationArea.innerHTML = `<p>${config.error}</p>`;
+            } else {
+                console.warn('Invalid configuration format received:', config);
+                configurationArea.innerHTML = '<p>Received invalid configuration format from server.</p>';
+            }
+
+            pluginTitle.textContent = '核心配置';
+            bindEventListeners();
+        } catch (error) {
+            console.error('Failed to load core configuration:', error);
             configurationArea.innerHTML = `<p>Failed to load configuration: ${error.message}</p>`;
         }
     }
@@ -830,6 +903,13 @@ function renderObjectHeader(container, item) {
     }
 
     function updatePluginStatus() {
+        if (currentConfigScope === 'core') {
+            pluginStatus.innerHTML = '<p style="color: #4CAF50;">当前配置: Core</p>';
+            enableButton.style.display = 'none';
+            disableButton.style.display = 'none';
+            saveButton.style.display = 'inline-block';
+            return;
+        }
         if (currentPluginStatus === 'DISABLED') {
             pluginStatus.innerHTML = '<p style="color: #ccc;">当前状态: 未启用</p>';
             enableButton.style.display = 'inline-block';
@@ -858,8 +938,13 @@ function renderObjectHeader(container, item) {
             const jsonContent = JSON.stringify(configData);
             console.log('Saving configuration:', jsonContent);
 
-            const fullName = addPluginPrefix(currentPluginName); // e.g. yumeri-plugin-pages
-            const url = `/api/console/saveconfig?name=${encodeURIComponent(fullName)}&config=${encodeURIComponent(jsonContent)}`;
+            let url = '';
+            if (currentConfigScope === 'core') {
+                url = `/api/console/savecoreconfig?config=${encodeURIComponent(jsonContent)}`;
+            } else {
+                const fullName = addPluginPrefix(currentPluginName); // e.g. yumeri-plugin-pages
+                url = `/api/console/saveconfig?name=${encodeURIComponent(fullName)}&config=${encodeURIComponent(jsonContent)}`;
+            }
             const response = await fetch(url);
 
             if (!response.ok) {

@@ -142,6 +142,9 @@ export async function apply(ctx: Context, config: ConsoleConfig) {
       if (!pluginName) return { success: false, message: '缺少插件名称参数' };
       return await configManager.getPluginConfig(pluginName);
     },
+    coreconfig: async () => {
+      return await configManager.getCoreConfig();
+    },
     saveconfig: async (params: URLSearchParams) => {
       const pluginName = params.get('name');
       const configData = params.get('config');
@@ -155,6 +158,21 @@ export async function apply(ctx: Context, config: ConsoleConfig) {
         }
         const success = await configManager.savePluginConfig(parsedName, parsedConfig, reload);
         return { success, message: success ? '配置保存成功' : '配置保存失败' };
+      } catch (error) {
+        return { success: false, message: `配置保存失败: ${error}` };
+      }
+    },
+    savecoreconfig: async (params: URLSearchParams) => {
+      const configData = params.get('config');
+      const reload = params.get('reload') !== 'false';
+      if (!configData) return { success: false, message: '缺少参数' };
+      try {
+        const parsedConfig = JSON.parse(configData);
+        const success = await configManager.saveCoreConfig(parsedConfig, reload);
+        if (success) {
+          setTimeout(() => process.exit(10), 100);
+        }
+        return { success, message: success ? '配置保存成功，正在重启…' : '配置保存失败' };
       } catch (error) {
         return { success: false, message: `配置保存失败: ${error}` };
       }
@@ -189,6 +207,13 @@ export async function apply(ctx: Context, config: ConsoleConfig) {
         usage: meta.usage || '',
         provide: meta.provide || [],
         depend: meta.depend || []
+      };
+    },
+    coremetadata: () => {
+      return {
+        usage: '核心配置项（服务端监听、静态目录、语言等）',
+        provide: [],
+        depend: []
       };
     },
     // 新建插件

@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { Config } from './config.js';
+import { Config, Schema } from './config.js';
 import { Logger } from './logger.js';
 import { Session } from './session.js';
 import { Middleware } from './middleware.js';
@@ -18,7 +18,7 @@ interface Plugin {
   provide: Array<string>;
 }
 
-interface CoreOptions {
+export interface CoreOptions {
   port: number;
   host: string;
   staticDir: string;
@@ -26,6 +26,15 @@ interface CoreOptions {
   enableWs: boolean;
   lang: string[];
 }
+
+export const coreConfigSchema = Schema.object<CoreOptions>({
+  port: Schema.number('监听端口').default(14510),
+  host: Schema.string('监听地址').default('0.0.0.0'),
+  staticDir: Schema.string('静态目录').default('public'),
+  enableCors: Schema.boolean('启用跨域').default(false),
+  enableWs: Schema.boolean('启用 WebSocket').default(false),
+  lang: Schema.array(Schema.string(), '语言列表').default(['zh', 'en']),
+});
 
 export const enum PluginStatus {
   ENABLED = 'enabled',

@@ -1,4 +1,4 @@
-import { Logger, Core, Schema, fallback } from 'yumeri'
+import { Logger, Core, Schema, fallback, coreConfigSchema } from 'yumeri'
 
 const logger = new Logger('console');
 
@@ -48,6 +48,20 @@ export class PluginConfigManager {
         return mergedConfig;
     }
 
+    async getCoreConfig(): Promise<any> {
+        if (!this.core) return [];
+        const schema = coreConfigSchema;
+        if (!schema) return [];
+        const config = this.loader.config.core || {};
+        const mergedValue = fallback(schema, config);
+        const mergedConfig: any[] = [];
+        for (const key in schema.properties) {
+            const propSchema = schema.properties[key];
+            mergedConfig.push(this.schemaToConfigItem(key, propSchema, mergedValue?.[key]));
+        }
+        return mergedConfig;
+    }
+
     async savePluginConfig(pluginName: string, config: any, reload: boolean = true): Promise<boolean> {
         if (!this.core) return false;
         const actualPluginName = pluginName.startsWith('~') ? pluginName.substring(1) : pluginName;
@@ -71,6 +85,21 @@ export class PluginConfigManager {
             return true;
         } catch (error) {
             logger.error(`Failed to save config for plugin ${actualPluginName}:`, error);
+            return false;
+        }
+    }
+
+    async saveCoreConfig(config: any, reload: boolean = true): Promise<boolean> {
+        if (!this.core) return false;
+        try {
+            this.loader.config.core = config;
+            await this.loader.saveConfig();
+            if (reload) {
+                await this.loader.reloadConfigFile();
+            }
+            return true;
+        } catch (error) {
+            logger.error(`Failed to save core config:`, error);
             return false;
         }
     }
