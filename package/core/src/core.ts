@@ -198,7 +198,7 @@ export class Core {
               });
             } else {
               const start = Date.now();
-              await route.executeHandler(session, queryParams, result.pathParams);
+              await route.executeHandler(session, queryParams, result.pathParams, result.hostParams);
               this.emit('route:end', {
                 path: pathname,
                 route: routePath,

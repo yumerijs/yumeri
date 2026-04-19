@@ -137,7 +137,7 @@ export class Route {
    * @param host 请求host
    * @returns 匹配结果
    */
-  match(pathname: string, host?: string): { params: Record<string, string | undefined>; pathParams: string[] } | null {
+  match(pathname: string, host?: string): { params: Record<string, string | undefined>; pathParams: string[]; hostParams: Record<string, string> } | null {
     let hostParams: Record<string, string | undefined> = {};
     // Host 匹配逻辑开始
     if (this.routehost && this.routehost.length > 0) {
@@ -333,12 +333,10 @@ export class Route {
 
       // after finishing pattern, path must be fully consumed (no extra segments)
       if (j !== parts.length) return null;
-      const result = { params, pathParams };
-      Object.assign(result.params, hostParams);
+      const result = { params, pathParams, hostParams };
       return result;
     } else if (pathname.startsWith('root') && this.path == pathname) {
-      const result = { params: { pathname }, pathParams: [pathname] };
-      Object.assign(result.params, hostParams);
+      const result = { params: { pathname }, pathParams: [pathname], hostParams };
       return result;
     }
     return null;
@@ -353,10 +351,11 @@ export class Route {
   async executeHandler(
     session: Session,
     params: URLSearchParams,
-    pathParams: string[]
+    pathParams: string[],
+    hostParams: Record<string, string>
   ): Promise<void> {
     if (this.handler) {
-      await this.handler(session, params, ...pathParams);
+      await this.handler(session, params, ...pathParams, ...Object.values(hostParams));
     }
   }
 
