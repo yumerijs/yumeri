@@ -171,7 +171,7 @@ export class Core {
   async executeRoute(pathname: string, session: Session, queryParams: URLSearchParams): Promise<boolean> {
     for (const routePath in this.routes) {
       const route = this.routes[routePath];
-      const result = route.match(pathname);
+      const result = route.match(pathname, session.client?.headers?.host);
       if (result) {
         try {
           this.emit('request:start', {
