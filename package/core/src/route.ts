@@ -49,6 +49,24 @@ function parsePatternToSegments(pattern: string): { segments: Segment[]; params:
   return { segments, params };
 }
 
+function parseHostToSegments(hostPattern: string) {
+  // 移除可能的空格，按 . 分割
+  const parts = hostPattern.split('.');
+  return parts.map(part => {
+    // 简单的参数解析逻辑
+    if (part.startsWith(':')) {
+      const lastChar = part[part.length - 1];
+      const hasModifier = ['?', '+', '*'].includes(lastChar);
+      return {
+        type: 'param',
+        name: hasModifier ? part.slice(1, -1) : part.slice(1),
+        modifier: hasModifier ? lastChar : '',
+      };
+    }
+    return { type: 'static', value: part };
+  });
+}
+
 /**
  * Route class using segment-based matching (no fragile capture-group-index mapping).
  * Behavior matches the SimpleRouter in the webpage:
@@ -65,7 +83,7 @@ export class Route {
   public allowedMethods: string[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD'];
   public ws: WebSocketServer = null;
   public context: Context;
-
+  private routehost: string[] = null;
 
   /**
    * 创建路由
@@ -90,6 +108,20 @@ export class Route {
   }
 
   /**
+   * 设置允许的host
+   * @param host host列表
+   * @returns this
+   */
+  host(host: string[] | string): this {
+    if (typeof host === 'string') {
+      this.routehost = [host];
+    } else {
+      this.routehost = host;
+    }
+    return this;
+  }
+
+  /**
    * 挂载中间件
    * @param middleware 中间件
    * @returns this
@@ -102,9 +134,88 @@ export class Route {
   /**
    * 匹配路由
    * @param pathname 请求路径
+   * @param host 请求host
    * @returns 匹配结果
    */
-  match(pathname: string): { params: Record<string, string | undefined>; pathParams: string[] } | null {
+  match(pathname: string, host?: string): { params: Record<string, string | undefined>; pathParams: string[] } | null {
+    let hostParams: Record<string, string | undefined> = {};
+    // Host 匹配逻辑开始
+    if (this.routehost && this.routehost.length > 0) {
+      if (!host) return null; // 如果设置了 host 限制但没有传入 host，直接失败
+
+      const actualHost = host.toLowerCase().split(':')[0]; // 移除端口并转小写
+      const hostParts = actualHost.split('.');
+      let hostMatched = false;
+      for (const pattern of this.routehost) {
+        const hSegments = parseHostToSegments(pattern); // 这里的 parsePattern 应该和你 path 解析逻辑一致
+
+        let hi = 0; // pattern segment index
+        let hj = 0; // actual host parts index
+        let tempParams: Record<string, string | undefined> = {};
+        let possible = true;
+
+        while (hi < hSegments.length) {
+          const seg = hSegments[hi];
+          const nextSegIsStatic = !!hSegments[hi + 1] && hSegments[hi + 1].type === 'static';
+
+          if (seg.type === 'static') {
+            if (hj >= hostParts.length || hostParts[hj] !== seg.value.toLowerCase()) {
+              possible = false; break;
+            }
+            hi++; hj++;
+          } else {
+            // 参数匹配逻辑 (:, ?, +, *)
+            switch (seg.modifier) {
+              case '': // required single
+                if (hj >= hostParts.length) { possible = false; break; }
+                tempParams[seg.name] = hostParts[hj];
+                hi++; hj++; break;
+              case '?': // optional single
+                if (hj < hostParts.length) {
+                  if (nextSegIsStatic && hostParts[hj] === hSegments[hi + 1].value.toLowerCase()) {
+                    tempParams[seg.name] = undefined; hi++;
+                  } else {
+                    tempParams[seg.name] = hostParts[hj]; hj++; hi++;
+                  }
+                } else { tempParams[seg.name] = undefined; hi++; }
+                break;
+              case '+': // required multi
+                if (hj >= hostParts.length) { possible = false; break; }
+                let endP = hostParts.length;
+                if (nextSegIsStatic) {
+                  let found = hostParts.indexOf(hSegments[hi + 1].value.toLowerCase(), hj);
+                  if (found === -1) { possible = false; break; }
+                  endP = found;
+                }
+                if (endP === hj) { possible = false; break; }
+                tempParams[seg.name] = hostParts.slice(hj, endP).join('.');
+                hj = endP; hi++; break;
+              case '*': // optional multi
+                let endS = hostParts.length;
+                if (nextSegIsStatic) {
+                  let found = hostParts.indexOf(hSegments[hi + 1].value.toLowerCase(), hj);
+                  if (found !== -1) endS = found;
+                }
+                const val = hostParts.slice(hj, endS).join('.');
+                tempParams[seg.name] = val === '' ? undefined : val;
+                hj = endS; hi++; break;
+              default: possible = false; break;
+            }
+            if (!possible) break;
+          }
+        }
+
+        if (possible && hj === hostParts.length) {
+          hostMatched = true;
+          hostParams = tempParams;
+          break; // 只要匹配到一个 host pattern 就行
+        }
+      }
+
+      if (!hostMatched) return null;
+    }
+    // Host 匹配逻辑结束
+    // 路由匹配逻辑开始
     if (pathname.startsWith('/')) {
       // normalize pathname: remove leading/trailing slashes
       const normPath = pathname.replace(/^\/+|\/+$/g, '');
@@ -222,10 +333,13 @@ export class Route {
 
       // after finishing pattern, path must be fully consumed (no extra segments)
       if (j !== parts.length) return null;
-
-      return { params, pathParams };
+      const result = { params, pathParams };
+      Object.assign(result.params, hostParams);
+      return result;
     } else if (pathname.startsWith('root') && this.path == pathname) {
-      return { params: {pathname}, pathParams: [pathname] };
+      const result = { params: { pathname }, pathParams: [pathname] };
+      Object.assign(result.params, hostParams);
+      return result;
     }
     return null;
   }
