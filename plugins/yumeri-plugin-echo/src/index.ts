@@ -11,6 +11,7 @@ interface ContentObject {
 
 export interface EchoConfig {
   path: string;
+  host: string;
   content: ContentObject;
   type: 'html' | 'json' | 'text' | 'file';
   filepath: string;
@@ -18,7 +19,8 @@ export interface EchoConfig {
 }
 
 export const config: Schema<EchoConfig> = Schema.object({
-  path: Schema.string('监听路径（命令）').default('echo'),
+  path: Schema.string('监听路径').default('echo'),
+  host: Schema.string('监听地址').default(''),
   content: Schema.object({
     content: Schema.array(Schema.string(), '输出内容').default([]),
     join: Schema.string('输出内容连接符').default('\n'),
@@ -29,7 +31,7 @@ export const config: Schema<EchoConfig> = Schema.object({
 });
 export async function apply(ctx: Context, config: EchoConfig) {
   const routePath = `/${config.path}`;
-  ctx.route(routePath)
+  const route = ctx.route(routePath)
     .action((session: Session) => {
       if (config.type !== 'file') {
         session.setMime(config.type);
@@ -37,6 +39,9 @@ export async function apply(ctx: Context, config: EchoConfig) {
       } else {
         session.sendFile(config.filepath, config.isstream);
       }
-    });
+    })
+  if (config.host !== '') {
+    route.host(config.host);
+  }
   logger.info(`Echo plugin loaded at route: ${routePath}`);
 }
