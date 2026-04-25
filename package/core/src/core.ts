@@ -9,6 +9,9 @@ import { HookHandler, Hook } from './hook.js';
 import { Server as CoreServer } from './server.js';
 import { I18n } from './i18n.js';
 import { IRenderer } from '@yumerijs/types';
+import * as fs from 'fs'
+
+const version = JSON.parse(await fs.promises.readFile(new URL('../package.json', import.meta.url), 'utf-8')).version;
 
 // This interface should probably be in @yumerijs/types
 interface Plugin {
@@ -25,6 +28,7 @@ export interface CoreOptions {
   enableCors: boolean;
   enableWs: boolean;
   lang: string[];
+  skipcheckUpdates?: boolean
 }
 
 export const coreConfigSchema = Schema.object<CoreOptions>({
@@ -34,6 +38,7 @@ export const coreConfigSchema = Schema.object<CoreOptions>({
   enableCors: Schema.boolean('启用跨域').default(false),
   enableWs: Schema.boolean('启用 WebSocket').default(false),
   lang: Schema.array(Schema.string(), '语言列表').default(['zh', 'en']),
+  skipcheckUpdates: Schema.boolean('启动时检查更新').default(false)
 });
 
 export const enum PluginStatus {
@@ -56,10 +61,29 @@ export class Core {
   public renderers: Map<string, IRenderer> = new Map();
   public pluginRenderers: Map<string, string> = new Map(); // Stores which plugin uses which renderer
 
-  constructor(loader?: any, coreConfig?: CoreOptions, setCore = true) {
+  constructor(loader?: any, coreConfig?: CoreOptions, loggersetCore = true, splash = true) {
     this.coreConfig = coreConfig || ({} as CoreOptions);
     this.loader = loader;
-    if (setCore) Logger.setCore(this);
+    if (splash) this.logger.info('Welcome to use Yumeri ver.' + version)
+      if (!this.coreConfig.skipcheckUpdates) this.checkUpdate();
+    if (loggersetCore) Logger.setCore(this);
+  }
+
+  async checkUpdate() {
+    try {
+      const response = await fetch('https://registry.npmjs.org/yumeri/latest');
+
+      if (!response.ok) return;
+
+      const { version: latest } = await response.json();
+
+      if (latest !== version) {
+        this.logger.info(`There is new version for Yumeri: ${version} -> ${latest}`);
+      } else {
+      }
+    } catch (error) {
+      this.logger.error('Error while checking updates: ', error.message);
+    }
   }
 
   public addRenderer(renderer: IRenderer): void {
