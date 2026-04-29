@@ -185,6 +185,19 @@ export class Context {
     }
 
     /**
+     * 快速注册子插件（自动 fork）
+     * @param module 插件模块
+     * @param config 插件配置
+     */
+    async plugin(module: Plugin, config: any = {}) {
+        if (!module) return;
+        const ctx = this.fork();
+        await this.core.plugin(module, ctx, config);
+        this.childPlugins.set(ctx, module);
+        return ctx;
+    }
+
+    /**
      * 注册 i18n
      * @param content 内容（可以是嵌套对象或单个key）
      * @param locale 可选的语言映射

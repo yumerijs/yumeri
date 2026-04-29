@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { Config, Schema } from './config.js';
+import { Config, Schema, fallback } from './config.js';
 import { Logger } from './logger.js';
 import { Session } from './session.js';
 import { Middleware } from './middleware.js';
@@ -22,19 +22,17 @@ interface Plugin {
 }
 
 export interface CoreOptions {
-  port: number;
-  host: string;
-  staticDir: string;
-  enableCors: boolean;
-  enableWs: boolean;
-  lang: string[];
+  port?: number;
+  host?: string;
+  enableCors?: boolean;
+  enableWs?: boolean;
+  lang?: string[];
   skipcheckUpdates?: boolean
 }
 
 export const coreConfigSchema = Schema.object<CoreOptions>({
   port: Schema.number('监听端口').default(14510),
   host: Schema.string('监听地址').default('0.0.0.0'),
-  staticDir: Schema.string('静态目录').default('public'),
   enableCors: Schema.boolean('启用跨域').default(false),
   enableWs: Schema.boolean('启用 WebSocket').default(false),
   lang: Schema.array(Schema.string(), '语言列表').default(['zh', 'en']),
@@ -61,11 +59,11 @@ export class Core {
   public renderers: Map<string, IRenderer> = new Map();
   public pluginRenderers: Map<string, string> = new Map(); // Stores which plugin uses which renderer
 
-  constructor(loader?: any, coreConfig?: CoreOptions, loggersetCore = true, splash = true) {
-    this.coreConfig = coreConfig || ({} as CoreOptions);
+  constructor(loader?: any, coreConfig: CoreOptions = {}, loggersetCore = true, splash = true) {
+    this.coreConfig = fallback(coreConfigSchema, coreConfig);
     this.loader = loader;
     if (splash) this.logger.info('Welcome to use Yumeri ver.' + version)
-      if (!this.coreConfig.skipcheckUpdates) this.checkUpdate();
+    if (!this.coreConfig.skipcheckUpdates) this.checkUpdate();
     if (loggersetCore) Logger.setCore(this);
   }
 
@@ -103,7 +101,6 @@ export class Core {
       host: this.coreConfig.host || '0.0.0.0',
       enableCors: this.coreConfig.enableCors || false,
       enableWs: this.coreConfig.enableWs || false,
-      staticDir: this.coreConfig.staticDir || 'public',
     });
     await this.server.start();
   }

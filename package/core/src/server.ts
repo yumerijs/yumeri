@@ -2,10 +2,7 @@ import { Core } from './core.js';
 import { Logger } from './logger.js';
 import { Session } from './session.js';
 import http, { IncomingMessage, ServerResponse } from 'http';
-import * as fs from 'fs';
-import * as path from 'path';
 import { URL } from 'url';
-import * as mime from 'mime-types';
 import { Stream } from 'stream';
 import { Context } from './context.js';
 import { resolveVirtualAsset } from '@yumerijs/types';
@@ -13,24 +10,32 @@ import { resolveVirtualAsset } from '@yumerijs/types';
 
 const logger = new Logger('server');
 
+/** 服务器配置接口 */
 export interface ServerConfig {
+    /** 监听端口 */
     port: number;
+    /** 监听主机 */
     host: string;
+    /** 是否启用跨域 */
     enableCors: boolean;
-    staticDir: string;
+    /** 是否启用 WebSocket */
     enableWs: boolean;
 }
 
+/** 判断是否为流对象 */
 function isStream(value: any): value is Stream {
     return value && typeof value.pipe === "function";
 }
 
+/**
+ * 核心服务器类
+ * 负责底层 HTTP 请求的监听、分发和响应
+ */
 export class Server {
     public core: Core;
     private port: number;
     private host: string;
     private enableCors: boolean;
-    private staticDir: string;
     private httpServer: http.Server | null = null;
 
     constructor(core: Core, config: Partial<ServerConfig> = {}) {
@@ -38,13 +43,11 @@ export class Server {
         this.port = config.port ?? 14510;
         this.host = config.host ?? '0.0.0.0';
         this.enableCors = config.enableCors ?? true;
-        this.staticDir = config.staticDir ?? 'static';
     }
 
-    public getStaticDir(): string {
-        return this.staticDir;
-    }
-
+    /**
+     * 创建一个新的会话对象
+     */
     private createSession(ip: string, cookies: Record<string, string>, res?: ServerResponse, req?: IncomingMessage, pathname?: string, pluginContext?: Context, extra: Record<string, any> = {}) {
         const session = new Session(ip, cookies, this, req, res, pathname, undefined, pluginContext);
         Object.assign(session.properties, extra);
@@ -52,6 +55,9 @@ export class Server {
         return session;
     }
 
+    /**
+     * 解析请求中的 Cookie
+     */
     private parseCookies(req: IncomingMessage) {
         const cookieHeader = req.headers.cookie;
         if (!cookieHeader) return {};
@@ -63,26 +69,20 @@ export class Server {
         return cookies;
     }
 
+    /**
+     * 获取客户端真实 IP
+     */
     private getClientIP(req: IncomingMessage) {
         const xff = req.headers['x-forwarded-for'] as string | undefined;
         return xff ? xff.split(',')[0].trim() : req.socket.remoteAddress || '127.0.0.1';
     }
 
-    private serveStaticFile(pathname: string, res: ServerResponse) {
-        const fullPath = path.join(process.cwd(), this.staticDir, pathname);
-        fs.readFile(fullPath, (err, data) => {
-            if (err) {
-                res.writeHead(404, { 'Content-Type': 'text/html' });
-                res.end(`<html><body><h1>404 Not Found</h1></body></html>`);
-            } else {
-                res.writeHead(200, { 'Content-Type': mime.lookup(fullPath) || 'text/plain' });
-                res.end(data);
-            }
-        });
-    }
-
+    /**
+     * 启动服务器
+     */
     async start() {
         this.httpServer = http.createServer(async (req, res) => {
+            // 处理跨域预检请求
             if (req.method === 'OPTIONS' && this.enableCors) {
                 res.writeHead(204, {
                     'Access-Control-Allow-Origin': '*',
@@ -99,6 +99,7 @@ export class Server {
             const ip = this.getClientIP(req);
             const cookies = this.parseCookies(req);
 
+            // 处理虚拟资产加载
             if (req.method === 'GET' || req.method === 'HEAD') {
                 const virtualAsset = await resolveVirtualAsset(pathname);
                 if (virtualAsset) {
@@ -117,15 +118,19 @@ export class Server {
             const session = this.createSession(ip, cookies, res, req, pathname, pluginContext, { protocol: 'http', header: req.headers });
             (session as any)._startAt = Date.now();
 
+            /** 路由处理逻辑 */
             const handleRoute = async (routePath: string) => {
                 const matched = await this.core.executeRoute(routePath, session, queryParams);
                 if (!matched) {
-                    this.serveStaticFile(pathname, res);
+                    // 核心层不再提供静态文件服务，直接返回 404
+                    res.writeHead(404, { 'Content-Type': 'text/plain' });
+                    res.end('Not Found');
                     return;
                 }
 
                 if (session.responseHandled) return;
 
+                // 组装响应头
                 const head = { ...session.head };
                 head['Set-Cookie'] = Object.entries(session.newCookie).map(([name, cookie]) => {
                     let cookieString = `${name}=${cookie.value}`;
@@ -144,6 +149,7 @@ export class Server {
 
                 res.writeHead(session.status ?? 200, head);
 
+                // 根据响应类型输出内容
                 switch (session.restype) {
                     case 'plain':
                         res.end(session.body as string);
@@ -161,19 +167,22 @@ export class Server {
                         }
                         break;
                     default:
-                        res.end(session.body); // fallback
+                        res.end(session.body);
                 }
             };
 
+            // 分发请求
             if (route && route.allowedMethods.includes(req.method ?? 'GET')) {
                 await handleRoute(pathname);
             } else if (rootroute && rootroute.allowedMethods.includes(req.method ?? 'GET')) {
                 await handleRoute('root');
             } else {
-                this.serveStaticFile(pathname, res);
+                res.writeHead(404, { 'Content-Type': 'text/plain' });
+                res.end('Not Found');
             }
         });
 
+        // 处理 WebSocket 升级
         this.httpServer.on('upgrade', async (req, socket, head) => {
             const url = new URL(req.url || '/', `http://${req.headers.host}`);
             const pathname = url.pathname;
@@ -187,24 +196,16 @@ export class Server {
             if (route && route.ws != null) {
                 const matched = await this.core.executeRoute(pathname, session, queryParams);
                 if (!matched) {
-                    socket.write(
-                        'HTTP/1.1 400 Bad Request\r\n' +
-                        'Content-Type: text/plain\r\n' +
-                        'Connection: close\r\n'
-                    )
-                    socket.destroy()
+                    socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+                    socket.destroy();
                 } else {
                     route.ws.handleUpgrade(req, socket, head, (ws) => {
                         route.ws.emit('connection', ws, req, session);
                     })
                 }
             } else {
-                socket.write(
-                    'HTTP/1.1 400 Bad Request\r\n' +
-                    'Content-Type: text/plain\r\n' +
-                    'Connection: close\r\n'
-                )
-                socket.destroy()
+                socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+                socket.destroy();
             }
         })
 
@@ -213,6 +214,7 @@ export class Server {
         });
     }
 
+    /** 停止服务器 */
     stop() {
         if (this.httpServer) this.httpServer.close(() => logger.info('Server stopped'));
     }
