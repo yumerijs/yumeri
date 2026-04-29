@@ -212,11 +212,6 @@ export class PluginLoader {
             }
 
             this.plugins[pluginName] = pluginInstance;
-            const depend = pluginInstance.depend || [];
-            let injections: Record<string, any> = {};
-            for (const injection of depend) {
-                injections[injection] = this.core.getComponent(injection);
-            }
 
             // ### NEW CONFIG LOGIC ###
             const rawConfig = (this.config.plugins && this.config.plugins[pluginName]) || {};
@@ -226,7 +221,7 @@ export class PluginLoader {
             this.config.plugins[pluginName] = finalConfig;
             // ### END NEW CONFIG LOGIC ###
 
-            const context = this.getContext(pluginName, injections);
+            const context = this.getContext(pluginName, {});
 
             if (pluginInstance.render) {
                 context.renderer = this.core.renderers.get(pluginInstance.render || '');

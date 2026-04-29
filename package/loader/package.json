@@ -1,6 +1,6 @@
 {
   "name": "@yumerijs/loader",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "description": "Module loader for yumeri",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -29,7 +29,7 @@
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.13.10",
-    "@yumerijs/core": "^2.0.1",
+    "@yumerijs/core": "^2.3.0",
     "esbuild-register": "^3.6.0",
     "typescript": "^5.8.2"
   },

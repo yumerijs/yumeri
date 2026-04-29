@@ -32,7 +32,7 @@ export class Context {
     private i18ns: string[] = [];
     public component: Components;
     public renderer?: IRenderer;
-    public instance: any;
+    public module: any;
     public childpath: string = '/';
 
     /** 插件名称 */
@@ -43,9 +43,9 @@ export class Context {
      * @param core Core 实例
      * @param pluginname 插件名称
      */
-    constructor(core: Core, pluginname: string, instance?: any, injections: Record<string, any> = {}) {
+    constructor(core: Core, pluginname: string, module?: any, injections: Record<string, any> = {}) {
         this.core = core;
-        this.instance = instance;
+        this.module = module;
         this.pluginname = pluginname;
         this.childPlugins = new Map();
         (this as any).component = injections;
@@ -174,14 +174,14 @@ export class Context {
 
     /**
      * 注册子插件
-     * @param plugin 插件实例
+     * @param module 插件模块
      * @param config 插件配置
      */
-    async apply(plugin: Plugin, config: any) {
-        if (!plugin || !plugin.apply) return;
+    async apply(module: Plugin, config: any) {
+        if (!module) return;
         const ctx = this.fork();
-        await plugin.apply(ctx, config);
-        this.childPlugins.set(ctx, plugin);
+        await this.core.plugin(module, ctx, config);
+        this.childPlugins.set(ctx, module);
     }
 
     /**

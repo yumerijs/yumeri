@@ -120,12 +120,22 @@ export class Core {
     return pluginName;
   }
 
-  public async plugin(pluginInstance: Plugin, context: Context, config: Config): Promise<void> {
+  public async plugin(module: Plugin, context: Context, config: Config): Promise<void> {
     const shortName = this.getShortPluginName(context.pluginname);
-    context.instance = pluginInstance;
+    context.module = module;
+    
+    // 自动依赖注入
+    const depend = module.depend || [];
+    for (const name of depend) {
+      const component = this.getComponent(name);
+      if (component) {
+        context.inject(name, component);
+      }
+    }
+
     this.logger.info(`apply plugin ${shortName}`);
-    if (pluginInstance.apply) {
-      await pluginInstance.apply(context, config);
+    if (module.apply) {
+      await module.apply(context, config);
     }
   }
 
