@@ -1,7 +1,9 @@
 import PluginLoader from '@yumerijs/loader'
+import { PluginStatus, fallback } from '@yumerijs/core'
 import * as fs from 'fs'
 import * as path from 'path'
 import * as yaml from 'js-yaml'
+import { pathToFileURL } from 'url'
 
 function migrateConfig(yamlPath: string, jsonPath: string) {
   try {
@@ -49,6 +51,29 @@ export async function runMain() {
     await loader.loadConfig(configPathToLoad)
 
     await loader.loadPlugins()
+
+    // 加载本地 APP 模块
+    const appDir = process.argv[2] || 'dist'
+    const appPath = path.resolve(cwd, appDir)
+    const indexPath = path.join(appPath, 'index.js')
+
+    if (fs.existsSync(indexPath)) {
+      try {
+        const appModule = await import(pathToFileURL(indexPath).href)
+        const plugin = appModule.default || appModule
+        const context = loader.getContext('app')
+        
+        const rawConfig = (loader.config.plugins && loader.config.plugins['app']) || {}
+        const finalConfig = fallback(plugin.config, rawConfig)
+        if (loader.config.plugins) loader.config.plugins['app'] = finalConfig
+
+        await loader.getCore().plugin(plugin, context, finalConfig)
+        loader.plugins['app'] = plugin
+        loader.pluginStatus['app'] = PluginStatus.ENABLED
+      } catch (e) {
+        console.error(`Failed to load app plugin from ${appPath}:`, e)
+      }
+    }
 
     await loader.getCore().runCore()
     
