@@ -1,6 +1,6 @@
 {
   "name": "yumeri-plugin-devtool",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Yumeri 开发控制台",
   "main": "dist/index.js",
   "dev": "src/index.ts",
@@ -14,12 +14,15 @@
     "webserver"
   ],
   "license": "MIT",
+  "scripts": {
+    "build": "tsc"
+  },
   "devDependencies": {
     "@types/node": "^22.14.1",
     "typescript": "^5.8.2"
   },
   "peerDependencies": {
-    "yumeri": "^2.0.0"
+    "yumeri": "^3.0.0-alpha.1"
   },
   "type": "module"
 }

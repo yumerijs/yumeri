@@ -1,6 +1,6 @@
 {
   "name": "yumeri-plugin-logger",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Log in console",
   "main": "dist/index.js",
   "dev": "src/index.ts",
@@ -23,7 +23,7 @@
     "ws": "^8.18.3"
   },
   "peerDependencies": {
-    "yumeri": "^2.1.2",
+    "yumeri": "^3.0.0-alpha.1",
     "yumeri-plugin-console": "^2.0.7"
   },
   "type": "module"

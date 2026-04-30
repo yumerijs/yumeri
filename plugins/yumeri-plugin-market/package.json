@@ -1,6 +1,6 @@
 {
   "name": "yumeri-plugin-market",
-  "version": "1.2.7",
+  "version": "1.2.8",
   "description": "Plugin market for Yumeri",
   "main": "dist/index.js",
   "dev": "src/index.ts",
@@ -29,7 +29,7 @@
     "typescript": "^5.8.2"
   },
   "peerDependencies": {
-    "yumeri": "^2.1.2",
+    "yumeri": "^3.0.0-alpha.1",
     "yumeri-plugin-console": "^2.0.7"
   },
   "type": "module"

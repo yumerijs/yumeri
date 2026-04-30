@@ -14,7 +14,9 @@ interface Plugin {
     provide: Array<string>;
 }
 
-export interface Components { }
+export interface Components {
+    [key: string]: any;
+}
 
 /**
  * 插件上下文对象

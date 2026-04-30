@@ -35,7 +35,7 @@ export async function apply(ctx: Context, config: EchoConfig) {
     .action((session: Session) => {
       if (config.type !== 'file') {
         session.setMime(config.type);
-        session.response(config.content.content?.join(config.content.join), 'plain');
+        session.respond(config.content.content?.join(config.content.join), 'plain');
       } else {
         session.sendFile(config.filepath, config.isstream);
       }

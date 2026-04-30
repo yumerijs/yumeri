@@ -20,7 +20,7 @@
     "@hirarijs/loader-tsx": "^1.0.0",
     "@hirarijs/loader-vue": "^1.0.0",
     "@yumerijs/scripts": "workspace:^",
-    "yumeri": "workspace:^",
+    "yumeri": "^3.0.0-alpha.1",
     "yumeri-plugin-console": "workspace:^"
   },
   "devDependencies": {

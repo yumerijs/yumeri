@@ -23,6 +23,6 @@
     "typescript": "^5.8.2"
   },
   "peerDependencies": {
-    "yumeri": "^2.0.0"
+    "yumeri": "^3.0.0-alpha.1"
   }
 }
