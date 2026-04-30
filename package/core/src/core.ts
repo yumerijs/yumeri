@@ -14,11 +14,62 @@ import * as fs from 'fs'
 const version = JSON.parse(await fs.promises.readFile(new URL('../package.json', import.meta.url), 'utf-8')).version;
 
 // This interface should probably be in @yumerijs/types
-interface Plugin {
-  apply: (ctx: Context, config: Config) => Promise<void>;
-  disable: (ctx: Context) => Promise<void>;
-  depend: Array<string>;
-  provide: Array<string>;
+export interface Plugin {
+  apply?: (ctx: Context, config: Config) => Promise<void> | void;
+  disable?: (ctx: Context) => Promise<void> | void;
+  depend?: Array<string>;
+  provide?: Array<string>;
+  render?: string;
+  config?: Schema<any>;
+}
+
+type PluginConstructor = new (ctx: Context, config: Config) => Plugin;
+type PluginModuleLike = Plugin | PluginConstructor | ((ctx: Context, config: Config) => Promise<void> | void) | {
+  default?: Plugin | PluginConstructor | ((ctx: Context, config: Config) => Promise<void> | void);
+  apply?: ((ctx: Context, config: Config) => Promise<void> | void);
+  disable?: (ctx: Context) => Promise<void> | void;
+  depend?: Array<string>;
+  provide?: Array<string>;
+  render?: string;
+  config?: Schema<any>;
+};
+
+function isClassPlugin(value: unknown): value is PluginConstructor {
+  if (typeof value !== 'function') return false;
+  const source = Function.prototype.toString.call(value);
+  return source.startsWith('class ');
+}
+
+function mergePluginMeta(target: Plugin, source: any): Plugin {
+  if (!source || typeof source !== 'object') return target;
+  if (target.depend == null && Array.isArray(source.depend)) target.depend = source.depend;
+  if (target.provide == null && Array.isArray(source.provide)) target.provide = source.provide;
+  if (target.render == null && typeof source.render === 'string') target.render = source.render;
+  if (target.config == null && source.config) target.config = source.config;
+  if (target.disable == null && typeof source.disable === 'function') target.disable = source.disable.bind(source);
+  return target;
+}
+
+export function resolvePluginModule(module: PluginModuleLike, context: Context, config: Config): Plugin {
+  const candidate = (module as any)?.default ?? (module as any)?.apply ?? module;
+  let plugin: Plugin;
+
+  if (isClassPlugin(candidate)) {
+    plugin = new candidate(context, config);
+  } else if (typeof candidate === 'function') {
+    plugin = { apply: candidate };
+  } else if (candidate && typeof candidate === 'object') {
+    plugin = candidate;
+  } else {
+    throw new TypeError('Invalid plugin module. Expected class, function, or plugin object.');
+  }
+
+  mergePluginMeta(plugin, module);
+  if (candidate !== module) {
+    mergePluginMeta(plugin, candidate);
+  }
+
+  return plugin;
 }
 
 export interface CoreOptions {
@@ -117,12 +168,13 @@ export class Core {
     return pluginName;
   }
 
-  public async plugin(module: Plugin, context: Context, config: Config): Promise<void> {
+  public async plugin(module: PluginModuleLike, context: Context, config: Config): Promise<void> {
+    const plugin = resolvePluginModule(module, context, config);
     const shortName = this.getShortPluginName(context.pluginname);
-    context.module = module;
+    context.module = plugin;
     
     // 自动依赖注入
-    const depend = module.depend || [];
+    const depend = plugin.depend || [];
     for (const name of depend) {
       const component = this.getComponent(name);
       if (component) {
@@ -131,8 +183,8 @@ export class Core {
     }
 
     this.logger.info(`apply plugin ${shortName}`);
-    if (module.apply) {
-      await module.apply(context, config);
+    if (plugin.apply) {
+      await plugin.apply(context, config);
     }
   }
 

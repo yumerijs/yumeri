@@ -1,13 +1,16 @@
 {
-  "name": "yumeri-plugin-echo",
-  "version": "1.2.3",
-  "description": "Echo something with Yumeri",
+  "name": "@yumerijs/decorator",
+  "version": "3.0.0-alpha.1",
+  "description": "Decorator module for yumeri",
   "main": "dist/index.js",
-  "dev": "src/index.ts",
   "types": "dist/index.d.ts",
+  "type": "module",
   "files": [
     "dist"
   ],
+  "scripts": {
+    "build": "tsc"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/yumerijs/yumeri.git"
@@ -28,10 +31,7 @@
     "typescript": "^5.8.2"
   },
   "dependencies": {
-    "@yumerijs/decorator": "workspace:^"
-  },
-  "peerDependencies": {
+    "@yumerijs/core": "workspace:^",
     "yumeri": "^3.0.0-alpha.1"
-  },
-  "type": "module"
+  }
 }

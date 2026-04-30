@@ -7,6 +7,7 @@ import { Session } from './session.js';
 import { Middleware } from './middleware.js';
 import { WebSocketServer } from 'ws';
 import { Context } from './context.js';
+import { isIP } from 'node:net';
 
 export type RouteHandler = (
   session: Session,
@@ -18,6 +19,16 @@ type ParamInfo = { name: string; modifier: '' | '?' | '*' | '+' };
 type Segment =
   | { type: 'static'; value: string }
   | { type: 'param'; name: string; modifier: '' | '?' | '*' | '+' };
+type HostPattern = {
+  hostSegments: Segment[];
+  portSegment?: Segment;
+  matchWholeHost: boolean;
+};
+type ParsedAuthority = {
+  hostname: string;
+  port?: string;
+  kind: 'ipv4' | 'ipv6' | 'domain';
+};
 
 function parsePatternToSegments(pattern: string): { segments: Segment[]; params: ParamInfo[] } {
   // Normalize: remove leading/trailing slashes for consistent splitting
@@ -49,22 +60,223 @@ function parsePatternToSegments(pattern: string): { segments: Segment[]; params:
   return { segments, params };
 }
 
-function parseHostToSegments(hostPattern: string) {
-  // 移除可能的空格，按 . 分割
-  const parts = hostPattern.split('.');
-  return parts.map(part => {
-    // 简单的参数解析逻辑
-    if (part.startsWith(':')) {
-      const lastChar = part[part.length - 1];
-      const hasModifier = ['?', '+', '*'].includes(lastChar);
-      return {
-        type: 'param',
-        name: hasModifier ? part.slice(1, -1) : part.slice(1),
-        modifier: hasModifier ? lastChar : '',
-      };
-    }
+function parseSegmentToken(part: string): Segment {
+  if (!part.startsWith(':')) {
     return { type: 'static', value: part };
-  });
+  }
+
+  let name = part.slice(1);
+  let modifier: '' | '?' | '*' | '+' = '';
+  const lastChar = name[name.length - 1];
+  if (lastChar === '?' || lastChar === '*' || lastChar === '+') {
+    modifier = lastChar as '?' | '*' | '+';
+    name = name.slice(0, -1);
+  }
+
+  return { type: 'param', name, modifier };
+}
+
+function splitHostAndPortPattern(pattern: string): { hostPart: string; portPart?: string } {
+  const normalized = pattern.trim().toLowerCase();
+
+  if (normalized.startsWith('[')) {
+    const end = normalized.indexOf(']');
+    if (end === -1) return { hostPart: normalized };
+    const hostPart = normalized.slice(1, end);
+    const rest = normalized.slice(end + 1);
+    if (rest.startsWith(':')) {
+      return { hostPart, portPart: rest.slice(1) };
+    }
+    return { hostPart };
+  }
+
+  const colonCount = (normalized.match(/:/g) || []).length;
+  const lastColon = normalized.lastIndexOf(':');
+  const hasDots = normalized.includes('.');
+
+  if (lastColon === -1) {
+    return { hostPart: normalized };
+  }
+
+  const suffix = normalized.slice(lastColon + 1);
+  const prefix = normalized.slice(0, lastColon);
+  const isPortToken = /^\d+$/.test(suffix) || /^:[a-z_][a-z0-9_]*[?*+]?$/.test(`:${suffix}`);
+
+  if (!isPortToken) {
+    return { hostPart: normalized };
+  }
+
+  if (normalized.startsWith(':') && !hasDots) {
+    const paramBody = prefix.slice(1);
+    if (/^[a-z_][a-z0-9_]*$/.test(paramBody)) {
+      return { hostPart: prefix, portPart: suffix };
+    }
+  }
+
+  if (colonCount === 1 && !normalized.startsWith(':')) {
+    return { hostPart: prefix, portPart: suffix };
+  }
+
+  if (hasDots) {
+    return { hostPart: prefix, portPart: suffix };
+  }
+
+  return { hostPart: normalized };
+}
+
+function parseHostPattern(hostPattern: string): HostPattern {
+  const { hostPart, portPart } = splitHostAndPortPattern(hostPattern);
+  const matchWholeHost = !hostPart.includes('.') || hostPart.includes(':');
+  const rawParts = matchWholeHost ? [hostPart] : hostPart.split('.');
+
+  return {
+    hostSegments: rawParts.map(parseSegmentToken),
+    portSegment: portPart ? parseSegmentToken(portPart) : undefined,
+    matchWholeHost,
+  };
+}
+
+function parseAuthority(host: string): ParsedAuthority {
+  const normalized = host.trim().toLowerCase();
+
+  if (normalized.startsWith('[')) {
+    const end = normalized.indexOf(']');
+    if (end !== -1) {
+      const hostname = normalized.slice(1, end);
+      const rest = normalized.slice(end + 1);
+      const port = rest.startsWith(':') ? rest.slice(1) : undefined;
+      return { hostname, port, kind: 'ipv6' };
+    }
+  }
+
+  if (isIP(normalized) === 6) {
+    return { hostname: normalized, kind: 'ipv6' };
+  }
+
+  const lastColon = normalized.lastIndexOf(':');
+  if (lastColon !== -1 && normalized.indexOf(':') === lastColon) {
+    const maybePort = normalized.slice(lastColon + 1);
+    if (/^\d+$/.test(maybePort)) {
+      const hostname = normalized.slice(0, lastColon);
+      if (isIP(hostname) === 4) {
+        return { hostname, port: maybePort, kind: 'ipv4' };
+      }
+      return { hostname, port: maybePort, kind: 'domain' };
+    }
+  }
+
+  if (isIP(normalized) === 4) {
+    return { hostname: normalized, kind: 'ipv4' };
+  }
+
+  return { hostname: normalized, kind: 'domain' };
+}
+
+function matchSingleSegment(
+  seg: Segment,
+  value: string | undefined,
+  params: Record<string, string | undefined>,
+): boolean {
+  if (seg.type === 'static') {
+    return value === seg.value;
+  }
+
+  switch (seg.modifier) {
+    case '':
+    case '+':
+    case '*':
+      if (value == null || value === '') {
+        if (seg.modifier === '*') {
+          params[seg.name] = undefined;
+          return true;
+        }
+        return false;
+      }
+      params[seg.name] = value;
+      return true;
+    case '?':
+      params[seg.name] = value || undefined;
+      return true;
+    default:
+      return false;
+  }
+}
+
+function matchHostSegments(
+  segments: Segment[],
+  parts: string[],
+  joiner: string,
+  params: Record<string, string | undefined>,
+): boolean {
+  let hi = 0;
+  let hj = 0;
+
+  while (hi < segments.length) {
+    const seg = segments[hi];
+    const nextSegIsStatic = !!segments[hi + 1] && segments[hi + 1].type === 'static';
+
+    if (seg.type === 'static') {
+      if (hj >= parts.length || parts[hj] !== seg.value) return false;
+      hi++;
+      hj++;
+      continue;
+    }
+
+    switch (seg.modifier) {
+      case '':
+        if (hj >= parts.length) return false;
+        params[seg.name] = parts[hj];
+        hi++;
+        hj++;
+        break;
+      case '?':
+        if (hj < parts.length) {
+          if (nextSegIsStatic && parts[hj] === (segments[hi + 1] as any).value) {
+            params[seg.name] = undefined;
+            hi++;
+          } else {
+            params[seg.name] = parts[hj];
+            hi++;
+            hj++;
+          }
+        } else {
+          params[seg.name] = undefined;
+          hi++;
+        }
+        break;
+      case '+': {
+        if (hj >= parts.length) return false;
+        let end = parts.length;
+        if (nextSegIsStatic) {
+          const nextStatic = (segments[hi + 1] as any).value;
+          const found = parts.indexOf(nextStatic, hj);
+          if (found === -1 || found === hj) return false;
+          end = found;
+        }
+        params[seg.name] = parts.slice(hj, end).join(joiner);
+        hj = end;
+        hi++;
+        break;
+      }
+      case '*': {
+        let end = parts.length;
+        if (nextSegIsStatic) {
+          const nextStatic = (segments[hi + 1] as any).value;
+          const found = parts.indexOf(nextStatic, hj);
+          if (found !== -1) end = found;
+        }
+        const value = parts.slice(hj, end).join(joiner);
+        params[seg.name] = value || undefined;
+        hj = end;
+        hi++;
+        break;
+      }
+      default:
+        return false;
+    }
+  }
+
+  return hj === parts.length;
 }
 
 /**
@@ -143,73 +355,26 @@ export class Route {
     if (this.routehost && this.routehost.length > 0) {
       if (!host) return null; // 如果设置了 host 限制但没有传入 host，直接失败
 
-      const actualHost = host.toLowerCase().split(':')[0]; // 移除端口并转小写
-      const hostParts = actualHost.split('.');
+      const actual = parseAuthority(host);
       let hostMatched = false;
       for (const pattern of this.routehost) {
-        const hSegments = parseHostToSegments(pattern); // 这里的 parsePattern 应该和你 path 解析逻辑一致
-
-        let hi = 0; // pattern segment index
-        let hj = 0; // actual host parts index
+        const parsedPattern = parseHostPattern(pattern);
+        const hostParts = parsedPattern.matchWholeHost || actual.kind === 'ipv6'
+          ? [actual.hostname]
+          : actual.hostname.split('.');
+        const joiner = parsedPattern.matchWholeHost || actual.kind === 'ipv6' ? ':' : '.';
         let tempParams: Record<string, string | undefined> = {};
-        let possible = true;
+        const hostOk = matchHostSegments(parsedPattern.hostSegments, hostParts, joiner, tempParams);
+        if (!hostOk) continue;
 
-        while (hi < hSegments.length) {
-          const seg = hSegments[hi];
-          const nextSegIsStatic = !!hSegments[hi + 1] && hSegments[hi + 1].type === 'static';
-
-          if (seg.type === 'static') {
-            if (hj >= hostParts.length || hostParts[hj] !== seg.value.toLowerCase()) {
-              possible = false; break;
-            }
-            hi++; hj++;
-          } else {
-            // 参数匹配逻辑 (:, ?, +, *)
-            switch (seg.modifier) {
-              case '': // required single
-                if (hj >= hostParts.length) { possible = false; break; }
-                tempParams[seg.name] = hostParts[hj];
-                hi++; hj++; break;
-              case '?': // optional single
-                if (hj < hostParts.length) {
-                  if (nextSegIsStatic && hostParts[hj] === hSegments[hi + 1].value.toLowerCase()) {
-                    tempParams[seg.name] = undefined; hi++;
-                  } else {
-                    tempParams[seg.name] = hostParts[hj]; hj++; hi++;
-                  }
-                } else { tempParams[seg.name] = undefined; hi++; }
-                break;
-              case '+': // required multi
-                if (hj >= hostParts.length) { possible = false; break; }
-                let endP = hostParts.length;
-                if (nextSegIsStatic) {
-                  let found = hostParts.indexOf(hSegments[hi + 1].value.toLowerCase(), hj);
-                  if (found === -1) { possible = false; break; }
-                  endP = found;
-                }
-                if (endP === hj) { possible = false; break; }
-                tempParams[seg.name] = hostParts.slice(hj, endP).join('.');
-                hj = endP; hi++; break;
-              case '*': // optional multi
-                let endS = hostParts.length;
-                if (nextSegIsStatic) {
-                  let found = hostParts.indexOf(hSegments[hi + 1].value.toLowerCase(), hj);
-                  if (found !== -1) endS = found;
-                }
-                const val = hostParts.slice(hj, endS).join('.');
-                tempParams[seg.name] = val === '' ? undefined : val;
-                hj = endS; hi++; break;
-              default: possible = false; break;
-            }
-            if (!possible) break;
-          }
+        if (parsedPattern.portSegment) {
+          const portOk = matchSingleSegment(parsedPattern.portSegment, actual.port, tempParams);
+          if (!portOk) continue;
         }
 
-        if (possible && hj === hostParts.length) {
-          hostMatched = true;
-          hostParams = tempParams;
-          break; // 只要匹配到一个 host pattern 就行
-        }
+        hostMatched = true;
+        hostParams = tempParams;
+        break; // 只要匹配到一个 host pattern 就行
       }
 
       if (!hostMatched) return null;

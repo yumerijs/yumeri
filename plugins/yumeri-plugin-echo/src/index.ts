@@ -1,4 +1,5 @@
 import { Context, Session, Logger, Schema } from 'yumeri';
+import { Plugin, Get, Host } from '@yumerijs/decorator';
 
 const logger = new Logger("echo");
 
@@ -29,19 +30,25 @@ export const config: Schema<EchoConfig> = Schema.object({
   filepath: Schema.string('输出文件路径(绝对路径)').default(''),
   isstream: Schema.boolean('是否流式输出文件').default(false),
 });
-export async function apply(ctx: Context, config: EchoConfig) {
-  const routePath = `/${config.path}`;
-  const route = ctx.route(routePath)
-    .action((session: Session) => {
-      if (config.type !== 'file') {
-        session.setMime(config.type);
-        session.respond(config.content.content?.join(config.content.join), 'plain');
-      } else {
-        session.sendFile(config.filepath, config.isstream);
-      }
-    })
-  if (config.host !== '') {
-    route.host(config.host);
+
+@Plugin
+export default class EchoPlugin {
+  private config: EchoConfig;
+
+  constructor(_ctx: Context, config: EchoConfig) {
+    this.config = config;
+    logger.info(`Echo plugin loaded at route: /${config.path}`);
   }
-  logger.info(`Echo plugin loaded at route: ${routePath}`);
+
+  @Get((plugin: EchoPlugin) => `/${plugin.config.path}`)
+  @Host((plugin: EchoPlugin) => plugin.config.host || undefined)
+  async echo(session: Session) {
+    if (this.config.type !== 'file') {
+      session.setMime(this.config.type);
+      session.respond(this.config.content.content?.join(this.config.content.join), 'plain');
+      return;
+    }
+
+    session.sendFile(this.config.filepath, this.config.isstream);
+  }
 }

@@ -1,4 +1,4 @@
-import { Core } from './core.js';
+import { Core, Plugin } from './core.js';
 import { Route } from './route.js';
 import { HookHandler } from './hook.js';
 import { Middleware } from './middleware.js';
@@ -6,13 +6,6 @@ import { Config } from './config.js';
 import { I18n } from './i18n.js';
 import { IRenderer } from '@yumerijs/types';
 import path from 'path';
-
-interface Plugin {
-    apply: (ctx: Context, config: any) => any;
-    disable: (ctx: Context) => Promise<void>;
-    depend: Array<string>;
-    provide: Array<string>;
-}
 
 export interface Components {
     [key: string]: any;
