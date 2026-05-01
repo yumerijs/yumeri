@@ -22,7 +22,14 @@ function registerDecoratedRoutes(instance: any, ctx: PluginLikeContext) {
 
     const path = resolveValue(instance, route.path);
     const routeInstance = ctx.route(path);
-    routeInstance.action(handler.bind(instance));
+    
+    // 支持路由处理器返回值覆盖 session.body
+    routeInstance.action(async (session: any, params: any, ...rest: any[]) => {
+      const result = await handler.apply(instance, [session, params, ...rest]);
+      if (result !== undefined) {
+        session.body = result;
+      }
+    });
 
     if (Array.isArray(routeInstance.allowedMethods) && route.methods.length > 0) {
       routeInstance.allowedMethods = route.methods;
@@ -72,16 +79,23 @@ function performInjections(instance: any, ctx: PluginLikeContext) {
   }
 }
 
+/**
+ * 插件类装饰器
+ * 负责在插件实例化时自动处理依赖注入、路由注册、事件监听和钩子挂载
+ */
 export function Plugin<TBase extends Constructor>(Base: TBase) {
-  return class DecoratedPlugin extends Base implements CorePlugin {
+  return class DecoratedPlugin extends Base {
     constructor(...args: any[]) {
       super(...args);
       const [ctx] = args;
-      if (ctx && typeof (ctx as PluginLikeContext).route === 'function') {
-        performInjections(this, ctx as PluginLikeContext);
-        registerDecoratedRoutes(this, ctx as PluginLikeContext);
-        registerDecoratedEvents(this, ctx as PluginLikeContext);
-        registerDecoratedHooks(this, ctx as PluginLikeContext);
+      
+      // 如果构造函数第一个参数是 Context 且具备核心 API，则自动执行绑定
+      if (ctx && typeof (ctx as any).route === 'function') {
+        const pluginCtx = ctx as PluginLikeContext;
+        performInjections(this, pluginCtx);
+        registerDecoratedRoutes(this, pluginCtx);
+        registerDecoratedEvents(this, pluginCtx);
+        registerDecoratedHooks(this, pluginCtx);
       }
     }
   };
