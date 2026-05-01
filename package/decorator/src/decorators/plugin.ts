@@ -1,5 +1,8 @@
 import type { Config, Context, Plugin as CorePlugin } from '@yumerijs/core';
 import { getRouteMetadata } from './route.js';
+import { getEventMetadata } from './event.js';
+import { getHookMetadata } from './hook.js';
+import { getInjectMetadata } from './inject.js';
 import type { PluginLikeContext, RouteValueResolver } from '../metadata.js';
 
 type Constructor<T = object> = new (...args: any[]) => T;
@@ -39,13 +42,46 @@ function registerDecoratedRoutes(instance: any, ctx: PluginLikeContext) {
   }
 }
 
+function registerDecoratedEvents(instance: any, ctx: PluginLikeContext) {
+  const events = getEventMetadata(Object.getPrototypeOf(instance));
+  for (const event of events) {
+    const handler = instance[event.propertyKey];
+    if (typeof handler === 'function') {
+      ctx.on(event.event, handler.bind(instance));
+    }
+  }
+}
+
+function registerDecoratedHooks(instance: any, ctx: PluginLikeContext) {
+  const hooks = getHookMetadata(Object.getPrototypeOf(instance));
+  for (const hook of hooks) {
+    const handler = instance[hook.propertyKey];
+    if (typeof handler === 'function') {
+      ctx.hook(hook.name, hook.hookname, handler.bind(instance));
+    }
+  }
+}
+
+function performInjections(instance: any, ctx: PluginLikeContext) {
+  const injects = getInjectMetadata(Object.getPrototypeOf(instance));
+  for (const inject of injects) {
+    const component = ctx.component[inject.name];
+    if (component) {
+      instance[inject.propertyKey] = component;
+    }
+  }
+}
+
 export function Plugin<TBase extends Constructor>(Base: TBase) {
   return class DecoratedPlugin extends Base implements CorePlugin {
     constructor(...args: any[]) {
       super(...args);
       const [ctx] = args;
       if (ctx && typeof (ctx as PluginLikeContext).route === 'function') {
+        performInjections(this, ctx as PluginLikeContext);
         registerDecoratedRoutes(this, ctx as PluginLikeContext);
+        registerDecoratedEvents(this, ctx as PluginLikeContext);
+        registerDecoratedHooks(this, ctx as PluginLikeContext);
       }
     }
   };
