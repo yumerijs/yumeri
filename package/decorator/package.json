@@ -1,6 +1,6 @@
 {
   "name": "@yumerijs/decorator",
-  "version": "3.0.0-alpha.2",
+  "version": "3.0.0-alpha.3",
   "description": "Decorator module for yumeri",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -31,7 +31,6 @@
     "typescript": "^5.8.2"
   },
   "dependencies": {
-    "@yumerijs/core": "workspace:^",
     "yumeri": "^3.0.0-alpha.1"
   }
 }
