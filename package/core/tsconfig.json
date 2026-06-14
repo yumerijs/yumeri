@@ -3,6 +3,7 @@
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist",
+    "ignoreDeprecations": "6.0"
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist"]

@@ -31,7 +31,7 @@
     "@types/mime-types": "^3",
     "@types/node": "^22.13.10",
     "@types/ws": "^8",
-    "typescript": "^5.8.2"
+    "typescript": "^6.0.3"
   },
   "dependencies": {
     "chokidar": "^4.0.3",
