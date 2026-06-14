@@ -16,7 +16,7 @@
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^22.14.1",
-    "typescript": "^5.8.2"
+    "typescript": "^6.0.3"
   },
   "peerDependencies": {
     "yumeri": "^3.0.0-alpha.1",
