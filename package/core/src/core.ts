@@ -104,8 +104,8 @@ export class Core {
   public globalMiddlewares: Record<string, Middleware> = {};
   public hooks: Record<string, Hook> = {};
   public coreConfig: CoreOptions;
-  public server: CoreServer;
-  public i18n: I18n;
+  public server!: CoreServer;
+  public i18n!: I18n;
   public loader: any;
   public renderers: Map<string, IRenderer> = new Map();
   public pluginRenderers: Map<string, string> = new Map(); // Stores which plugin uses which renderer
@@ -131,7 +131,7 @@ export class Core {
       } else {
       }
     } catch (error) {
-      this.logger.error('Error while checking updates: ', error.message);
+      this.logger.error('Error while checking updates: ', (error as Error).message);
     }
   }
 
