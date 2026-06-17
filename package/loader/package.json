@@ -37,7 +37,7 @@
     "@types/js-yaml": "^4.0.9",
     "@vue/compiler-sfc": "^3.5.25",
     "chokidar": "^4.0.3",
-    "esbuild": "^0.25.9",
+    "esbuild": "^0.28.1",
     "js-yaml": "^4.1.0"
   },
   "peerDependencies": {
