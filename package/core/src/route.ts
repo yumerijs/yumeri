@@ -293,9 +293,9 @@ export class Route {
   private handler: RouteHandler | null = null;
   public middlewares: Middleware[] = [];
   public allowedMethods: string[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD'];
-  public ws: WebSocketServer = null;
+  public ws: WebSocketServer | null = null;
   public context: Context;
-  private routehost: string[] = null;
+  private routehost: string[] | null = null;
 
   /**
    * 创建路由
@@ -498,10 +498,18 @@ export class Route {
 
       // after finishing pattern, path must be fully consumed (no extra segments)
       if (j !== parts.length) return null;
-      const result = { params, pathParams, hostParams };
+      const normalizedHostParams: Record<string, string> = {};
+      for (const [key, value] of Object.entries(hostParams)) {
+        normalizedHostParams[key] = value ?? '';
+      }
+      const result = { params, pathParams, hostParams: normalizedHostParams };
       return result;
     } else if (pathname.startsWith('root') && this.path == pathname) {
-      const result = { params: { pathname }, pathParams: [pathname], hostParams };
+      const normalizedHostParams: Record<string, string> = {};
+      for (const [key, value] of Object.entries(hostParams)) {
+        normalizedHostParams[key] = value ?? '';
+      }
+      const result = { params: { pathname }, pathParams: [pathname], hostParams: normalizedHostParams };
       return result;
     }
     return null;

@@ -20,9 +20,9 @@ type MissingMode = 'keep-template' | 'keep-key' | 'remove';
 /** 客户端对象，包含原始的 HTTP 请求和响应对象 */
 export interface Client {
   /** 原始的 Node.js HTTP 请求对象 */
-  req: IncomingMessage;
+  req?: IncomingMessage;
   /** 原始的 Node.js HTTP 响应对象 */
-  res: ServerResponse;
+  res?: ServerResponse;
   /** 经过处理后的规范化请求头 */
   headers?: Record<string, string>;
 }
@@ -104,7 +104,7 @@ class SessionRequest {
   /** 请求使用的协议 */
   public protocol: string = 'http';
   /** 原始的 IncomingMessage 对象 */
-  public raw: IncomingMessage;
+  public raw?: IncomingMessage;
 
   constructor(data: {
     ip: string,
@@ -112,7 +112,7 @@ class SessionRequest {
     query?: Record<string, string>,
     pathname?: string,
     headers: Record<string, string>,
-    raw: IncomingMessage
+    raw?: IncomingMessage
   }) {
     this.ip = data.ip;
     this.cookies = data.cookies;
@@ -141,9 +141,9 @@ class SessionResponse {
   /** 标识该响应是否已经处理完毕 */
   public handled: boolean = false;
   /** 原始的 ServerResponse 对象 */
-  public raw: ServerResponse;
+  public raw?: ServerResponse;
 
-  constructor(res: ServerResponse) {
+  constructor(res?: ServerResponse) {
     this.raw = res;
   }
 }
@@ -162,6 +162,8 @@ export class Session {
   public sessionid: string;
   /** 持久化的会话数据存储 */
   public data: Record<string, any> = {};
+  private dataDirty: boolean = false;
+  private dataDestroyed: boolean = false;
   /** 供插件或中间件挂载的临时属性 */
   public properties: Record<string, any> = {};
   
@@ -341,6 +343,7 @@ export class Session {
    */
   public async parseRequestBody(client: Client = this.client): Promise<ParsedParams> {
     const req = client.req;
+    if (!req) return {};
     return new Promise((resolve, reject) => {
       const contentType = (req.headers['content-type'] || '').toLowerCase();
       if (contentType.includes('application/json') || contentType.includes('application/x-www-form-urlencoded')) {
@@ -393,14 +396,52 @@ export class Session {
     return hash.digest('hex');
   }
 
+  /** 从 core 存储处理器加载会话数据 */
+  public async loadData(): Promise<void> {
+    this.data = await this.server.core.storage.load(this.sessionid);
+    this.dataDirty = false;
+    this.dataDestroyed = false;
+  }
+
+  /** 将当前会话数据保存到 core 存储处理器 */
+  public async saveData(force: boolean = false): Promise<void> {
+    if (this.dataDestroyed) {
+      await this.server.core.storage.delete(this.sessionid);
+      this.dataDirty = false;
+      return;
+    }
+
+    if (force || this.dataDirty) {
+      await this.server.core.storage.save(this.sessionid, this.data);
+      this.dataDirty = false;
+    }
+  }
+
   /** 设置会话数据 */
-  public setData(key: string, value: any): void { this.data[key] = value; }
+  public setData(key: string, value: any): void {
+    this.data[key] = value;
+    this.dataDirty = true;
+    this.dataDestroyed = false;
+  }
+
   /** 删除会话数据 */
-  public deleteData(key: string): void { delete this.data[key]; }
+  public deleteData(key: string): void {
+    delete this.data[key];
+    this.dataDirty = true;
+  }
+
   /** 清空会话数据 */
-  public clearData(): void { this.data = {}; }
+  public clearData(): void {
+    this.data = {};
+    this.dataDirty = true;
+  }
+
   /** 销毁会话 */
-  public destroy(): void { this.clearData(); }
+  public destroy(): void {
+    this.data = {};
+    this.dataDirty = true;
+    this.dataDestroyed = true;
+  }
 
   /** 设置 MIME 类型 */
   public setMime(mimeType: string): void {
@@ -413,11 +454,15 @@ export class Session {
   }
 
   /** 向响应流写入数据 */
-  public send(data: any): any { return this.response.raw.write(data); }
+  public send(data: any): any {
+    if (!this.response.raw) throw new Error('Cannot send data without a response object.');
+    return this.response.raw.write(data);
+  }
 
   /** 结束响应 */
   public endsession(message: any): any {
     this.response.handled = true;
+    if (!this.response.raw) throw new Error('Cannot end session without a response object.');
     return this.response.raw.end(message);
   }
 

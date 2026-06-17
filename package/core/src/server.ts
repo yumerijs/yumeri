@@ -48,8 +48,8 @@ export class Server {
     /**
      * 创建一个新的会话对象
      */
-    private createSession(ip: string, cookies: Record<string, string>, res?: ServerResponse, req?: IncomingMessage, pathname?: string, pluginContext?: Context, extra: Record<string, any> = {}) {
-        const session = new Session(ip, cookies, this, req, res, pathname, undefined, pluginContext);
+    private createSession(ip: string, cookies: Record<string, string>, res?: ServerResponse | null, req?: IncomingMessage, pathname?: string, pluginContext?: Context, extra: Record<string, any> = {}) {
+        const session = new Session(ip, cookies, this, req, res ?? undefined, pathname, undefined, pluginContext);
         Object.assign(session.properties, extra);
         session.protocol = extra.protocol ?? 'http';
         return session;
@@ -117,10 +117,18 @@ export class Server {
 
             const session = this.createSession(ip, cookies, res, req, pathname, pluginContext, { protocol: 'http', header: req.headers });
             (session as any)._startAt = Date.now();
+            await session.loadData();
 
             /** 路由处理逻辑 */
             const handleRoute = async (routePath: string) => {
-                const matched = await this.core.executeRoute(routePath, session, queryParams);
+                let matched = false;
+                try {
+                    matched = await this.core.executeRoute(routePath, session, queryParams);
+                } finally {
+                    if (matched) {
+                        await session.saveData(true);
+                    }
+                }
                 if (!matched) {
                     // 核心层不再提供静态文件服务，直接返回 404
                     res.writeHead(404, { 'Content-Type': 'text/plain' });
@@ -193,14 +201,17 @@ export class Server {
             const pluginContext = route ? route.context : undefined;
 
             const session = this.createSession(ip, cookies, null, req, pathname, pluginContext, { protocol: 'http', header: req.headers });
+            await session.loadData();
             if (route && route.ws != null) {
+                const wsServer = route.ws;
                 const matched = await this.core.executeRoute(pathname, session, queryParams);
                 if (!matched) {
                     socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
                     socket.destroy();
                 } else {
-                    route.ws.handleUpgrade(req, socket, head, (ws) => {
-                        route.ws.emit('connection', ws, req, session);
+                    await session.saveData(true);
+                    wsServer.handleUpgrade(req, socket, head, (ws) => {
+                        wsServer.emit('connection', ws, req, session);
                     })
                 }
             } else {

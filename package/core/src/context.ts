@@ -5,6 +5,7 @@ import { Middleware } from './middleware.js';
 import { Config } from './config.js';
 import { I18n } from './i18n.js';
 import { IRenderer } from '@yumerijs/types';
+import { SessionStorageProcessor, Storage, SessionStorageSnapshot } from './storage.js';
 import path from 'path';
 
 export interface Components {
@@ -25,7 +26,7 @@ export class Context {
     private childContexts: Context[] = [];
     private childPlugins: Map<Context, Plugin> = new Map();
     private i18ns: string[] = [];
-    public component: Components;
+    public component!: Components;
     public renderer?: IRenderer;
     public module: any;
     public childpath: string = '/';
@@ -43,7 +44,7 @@ export class Context {
         this.module = module;
         this.pluginname = pluginname;
         this.childPlugins = new Map();
-        (this as any).component = injections;
+        this.component = injections;
     }
 
     /**
@@ -52,7 +53,7 @@ export class Context {
      * @param value 依赖值
      */
     inject(name: string, value: any) {
-        (this as any).component[name] = value;
+        this.component[name] = value;
     }
 
     /**
@@ -122,6 +123,13 @@ export class Context {
     }
 
     /**
+     * 替换 core 的 session 存储处理器或底层存储。
+     */
+    setStorage(storage: SessionStorageProcessor | Storage<SessionStorageSnapshot>) {
+        this.core.setStorage(storage);
+    }
+
+    /**
      * 触发事件
      * @param event 事件名称
      * @param args 事件参数
@@ -162,7 +170,7 @@ export class Context {
      */
     fork(name = this.pluginname, path?: string) {
         const ctx = new Context(this.core, name);
-        ctx.childpath = path;
+        ctx.childpath = path ?? '/';
         this.childContexts.push(ctx);
         return ctx;
     }

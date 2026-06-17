@@ -9,6 +9,7 @@ import { HookHandler, Hook } from './hook.js';
 import { Server as CoreServer } from './server.js';
 import { I18n } from './i18n.js';
 import { IRenderer } from '@yumerijs/types';
+import { SessionStorageProcessor, Storage, SessionStorageSnapshot } from './storage.js';
 import * as fs from 'fs'
 
 const version = JSON.parse(await fs.promises.readFile(new URL('../package.json', import.meta.url), 'utf-8')).version;
@@ -107,6 +108,7 @@ export class Core {
   public server!: CoreServer;
   public i18n!: I18n;
   public loader: any;
+  public storage: SessionStorageProcessor = new SessionStorageProcessor();
   public renderers: Map<string, IRenderer> = new Map();
   public pluginRenderers: Map<string, string> = new Map(); // Stores which plugin uses which renderer
 
@@ -140,6 +142,18 @@ export class Core {
       this.logger.warn(`Renderer "${renderer.name}" is already registered and will be overwritten.`);
     }
     this.renderers.set(renderer.name, renderer);
+  }
+
+  public setStorage(storage: SessionStorageProcessor | Storage<SessionStorageSnapshot>): void {
+    if (storage instanceof SessionStorageProcessor) {
+      this.storage = storage;
+    } else {
+      this.storage.setStorage(storage);
+    }
+  }
+
+  public getStorage(): SessionStorageProcessor {
+    return this.storage;
   }
 
   public getRendererForPlugin(pluginName: string): string | undefined {
