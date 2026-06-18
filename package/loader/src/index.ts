@@ -215,7 +215,7 @@ export class PluginLoader {
 
             // ### NEW CONFIG LOGIC ###
             const rawConfig = (this.config.plugins && this.config.plugins[pluginName]) || {};
-            const schema = pluginInstance.config; // The schema is exported as 'config'
+            const schema = pluginInstance.config || Schema.object({}); // The schema is exported as 'config'
             const finalConfig = fallback(schema, rawConfig);
             // Update the in-memory config with the fully resolved one
             this.config.plugins[pluginName] = finalConfig;
