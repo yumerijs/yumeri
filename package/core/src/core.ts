@@ -11,6 +11,7 @@ import { I18n } from './i18n.js';
 import { IRenderer } from '@yumerijs/types';
 import { SessionStorageProcessor, Storage, SessionStorageSnapshot } from './storage.js';
 import * as fs from 'fs'
+import semver from 'semver';
 
 const version = JSON.parse(await fs.promises.readFile(new URL('../package.json', import.meta.url), 'utf-8')).version;
 
@@ -120,17 +121,18 @@ export class Core {
     if (loggersetCore) Logger.setCore(this);
   }
 
-  async checkUpdate() {
+
+  private async checkUpdate() {
     try {
-      const response = await fetch('https://registry.npmjs.org/yumeri/latest');
-
+      const response = await fetch('https://registry.npmjs.org/yumeri');
       if (!response.ok) return;
-
-      const { version: latest } = await response.json();
-
-      if (latest !== version) {
+      const pkg = await response.json();
+      const currentMajor = semver.major(version);
+      const latest = Object.keys(pkg.versions)
+        .filter(v => semver.valid(v) && semver.major(v) === currentMajor)
+        .sort(semver.rcompare)[0];
+      if (latest && semver.gt(latest, version)) {
         this.logger.info(`There is new version for Yumeri: ${version} -> ${latest}`);
-      } else {
       }
     } catch (error) {
       this.logger.error('Error while checking updates: ', (error as Error).message);
@@ -186,7 +188,7 @@ export class Core {
     const plugin = resolvePluginModule(module, context, config);
     const shortName = this.getShortPluginName(context.pluginname);
     context.module = plugin;
-    
+
     // 自动依赖注入
     const depend = plugin.depend || [];
     for (const name of depend) {

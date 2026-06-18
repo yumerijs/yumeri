@@ -1,6 +1,6 @@
 {
   "name": "yumeri",
-  "version": "3.0.0-alpha.1",
+  "version": "3.0.0-alpha.5",
   "description": "基于nodejs的Web构建平台",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
