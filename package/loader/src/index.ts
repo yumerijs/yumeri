@@ -181,7 +181,6 @@ export class PluginLoader {
                     this.logger.info(`Renderer "${rendererName}" is not registered. Attempting to auto-load...`);
                     try {
                         const rendererPackageMap: Record<string, string> = {
-                            'vue': '@yumerijs/vue-renderer',
                             'react': '@yumerijs/react-renderer',
                             'ejs': '@yumerijs/ejs-renderer'
                         };

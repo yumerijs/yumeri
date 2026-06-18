@@ -5,8 +5,6 @@ import prompts from 'prompts'
 import { stat } from 'fs/promises'
 import { spawn } from 'child_process'
 import { build as tsupBuild } from 'tsup'
-import { parse, compileScript, compileTemplate } from '@vue/compiler-sfc'
-import crypto from 'crypto'
 
 async function ensureDir(dir: string) {
   await fs.mkdir(dir, { recursive: true })
@@ -29,8 +27,8 @@ async function copyTemplate(templateDir: string, targetDir: string, name: string
   for (const file of files) {
     const srcPath = path.join(templateDir, file)
     const destPath = path.join(targetDir, file)
-    const stat = await fs.stat(srcPath)
-    if (stat.isDirectory()) {
+    const fileStat = await fs.stat(srcPath)
+    if (fileStat.isDirectory()) {
       await copyTemplate(srcPath, destPath, name, description)
     } else {
       let content = await fs.readFile(srcPath, 'utf-8')
@@ -42,19 +40,12 @@ async function copyTemplate(templateDir: string, targetDir: string, name: string
 
 const cli = cac('yumeri-scripts')
 
+// ==================== SETUP COMMAND ====================
 cli
   .command('setup <name>', 'Create a new plugin')
   .action(async (rawName: string) => {
+    // 移除 UI 模板选项，只保留 description 输入
     const responses = await prompts([
-      {
-        type: 'select',
-        name: 'templateType',
-        message: 'Select a template for your plugin:',
-        choices: [
-          { title: 'Standard Plugin (backend only)', value: 'standard' },
-          { title: 'UI Plugin (Vue + Vite)', value: 'ui-plugin' },
-        ],
-      },
       {
         type: 'text',
         name: 'description',
@@ -62,35 +53,30 @@ cli
       },
     ]);
 
-    if (!responses.templateType || !responses.description) {
+    if (!responses.description) {
       console.log('Plugin setup cancelled.');
       return;
     }
 
-    const { templateType, description } = responses;
+    const { description } = responses;
+    const templateType = 'standard'; // 默认 standard，不再支持 ui-plugin
     const cwd = process.cwd()
-
     const isScoped = rawName.startsWith('@')
     const parts = rawName.split('/')
     const baseName = isScoped ? parts[1] : parts[0]
     const cleanName = baseName.startsWith('yumeri-plugin-') ? baseName.replace(/^yumeri-plugin-/, '') : baseName
-
     const folderName = baseName.startsWith('yumeri-plugin-') ? baseName : `yumeri-plugin-${baseName}`
+    
     const pluginDir = path.join(cwd, 'plugins', folderName)
-
     const templateDir = path.resolve(__dirname, '../template', templateType)
 
     console.log(`Creating plugin at: ${pluginDir}`);
-    console.log(`Using template: ${templateType}`);
-
     await copyTemplate(templateDir, pluginDir, cleanName, description)
 
     const pkgPath = path.join(cwd, 'package.json')
     const pkg = JSON.parse(await fs.readFile(pkgPath, 'utf-8'))
-
     if (!pkg.workspaces) pkg.workspaces = []
     if (!pkg.workspaces.includes('plugins/*')) pkg.workspaces.push('plugins/*')
-
     await fs.writeFile(pkgPath, JSON.stringify(pkg, null, 2))
 
     console.log('Running yarn to install dependencies...');
@@ -100,123 +86,112 @@ cli
         if (code === 0) {
           console.log('Plugin setup complete!');
           resolve(undefined)
-        }
-        else reject(new Error(`yarn exited with code ${code}`))
+        } else reject(new Error(`yarn exited with code ${code}`))
       })
     })
   })
 
+// ==================== BUILD COMMAND ====================
 cli
-  .command('build <name>', 'Build a plugin with tsup')
+  .command('build [...names]', 'Build one or multiple plugins')
   .option('--watch', 'Watch mode', { default: false })
-  .action(async (name: string, options: { watch?: boolean }) => {
+  .option('--dir <dir>', 'Base directory of plugins', { default: 'plugins' })
+  .action(async (names: string[], options: { watch?: boolean; dir: string }) => {
     const cwd = process.cwd()
-    const candidates = [
-      path.isAbsolute(name) ? name : path.join(cwd, name),
-      path.join(cwd, 'plugins', name),
-      path.join(cwd, 'common', name),
-    ]
+    const baseDir = path.isAbsolute(options.dir) ? options.dir : path.join(cwd, options.dir)
+    let targetPlugins: string[] = [...names]
 
-    let pluginDir: string | null = null
-    // 先尝试 require.resolve 定位包根目录
-    try {
-      const resolved = require.resolve(path.join(name, 'package.json'), { paths: [cwd] })
-      pluginDir = path.dirname(resolved)
-    } catch {
-      // ignore
-    }
-    for (const p of candidates) {
-      if (pluginDir) break
+    // 1. 如果没有传入插件名称，自动扫描目录并提示用户确认
+    if (targetPlugins.length === 0) {
       try {
-        const st = await stat(p)
-        if (st.isDirectory()) {
-          pluginDir = p
-          break
+        const files = await fs.readdir(baseDir)
+        const dirs: string[] = []
+        for (const file of files) {
+          const st = await stat(path.join(baseDir, file))
+          if (st.isDirectory()) dirs.push(file)
         }
-      } catch {
-        // ignore missing paths
-      }
-    }
 
-    if (!pluginDir) {
-      console.error(`Plugin directory not found for "${name}". Tried: ${candidates.join(', ')}`)
-      process.exit(1)
-    }
+        if (dirs.length === 0) {
+          console.error(`[yumeri-scripts] No plugins found in directory: ${baseDir}`)
+          process.exit(1)
+        }
 
-    console.log(`[yumeri-scripts] Building plugin at: ${pluginDir}`)
-
-    const vuePlugin = {
-      name: 'yumeri-vue-sfc',
-      setup(build: any) {
-        build.onLoad({ filter: /\.vue$/ }, async (args: any) => {
-          const source = await fs.readFile(args.path, 'utf8')
-          const { descriptor } = parse(source, { filename: args.path })
-          const id = crypto.createHash('md5').update(args.path).digest('hex').slice(0, 8)
-
-          let contents = ''
-          if (descriptor.script || descriptor.scriptSetup) {
-            const compiled = compileScript(descriptor, {
-              id,
-              inlineTemplate: !descriptor.template,
-            })
-            contents = compiled.content
-          } else {
-            contents = 'export default {}'
-          }
-
-          if (descriptor.template) {
-            const tpl = compileTemplate({
-              id,
-              filename: args.path,
-              source: descriptor.template.content,
-              ssr: false,
-            })
-            contents += `\n${tpl.code}\n`
-          }
-
-          return {
-            contents,
-            loader: 'ts',
-            resolveDir: path.dirname(args.path),
-          }
+        const confirm = await prompts({
+          type: 'confirm',
+          name: 'value',
+          message: `No plugin specified. Do you want to build ALL plugins (${dirs.length} found) in "${options.dir}"?`,
+          initial: false
         })
-      },
+
+        if (!confirm.value) {
+          console.log('Build cancelled.')
+          return
+        }
+        targetPlugins = dirs
+      } catch (err) {
+        console.error(`[yumeri-scripts] Failed to read directory: ${baseDir}`)
+        process.exit(1)
+      }
     }
 
-    const hasVue = await (async () => {
+    // 2. 依次解析并编译每个插件
+    const total = targetPlugins.length
+    for (let i = 0; i < total; i++) {
+      const name = targetPlugins[i]
+      const progressPrefix = `[${i + 1}/${total}]`
+      
+      const candidates = [
+        path.isAbsolute(name) ? name : path.join(cwd, name),
+        path.join(baseDir, name),
+        path.join(cwd, 'common', name),
+      ]
+      
+      let pluginDir: string | null = null
       try {
-        const files = await fs.readdir(path.join(pluginDir, 'src'))
-        return files.some((f) => f.endsWith('.vue')) || files.some((f) => f === 'views')
-      } catch {
-        return false
-      }
-    })()
+        const resolved = require.resolve(path.join(name, 'package.json'), { paths: [cwd] })
+        pluginDir = path.dirname(resolved)
+      } catch { /* ignore */ }
 
-    await tsupBuild({
-      entry: [path.join(pluginDir, 'src/index.ts')],
-      format: ['esm', 'cjs'],
-      dts: hasVue
-        ? {
-            banner:
-              "declare module '*.vue' { import type { DefineComponent } from 'vue'; const component: DefineComponent<any, any, any>; export default component; }",
-        }
-        : true,
-      clean: true,
-      outDir: path.join(pluginDir, 'dist'),
-      splitting: false,
-      sourcemap: false,
-      target: 'esnext',
-      tsconfig: path.join(pluginDir, 'tsconfig.json'),
-      esbuildPlugins: hasVue ? [vuePlugin as any] : undefined,
-      esbuildOptions(options) {
-        if (hasVue) {
-          options.loader = { ...options.loader, '.vue': 'ts' }
-        }
-      },
-      watch: options.watch ?? false,
-      minify: false,
-      shims: false,
-    })
+      for (const p of candidates) {
+        if (pluginDir) break
+        try {
+          const st = await stat(p)
+          if (st.isDirectory()) {
+            pluginDir = p
+            break
+          }
+        } catch { /* ignore */ }
+      }
+
+      if (!pluginDir) {
+        console.error(`\n${progressPrefix} ❌ Error: Plugin directory not found for "${name}"`)
+        continue // 某个插件没找到，跳过继续编译下一个
+      }
+
+      console.log(`\n${progressPrefix} 🚀 Building: ${path.basename(pluginDir)}`)
+
+      try {
+        // 默认使用 tsc (tsup 内部驱动)，剥离所有 Vue 逻辑
+        await tsupBuild({
+          entry: [path.join(pluginDir, 'src/index.ts')],
+          format: ['esm', 'cjs'],
+          dts: true,
+          clean: true,
+          outDir: path.join(pluginDir, 'dist'),
+          splitting: false,
+          sourcemap: false,
+          target: 'esnext',
+          tsconfig: path.join(pluginDir, 'tsconfig.json'),
+          watch: options.watch ?? false,
+          minify: false,
+          shims: false,
+          // 移除 esbuildPlugins 里的 vue 插件
+        })
+        console.log(`${progressPrefix} ✅ Success: ${path.basename(pluginDir)} built.`)
+      } catch (err) {
+        console.error(`${progressPrefix} ❌ Failed to build ${name}:`, err)
+      }
+    }
   })
 
 cli.help()
