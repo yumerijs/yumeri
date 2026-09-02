@@ -100,7 +100,7 @@ export async function apply(ctx: Context, config: ConsoleConfig) {
   ctx.route(`/${basePath}/login`).action(async (session) => {
     const loginHtmlPath = path.join(staticDir, 'login.html');
     if (fs.existsSync(loginHtmlPath)) {
-      await session.renderFile(loginHtmlPath, {});
+      await session.render(loginHtmlPath, {});
     }
   });
 
@@ -108,7 +108,7 @@ export async function apply(ctx: Context, config: ConsoleConfig) {
     const consoleHtmlPath = path.join(staticDir, 'home.html');
     if (fs.existsSync(consoleHtmlPath)) {
       const consoleHome = await getHook(ctx, 'console:home', '{{console:home}}');
-      await session.renderFile(consoleHtmlPath, { consoleHome });
+      await session.render(consoleHtmlPath, { consoleHome });
     }
   }));
 
@@ -267,7 +267,7 @@ export async function apply(ctx: Context, config: ConsoleConfig) {
       if (fs.existsSync(assetPath) && fs.statSync(assetPath).isFile()) {
         const ext = path.extname(assetPath).toLowerCase();
         if (!asset || ext === '.html' || ext === '.ejs') {
-          await session.renderFile(assetPath, {});
+          await session.render(assetPath, {});
         } else {
           const mimeType = mime.getType(assetPath) || 'application/octet-stream';
           session.setMime(mimeType);

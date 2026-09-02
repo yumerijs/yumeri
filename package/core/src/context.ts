@@ -1,20 +1,16 @@
-import { Core } from './core.js';
+import { Core, Plugin } from './core.js';
 import { Route } from './route.js';
 import { HookHandler } from './hook.js';
 import { Middleware } from './middleware.js';
 import { Config } from './config.js';
 import { I18n } from './i18n.js';
 import { IRenderer } from '@yumerijs/types';
+import { SessionStorageProcessor, Storage, SessionStorageSnapshot } from './storage.js';
 import path from 'path';
 
-interface Plugin {
-    apply: (ctx: Context, config: any) => any;
-    disable: (ctx: Context) => Promise<void>;
-    depend: Array<string>;
-    provide: Array<string>;
+export interface Components {
+    [key: string]: any;
 }
-
-export interface Components { }
 
 /**
  * 插件上下文对象
@@ -30,9 +26,9 @@ export class Context {
     private childContexts: Context[] = [];
     private childPlugins: Map<Context, Plugin> = new Map();
     private i18ns: string[] = [];
-    public component: Components;
+    public component!: Components;
     public renderer?: IRenderer;
-    public instance: any;
+    public module: any;
     public childpath: string = '/';
 
     /** 插件名称 */
@@ -43,12 +39,12 @@ export class Context {
      * @param core Core 实例
      * @param pluginname 插件名称
      */
-    constructor(core: Core, pluginname: string, instance?: any, injections: Record<string, any> = {}) {
+    constructor(core: Core, pluginname: string, module?: any, injections: Record<string, any> = {}) {
         this.core = core;
-        this.instance = instance;
+        this.module = module;
         this.pluginname = pluginname;
         this.childPlugins = new Map();
-        (this as any).component = injections;
+        this.component = injections;
     }
 
     /**
@@ -57,7 +53,7 @@ export class Context {
      * @param value 依赖值
      */
     inject(name: string, value: any) {
-        (this as any).component[name] = value;
+        this.component[name] = value;
     }
 
     /**
@@ -127,6 +123,13 @@ export class Context {
     }
 
     /**
+     * 替换 core 的 session 存储处理器或底层存储。
+     */
+    setStorage(storage: SessionStorageProcessor | Storage<SessionStorageSnapshot>) {
+        this.core.setStorage(storage);
+    }
+
+    /**
      * 触发事件
      * @param event 事件名称
      * @param args 事件参数
@@ -167,21 +170,34 @@ export class Context {
      */
     fork(name = this.pluginname, path?: string) {
         const ctx = new Context(this.core, name);
-        ctx.childpath = path;
+        ctx.childpath = path ?? '/';
         this.childContexts.push(ctx);
         return ctx;
     }
 
     /**
      * 注册子插件
-     * @param plugin 插件实例
+     * @param module 插件模块
      * @param config 插件配置
      */
-    async apply(plugin: Plugin, config: any) {
-        if (!plugin || !plugin.apply) return;
+    async apply(module: Plugin, config: any) {
+        if (!module) return;
         const ctx = this.fork();
-        await plugin.apply(ctx, config);
-        this.childPlugins.set(ctx, plugin);
+        await this.core.plugin(module, ctx, config);
+        this.childPlugins.set(ctx, module);
+    }
+
+    /**
+     * 快速注册子插件（自动 fork）
+     * @param module 插件模块
+     * @param config 插件配置
+     */
+    async plugin(module: Plugin, config: any = {}) {
+        if (!module) return;
+        const ctx = this.fork();
+        await this.core.plugin(module, ctx, config);
+        this.childPlugins.set(ctx, module);
+        return ctx;
     }
 
     /**

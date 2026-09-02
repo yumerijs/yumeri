@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { Core, Config, Logger, Context, PluginStatus, fallback, Schema, I18n } from '@yumerijs/core';
+import { Core, Config, Logger, Context, PluginStatus, fallback, Schema, I18n, resolvePluginModule } from '@yumerijs/core';
 import * as fs from 'fs';
 import { promisify } from 'util';
 import { exec } from 'child_process';
@@ -181,7 +181,6 @@ export class PluginLoader {
                     this.logger.info(`Renderer "${rendererName}" is not registered. Attempting to auto-load...`);
                     try {
                         const rendererPackageMap: Record<string, string> = {
-                            'vue': '@yumerijs/vue-renderer',
                             'react': '@yumerijs/react-renderer',
                             'ejs': '@yumerijs/ejs-renderer'
                         };
@@ -212,21 +211,16 @@ export class PluginLoader {
             }
 
             this.plugins[pluginName] = pluginInstance;
-            const depend = pluginInstance.depend || [];
-            let injections: Record<string, any> = {};
-            for (const injection of depend) {
-                injections[injection] = this.core.getComponent(injection);
-            }
 
             // ### NEW CONFIG LOGIC ###
             const rawConfig = (this.config.plugins && this.config.plugins[pluginName]) || {};
-            const schema = pluginInstance.config; // The schema is exported as 'config'
+            const schema = pluginInstance.config || Schema.object({}); // The schema is exported as 'config'
             const finalConfig = fallback(schema, rawConfig);
             // Update the in-memory config with the fully resolved one
             this.config.plugins[pluginName] = finalConfig;
             // ### END NEW CONFIG LOGIC ###
 
-            const context = this.getContext(pluginName, injections);
+            const context = this.getContext(pluginName, {});
 
             if (pluginInstance.render) {
                 context.renderer = this.core.renderers.get(pluginInstance.render || '');
@@ -384,8 +378,10 @@ export class PluginLoader {
     }
 
     async loadModule(pluginName: string): Promise<Plugin> {
-        const plugin = await import(pluginName);
-        return plugin.default || plugin;
+        const pluginModule = await import(pluginName);
+        const context = this.getContext(pluginName, {});
+        const rawConfig = (this.config.plugins && this.config.plugins[pluginName]) || {};
+        return resolvePluginModule(pluginModule, context, rawConfig) as Plugin;
     }
 
     async checkPluginDependencies(pluginPath: string): Promise<boolean> {

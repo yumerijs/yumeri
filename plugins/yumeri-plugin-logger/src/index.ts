@@ -48,7 +48,7 @@ export async function apply(ctx: Context, config: {}) {
       }
     })
   ctx.on('log', async (msg) => {
-    route.ws.clients.forEach((ws) => {
+    route.ws?.clients.forEach((ws) => {
       try {
         ws.send(JSON.stringify(msg));
       } catch (e) {
@@ -60,5 +60,5 @@ export async function apply(ctx: Context, config: {}) {
 export async function disable(ctx: Context) {
   const consoleApi = ctx.component.console;
   consoleApi.removeconsoleitem('logger');
-  route.ws.close();
+  route.ws?.close();
 }

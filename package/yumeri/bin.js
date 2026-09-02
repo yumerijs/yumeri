@@ -11,14 +11,17 @@ const pkg = require('./package.json')
 const __filename = fileURLToPath(import.meta.url)
 
 function startWorker() {
-    const originalArgs = process.argv.slice(2)
-
-    const filteredArgs = originalArgs.filter(arg => arg !== 'start')
+    const args = process.argv.slice(2)
+    const startIdx = args.indexOf('start')
+    
+    const nodeOptions = startIdx !== -1 ? args.slice(0, startIdx) : []
+    const commandArgs = startIdx !== -1 ? args.slice(startIdx + 1) : args
 
     const nodeArgs = [
-        ...filteredArgs,
+        ...nodeOptions,
         __filename,
-        '--worker'
+        '--worker',
+        ...commandArgs
     ]
 
     console.log(`[Manager] Spawning worker: node ${nodeArgs.join(' ')}`)

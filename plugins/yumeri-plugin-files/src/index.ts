@@ -122,7 +122,7 @@ export async function apply(ctx: Context, config: FilesConfig) {
 
             session.head['Content-Disposition'] = `attachment; filename="${encodeURIComponent(fileName)}"`;
             session.setMime(mimeType);
-            session.response(fsSync.createReadStream(filePath), 'stream');
+            session.respond(fsSync.createReadStream(filePath), 'stream');
         } catch (error) {
             handleError(session, error);
         }

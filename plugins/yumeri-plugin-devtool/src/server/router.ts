@@ -8,7 +8,7 @@ const buffer = new EventBuffer();
 export function registerRoutes(ctx: Context, options: { basePath?: string; assetsRoot?: string } = {}) {
   const basePath = options.basePath || '/devtool';
   const core = ctx.getCore();
-  const staticRoot = options.assetsRoot || core?.coreConfig?.staticDir || 'public';
+  const staticRoot = options.assetsRoot || 'public';
   const assetsBase = path.isAbsolute(staticRoot) ? staticRoot : path.resolve(process.cwd(), staticRoot);
 
   ctx.route(`${basePath}/events`).action(async (session: Session) => {
