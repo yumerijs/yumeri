@@ -45,29 +45,16 @@ const cli = cac('yumeri-scripts')
 cli
   .command('setup <name>', 'Create a new plugin')
   .action(async (rawName: string) => {
-    const responses = await prompts([
-      {
-        type: 'select',
-        name: 'templateType',
-        message: 'Select a template for your plugin:',
-        choices: [
-          { title: 'Standard Plugin (backend only)', value: 'standard' },
-          { title: 'UI Plugin (Vue + Vite)', value: 'ui-plugin' },
-        ],
-      },
-      {
-        type: 'text',
-        name: 'description',
-        message: 'Description:',
-      },
-    ]);
+    const { description } = await prompts({
+      type: 'text',
+      name: 'description',
+      message: 'Description:',
+    });
 
-    if (!responses.templateType || !responses.description) {
+    if (!description) {
       console.log('Plugin setup cancelled.');
       return;
     }
-
-    const { templateType, description } = responses;
     const cwd = process.cwd()
 
     const isScoped = rawName.startsWith('@')
@@ -78,10 +65,9 @@ cli
     const folderName = baseName.startsWith('yumeri-plugin-') ? baseName : `yumeri-plugin-${baseName}`
     const pluginDir = path.join(cwd, 'plugins', folderName)
 
-    const templateDir = path.resolve(__dirname, '../template', templateType)
+    const templateDir = path.resolve(__dirname, '../template/standard')
 
     console.log(`Creating plugin at: ${pluginDir}`);
-    console.log(`Using template: ${templateType}`);
 
     await copyTemplate(templateDir, pluginDir, cleanName, description)
 
