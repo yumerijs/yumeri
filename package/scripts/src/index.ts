@@ -59,7 +59,6 @@ cli
     }
 
     const { description } = responses;
-    const templateType = 'standard'; // 默认 standard，不再支持 ui-plugin
     const cwd = process.cwd()
     const isScoped = rawName.startsWith('@')
     const parts = rawName.split('/')
@@ -68,7 +67,7 @@ cli
     const folderName = baseName.startsWith('yumeri-plugin-') ? baseName : `yumeri-plugin-${baseName}`
     
     const pluginDir = path.join(cwd, 'plugins', folderName)
-    const templateDir = path.resolve(__dirname, '../template', templateType)
+    const templateDir = path.resolve(__dirname, '../template/standard')
 
     console.log(`Creating plugin at: ${pluginDir}`);
     await copyTemplate(templateDir, pluginDir, cleanName, description)
