@@ -1,6 +1,6 @@
 {
   "name": "@yumerijs/loader",
-  "version": "3.0.0-alpha.1",
+  "version": "3.0.0",
   "description": "Module loader for yumeri",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -29,7 +29,7 @@
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.13.10",
-    "@yumerijs/core": "^3.0.0-alpha.1",
+    "@yumerijs/core": "^3.0.0",
     "esbuild-register": "^3.6.0",
     "typescript": "^6.0.3"
   },
@@ -41,6 +41,6 @@
     "js-yaml": "^4.1.0"
   },
   "peerDependencies": {
-    "@yumerijs/core": "^3.0.0-alpha.1"
+    "@yumerijs/core": "^3.0.0"
   }
 }

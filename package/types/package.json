@@ -1,6 +1,6 @@
 {
   "name": "@yumerijs/types",
-  "version": "3.0.0-alpha.1",
+  "version": "3.0.0",
   "description": "Standard types for Yumeri",
   "main": "dist/index.js",
   "dev": "src/index.ts",
