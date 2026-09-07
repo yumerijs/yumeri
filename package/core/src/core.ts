@@ -10,6 +10,7 @@ import { Server as CoreServer } from './server.js';
 import { I18n } from './i18n.js';
 import { IRenderer } from '@yumerijs/types';
 import { SessionStorageProcessor, Storage, SessionStorageSnapshot } from './storage.js';
+import { Service } from './service.js';
 import * as fs from 'fs'
 import semver from 'semver';
 
@@ -101,6 +102,7 @@ export const enum PluginStatus {
 export class Core {
   public emitter = new EventEmitter();
   public components: { [name: string]: any } = {};
+  public services: { [name: string]: new (context: Context) => Service } = {};
   public routes: Record<string, Route> = {};
   public logger = new Logger('core');
   public globalMiddlewares: Record<string, Middleware> = {};
@@ -196,6 +198,10 @@ export class Core {
       if (component) {
         context.inject(name, component);
       }
+      const service = this.getService(name, context);
+      if (service) {
+        context.inject(name, service);
+      }
     }
 
     this.logger.info(`apply plugin ${shortName}`);
@@ -214,6 +220,19 @@ export class Core {
 
   unregisterComponent(name: string): void {
     delete this.components[name];
+  }
+
+  registerService(name: string, service: new (context: Context) => Service): void {
+    this.services[name] = service;
+  }
+
+  getService(name: string, context: Context): Service | undefined {
+    const service = this.services[name];
+    return service ? new service(context) : undefined;
+  }
+
+  unregisterService(name: string): void {
+    delete this.services[name];
   }
 
   on(event: string, listener: (...args: any[]) => Promise<void>): void {

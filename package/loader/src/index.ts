@@ -204,7 +204,7 @@ export class PluginLoader {
             }
 
             const deps = pluginInstance.depend || [];
-            const unmetDependencies = deps.filter(dep => !this.core.components[dep]);
+            const unmetDependencies = deps.filter(dep => !this.core.components[dep] && !this.core.services[dep]);
 
             if (unmetDependencies.length > 0) {
                 return false;

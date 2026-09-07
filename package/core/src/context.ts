@@ -6,6 +6,7 @@ import { Config } from './config.js';
 import { I18n } from './i18n.js';
 import { IRenderer } from '@yumerijs/types';
 import { SessionStorageProcessor, Storage, SessionStorageSnapshot } from './storage.js';
+import { Service } from './service.js';
 import path from 'path';
 
 export interface Components {
@@ -27,6 +28,7 @@ export class Context {
     private childPlugins: Map<Context, Plugin> = new Map();
     private i18ns: string[] = [];
     private affects: (() => void | Promise<void>)[] = [];
+    private services: string[] = [];
     public component!: Components;
     public renderer?: IRenderer;
     public module: any;
@@ -175,6 +177,22 @@ export class Context {
     }
 
     /**
+     * 注册服务
+     * @param name 服务名称
+     * @param service Service 派生类
+     */
+    registerService(name: string, service: new (context: Context) => Service) {
+        if (this.core.services[name]) {
+            this.core.logger.warn(
+                `Plugin "${this.pluginname}" attempt to register service "${name}", but it has already been registered.`
+            );
+            return;
+        }
+        this.core.services[name] = service;
+        this.services.push(name);
+    }
+
+    /**
      * 注册子 Context
      * @param name 子 Context 名称
      */
@@ -251,6 +269,9 @@ export class Context {
         // 删除组件
         this.components.forEach((name) => delete this.core.components[name]);
 
+        // 删除服务
+        this.services.forEach((name) => delete this.core.services[name]);
+
         // 删除路由
         this.routes.forEach((route) => delete this.core.routes[route]);
 
@@ -300,5 +321,6 @@ export class Context {
         this.hooks = {};
         this.childContexts = [];
         this.affects = [];
+        this.services = [];
     }
 }
