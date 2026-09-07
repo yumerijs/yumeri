@@ -26,6 +26,7 @@ export class Context {
     private childContexts: Context[] = [];
     private childPlugins: Map<Context, Plugin> = new Map();
     private i18ns: string[] = [];
+    private affects: (() => void | Promise<void>)[] = [];
     public component!: Components;
     public renderer?: IRenderer;
     public module: any;
@@ -54,6 +55,15 @@ export class Context {
      */
     inject(name: string, value: any) {
         this.component[name] = value;
+    }
+
+    /**
+     * 注册 Context 销毁时执行的回调
+     * @param callback 销毁回调
+     */
+    affect(callback: () => void | Promise<void>) {
+        if (!callback) return;
+        this.affects.push(callback);
     }
 
     /**
@@ -277,6 +287,11 @@ export class Context {
             this.i18ns.length = 0
         }
 
+        // 执行 Context 销毁回调
+        for (const callback of this.affects) {
+            await callback();
+        }
+
         // 清空内部记录
         this.components = [];
         this.routes = [];
@@ -284,5 +299,6 @@ export class Context {
         this.eventlisteners = [];
         this.hooks = {};
         this.childContexts = [];
+        this.affects = [];
     }
 }
