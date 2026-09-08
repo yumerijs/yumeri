@@ -1,6 +1,6 @@
 {
   "name": "@yumerijs/core",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Core module for yumeri",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
