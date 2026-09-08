@@ -14,6 +14,7 @@ export type RouteHandler = (
   queryParams: URLSearchParams,
   ...pathParams: string[]
 ) => Promise<void> | void;
+type RouteMethod = string | string[];
 
 type ParamInfo = { name: string; modifier: '' | '?' | '*' | '+' };
 type Segment =
@@ -290,7 +291,9 @@ function matchHostSegments(
 export class Route {
   private segments: Segment[];
   private paramsInfo: ParamInfo[];
-  private handler: RouteHandler | null = null;
+  private handlers: Record<string, RouteHandler> = {};
+  private pendingActionMethods: string[] | null = null;
+  private methodsConfigured = false;
   public middlewares: Middleware[] = [];
   public allowedMethods: string[] = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD'];
   public ws: WebSocketServer | null = null;
@@ -314,8 +317,18 @@ export class Route {
    * @param handler 路由处理器
    * @returns this
    */
-  action(handler: RouteHandler): this {
-    this.handler = handler;
+  action(handler: RouteHandler): this;
+  action(method: RouteMethod, handler: RouteHandler): this;
+  action(methodOrHandler: RouteMethod | RouteHandler, maybeHandler?: RouteHandler): this {
+    const handler = typeof methodOrHandler === 'function' ? methodOrHandler : maybeHandler;
+    if (!handler) return this;
+    const methods = typeof methodOrHandler === 'function'
+      ? (this.pendingActionMethods ?? this.allowedMethods)
+      : (Array.isArray(methodOrHandler) ? methodOrHandler : [methodOrHandler]);
+    for (const method of methods) {
+      this.handlers[method.toUpperCase()] = handler;
+    }
+    this.pendingActionMethods = null;
     return this;
   }
 
@@ -525,11 +538,17 @@ export class Route {
     session: Session,
     params: URLSearchParams,
     pathParams: string[],
-    hostParams: Record<string, string>
+    hostParams: Record<string, string>,
+    method?: string
   ): Promise<void> {
-    if (this.handler) {
-      await this.handler(session, params, ...pathParams, ...Object.values(hostParams));
+    const handler = this.handlers[(method || session.client?.req?.method || 'GET').toUpperCase()];
+    if (handler) {
+      await handler(session, params, ...pathParams, ...Object.values(hostParams));
     }
+  }
+
+  hasHandler(method: string): boolean {
+    return !!this.handlers[method.toUpperCase()];
   }
 
   /**
@@ -538,7 +557,12 @@ export class Route {
    * @returns this
    */
   methods(...methods: string[]): Route {
-    this.allowedMethods = methods;
+    const normalized = methods.map(method => method.toUpperCase());
+    this.allowedMethods = this.methodsConfigured
+      ? [...new Set([...this.allowedMethods, ...normalized])]
+      : normalized;
+    this.methodsConfigured = true;
+    this.pendingActionMethods = normalized;
     return this;
   }
 

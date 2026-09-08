@@ -291,6 +291,10 @@ export class Core {
       const route = this.routes[routePath];
       const result = route.match(pathname, session.client?.headers?.host);
       if (result) {
+        const method = session.client?.req?.method ?? 'GET';
+        if (!route.hasHandler(method)) {
+          continue;
+        }
         try {
           this.emit('request:start', {
             path: pathname,
@@ -316,7 +320,7 @@ export class Core {
               });
             } else {
               const start = Date.now();
-              await route.executeHandler(session, queryParams, result.pathParams, result.hostParams);
+              await route.executeHandler(session, queryParams, result.pathParams, result.hostParams, method);
               this.emit('route:end', {
                 path: pathname,
                 route: routePath,

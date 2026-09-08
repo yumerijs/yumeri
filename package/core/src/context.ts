@@ -80,10 +80,9 @@ export class Context {
             ? 'root'
             : path.posix.join(this.childpath, routepath);
         if (this.core.routes[realpath]) {
-            this.core.logger.warn(
-                `Plugin "${this.pluginname}" attempt to register route "${path}", but it has already been registered.`
-            );
-            return new Route(realpath, this);
+            // Reuse the registered route so the same path can be split across
+            // multiple declarations, e.g. one GET handler and one POST handler.
+            return this.core.routes[realpath];
         }
         this.routes.push(realpath);
         return this.core.route(realpath, this);
