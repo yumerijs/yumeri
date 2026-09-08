@@ -74,7 +74,11 @@ export class Context {
      * @returns Route 实例
      */
     route(routepath: string): Route {
-        const realpath = path.join(this.childpath, routepath);
+        // `root` is a special fallback route name, not a filesystem path.
+        // URL paths must use POSIX separators even when Yumeri runs on Windows.
+        const realpath = routepath === 'root'
+            ? 'root'
+            : path.posix.join(this.childpath, routepath);
         if (this.core.routes[realpath]) {
             this.core.logger.warn(
                 `Plugin "${this.pluginname}" attempt to register route "${path}", but it has already been registered.`
