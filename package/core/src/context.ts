@@ -8,6 +8,7 @@ import { IRenderer } from '@yumerijs/types';
 import { SessionStorageProcessor, Storage, SessionStorageSnapshot } from './storage.js';
 import { Service } from './service.js';
 import path from 'path';
+import { setInterval as nodeSetInterval, clearInterval as nodeClearInterval, setTimeout as nodeSetTimeout, clearTimeout as nodeClearTimeout } from 'timers';
 
 export interface Components {
     [key: string]: any;
@@ -29,6 +30,8 @@ export class Context {
     private i18ns: string[] = [];
     private affects: (() => void | Promise<void>)[] = [];
     private services: string[] = [];
+    private timers: Set<NodeJS.Timeout> = new Set();
+    private disposed: boolean = false;
     public component!: Components;
     public renderer?: IRenderer;
     public module: any;
@@ -66,6 +69,124 @@ export class Context {
     affect(callback: () => void | Promise<void>) {
         if (!callback) return;
         this.affects.push(callback);
+    }
+
+    /**
+     * 注册重复定时器（Node 原生 setInterval 的包装）
+     *
+     * 参数与行为和原生 setInterval 完全一致，额外保证插件卸载后不留副作用：
+     * - 定时器句柄会被 Context 记录，插件卸载（dispose）时统一清理，
+     *   不会留下继续运行、拖住事件循环的“幽灵定时器”
+     * - 卸载后即使还有已经排队的 tick，包装层也会拦截，不再调用插件回调
+     * - 回调中的同步异常与 async 回调的 Promise 拒绝会被捕获并写入日志，
+     *   不会变成 uncaughtException / unhandledRejection 影响整个进程
+     *
+     * @param callback 定时执行的回调
+     * @param ms 间隔毫秒数
+     * @param args 原样透传给回调的额外参数
+     * @returns 定时器句柄，可用 ctx.clearInterval 或原生 clearInterval 取消；
+     *          若 Context 已卸载则返回 undefined（此时不会创建定时器）
+     */
+    setInterval(callback: (...args: any[]) => any, ms?: number, ...args: any[]): NodeJS.Timeout | undefined {
+        if (!this.prepareTimer('interval', callback)) return undefined;
+
+        const timer = nodeSetInterval(() => {
+            // 兜底：卸载后可能仍有已经排队的 tick，直接丢弃
+            if (this.disposed) return;
+            this.invokeTimerCallback(callback, args);
+        }, ms);
+
+        this.timers.add(timer);
+        return timer;
+    }
+
+    /**
+     * 注册一次性定时器（Node 原生 setTimeout 的包装）
+     *
+     * 行为与原生 setTimeout 一致，卸载保证同 setInterval：
+     * 卸载时清理尚未触发的句柄，已排队但尚未执行的回调同样会被拦截。
+     *
+     * @param callback 延时执行的回调
+     * @param ms 延时毫秒数
+     * @param args 原样透传给回调的额外参数
+     * @returns 定时器句柄，可用 ctx.clearTimeout 或原生 clearTimeout 取消；
+     *          若 Context 已卸载则返回 undefined（此时不会创建定时器）
+     */
+    setTimeout(callback: (...args: any[]) => any, ms?: number, ...args: any[]): NodeJS.Timeout | undefined {
+        if (!this.prepareTimer('timeout', callback)) return undefined;
+
+        const timer = nodeSetTimeout(() => {
+            // 触发过的句柄不必再被追踪，先摘掉再执行回调
+            this.timers.delete(timer);
+            if (this.disposed) return;
+            this.invokeTimerCallback(callback, args);
+        }, ms);
+
+        this.timers.add(timer);
+        return timer;
+    }
+
+    /**
+     * 取消由 setInterval 创建的定时器（Node 原生 clearInterval 的包装）
+     * @param timer 定时器句柄
+     */
+    clearInterval(timer?: NodeJS.Timeout | number | null) {
+        if (timer === undefined || timer === null) return;
+        this.timers.delete(timer as NodeJS.Timeout);
+        nodeClearInterval(timer as any);
+    }
+
+    /**
+     * 取消由 setTimeout 创建的定时器（Node 原生 clearTimeout 的包装）
+     * @param timer 定时器句柄
+     */
+    clearTimeout(timer?: NodeJS.Timeout | number | null) {
+        if (timer === undefined || timer === null) return;
+        this.timers.delete(timer as NodeJS.Timeout);
+        nodeClearTimeout(timer as any);
+    }
+
+    /**
+     * 校验回调参数并确认 Context 尚未卸载
+     * @param kind 定时器类型，仅用于日志
+     * @param callback 用户回调
+     */
+    private prepareTimer(kind: string, callback: unknown): boolean {
+        if (typeof callback !== 'function') {
+            throw new TypeError('The "callback" argument must be of type function.');
+        }
+        if (this.disposed) {
+            this.core.logger.warn(
+                `Plugin "${this.pluginname}" attempt to create a ${kind} after its context was disposed, ignored.`
+            );
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * 调用插件定时器回调，并捕获同步异常与 async 拒绝
+     * @param callback 用户回调
+     * @param args 透传给回调的参数
+     */
+    private invokeTimerCallback(callback: (...args: any[]) => any, args: any[]) {
+        try {
+            const result = callback(...args);
+            // 兼容 async 回调，避免未处理的 Promise 拒绝
+            if (result && typeof result.then === 'function') {
+                Promise.resolve(result).catch((error) => {
+                    this.core.logger.error(
+                        `Unhandled rejection in timer callback of plugin "${this.pluginname}":`,
+                        error
+                    );
+                });
+            }
+        } catch (error) {
+            this.core.logger.error(
+                `Unhandled error in timer callback of plugin "${this.pluginname}":`,
+                error
+            );
+        }
     }
 
     /**
@@ -269,6 +390,12 @@ export class Context {
      * 卸载插件时清理注册的所有资源
      */
     async dispose() {
+        // 先把自己标记为已卸载并停掉所有定时器（Node 里 clearTimeout/clearInterval 可互换）：
+        // 这样后续拆卸过程中即使有已排队的 tick 也不会再触发插件回调
+        this.disposed = true;
+        this.timers.forEach((timer) => nodeClearTimeout(timer));
+        this.timers.clear();
+
         // 删除组件
         this.components.forEach((name) => delete this.core.components[name]);
 
