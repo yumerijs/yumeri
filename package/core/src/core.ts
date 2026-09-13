@@ -85,13 +85,23 @@ export interface CoreOptions {
 }
 
 export const coreConfigSchema = Schema.object<CoreOptions>({
-  port: Schema.number('监听端口').default(14510),
-  host: Schema.string('监听地址').default('0.0.0.0'),
-  enableCors: Schema.boolean('启用跨域').default(false),
-  enableWs: Schema.boolean('启用 WebSocket').default(false),
-  lang: Schema.array(Schema.string(), '语言列表').default(['zh', 'en']),
-  skipcheckUpdates: Schema.boolean('启动时检查更新').default(false)
+  port: Schema.number('监听端口').key('core.config.port').default(14510),
+  host: Schema.string('监听地址').key('core.config.host').default('0.0.0.0'),
+  enableCors: Schema.boolean('启用跨域').key('core.config.enableCors').default(false),
+  enableWs: Schema.boolean('启用 WebSocket').key('core.config.enableWs').default(false),
+  lang: Schema.array(Schema.string(), '语言列表').key('core.config.lang').default(['zh', 'en']),
+  skipcheckUpdates: Schema.boolean('启动时检查更新').key('core.config.skipcheckUpdates').default(false)
 });
+
+/** 核心配置项的内置文案，随 i18n 实例初始化自动注册 */
+export const coreI18n = {
+  'core.config.port': { zh: '监听端口', en: 'Listening port' },
+  'core.config.host': { zh: '监听地址', en: 'Listening address' },
+  'core.config.enableCors': { zh: '启用跨域', en: 'Enable CORS' },
+  'core.config.enableWs': { zh: '启用 WebSocket', en: 'Enable WebSocket' },
+  'core.config.lang': { zh: '语言列表', en: 'Language list' },
+  'core.config.skipcheckUpdates': { zh: '启动时检查更新', en: 'Check for updates on startup' }
+};
 
 export const enum PluginStatus {
   ENABLED = 'enabled',
@@ -109,11 +119,35 @@ export class Core {
   public hooks: Record<string, Hook> = {};
   public coreConfig: CoreOptions;
   public server!: CoreServer;
-  public i18n!: I18n;
+  private _i18n?: I18n;
   public loader: any;
   public storage: SessionStorageProcessor = new SessionStorageProcessor();
   public renderers: Map<string, IRenderer> = new Map();
   public pluginRenderers: Map<string, string> = new Map(); // Stores which plugin uses which renderer
+
+  /**
+   * i18n 实例
+   *
+   * 未赋值时按 core 配置的 lang 惰性创建，赋值时自动注册核心内置文案，
+   * 这样无论 i18n 是被 loader 创建还是被直接使用 core 的场景创建，
+   * coreConfigSchema 的说明文字都能被翻译到。
+   */
+  public get i18n(): I18n {
+    if (!this._i18n) {
+      this.setI18n(new I18n(this.coreConfig?.lang || ['zh', 'en']));
+    }
+    return this._i18n!;
+  }
+
+  public set i18n(value: I18n) {
+    this.setI18n(value);
+  }
+
+  /** 设置 i18n 实例并注册核心内置文案 */
+  public setI18n(i18n: I18n): void {
+    this._i18n = i18n;
+    i18n.register(coreI18n);
+  }
 
   constructor(loader?: any, coreConfig: CoreOptions = {}, loggersetCore = true, splash = true) {
     this.coreConfig = fallback(coreConfigSchema, coreConfig);

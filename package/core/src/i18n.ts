@@ -27,14 +27,24 @@ export class I18n {
     this.fallback = fallback
   }
 
+  /**
+   * 判断一个值是否是语言表，即 `{ zh: '...', en: '...' }` 这种值全为字符串的对象。
+   * 这里不硬编码具体语言码，因为 fallback 列表可由 coreConfig.lang 配置。
+   */
+  private isLocaleMap(value: any): value is Record<string, string> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+    const values = Object.values(value)
+    return values.length > 0 && values.every(v => typeof v === 'string')
+  }
+
   private flattenAndRegister(obj: Record<string, any>, prefix = '') {
     for (const [k, v] of Object.entries(obj)) {
       const fullKey = prefix ? `${prefix}.${k}` : k
-      if (typeof v === 'object' && !('zh' in v || 'en' in v)) {
-        this.flattenAndRegister(v, fullKey)
-      } else if (typeof v === 'object') {
+      if (this.isLocaleMap(v)) {
         if (!this.data[fullKey]) this.data[fullKey] = {}
         Object.assign(this.data[fullKey], v)
+      } else if (v && typeof v === 'object') {
+        this.flattenAndRegister(v, fullKey)
       }
     }
   }
