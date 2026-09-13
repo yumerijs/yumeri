@@ -39,10 +39,17 @@ export interface Console {
 }
 
 export const config: Schema<ConsoleConfig> = Schema.object({
-  path: Schema.string('监听路径（命令）').default('console'),
-  adminname: Schema.string('管理员用户名').default('admin'),
-  adminpassword: Schema.string('管理员密码').default('admin'),
+  path: Schema.string('监听路径（命令）').key('console.config.path').default('console'),
+  adminname: Schema.string('管理员用户名').key('console.config.adminname').default('admin'),
+  adminpassword: Schema.string('管理员密码').key('console.config.adminpassword').default('admin'),
 });
+
+/** 插件配置项说明的翻译表 */
+const configI18n = {
+  'console.config.path': { zh: '监听路径（命令）', en: 'Listening path (command)' },
+  'console.config.adminname': { zh: '管理员用户名', en: 'Admin username' },
+  'console.config.adminpassword': { zh: '管理员密码', en: 'Admin password' },
+};
 
 let loginstatus: Record<string, string> = {};
 
@@ -74,6 +81,7 @@ export async function apply(ctx: Context, config: ConsoleConfig) {
   const configManager = new PluginConfigManager();
   const core = ctx.getCore();
   configManager.setCore(core);
+  ctx.i18n(configI18n);
   const staticDir = path.join(__dirname, '..', 'static');
   const basePath = config.path;
 
@@ -132,18 +140,19 @@ export async function apply(ctx: Context, config: ConsoleConfig) {
     }
   });
 
-  const apiRoutes = {
+  // 第二个参数是当前请求的语言优先级列表，用于解析配置项说明的 i18n 文案
+  const apiRoutes: Record<string, (params: URLSearchParams, langs: string[]) => any> = {
     plugins: async (params: URLSearchParams) => {
       const includeDisabled = params.get('includeDisabled') === 'true';
       return await configManager.getAllPluginNames(includeDisabled);
     },
-    config: async (params: URLSearchParams) => {
+    config: async (params: URLSearchParams, langs: string[]) => {
       const pluginName = params.get('name');
       if (!pluginName) return { success: false, message: '缺少插件名称参数' };
-      return await configManager.getPluginConfig(pluginName);
+      return await configManager.getPluginConfig(pluginName, langs);
     },
-    coreconfig: async () => {
-      return await configManager.getCoreConfig();
+    coreconfig: async (_params: URLSearchParams, langs: string[]) => {
+      return await configManager.getCoreConfig(langs);
     },
     saveconfig: async (params: URLSearchParams) => {
       const pluginName = params.get('name');
@@ -251,7 +260,7 @@ export async function apply(ctx: Context, config: ConsoleConfig) {
       await requireLogin(session, async () => {
         try {
           session.setMime('json');
-          const result = await handler(params);
+          const result = await handler(params, session.request.languages);
           session.body = JSON.stringify(result);
         } catch (err) {
           session.setMime('json');

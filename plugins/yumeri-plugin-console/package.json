@@ -1,6 +1,6 @@
 {
   "name": "yumeri-plugin-console",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Web console for yumeri",
   "main": "dist/index.js",
   "dev": "src/index.ts",

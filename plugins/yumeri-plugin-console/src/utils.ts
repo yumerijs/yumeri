@@ -1,4 +1,4 @@
-import { Logger, Core, Schema, fallback, coreConfigSchema } from 'yumeri'
+import { Logger, Core, Schema, fallback, coreConfigSchema, resolveDescription } from 'yumeri'
 
 const logger = new Logger('console');
 
@@ -26,7 +26,12 @@ export class PluginConfigManager {
         return this.core.loader;
     }
 
-    async getPluginConfig(pluginName: string): Promise<any> {
+    /**
+     * 获取插件配置项
+     * @param pluginName 插件名
+     * @param langs 语言优先级列表，用于解析配置项说明的 i18n 文案
+     */
+    async getPluginConfig(pluginName: string, langs?: string[]): Promise<any> {
         const actualPluginName = pluginName.startsWith('~') ? pluginName.substring(1) : pluginName;
         const config = this.loader.config.plugins[actualPluginName] || {};
 
@@ -43,12 +48,12 @@ export class PluginConfigManager {
         const mergedConfig: any[] = [];
         for (const key in schema.properties) {
             const propSchema = schema.properties[key];
-            mergedConfig.push(this.schemaToConfigItem(key, propSchema, mergedValue?.[key]));
+            mergedConfig.push(this.schemaToConfigItem(key, propSchema, mergedValue?.[key], langs));
         }
         return mergedConfig;
     }
 
-    async getCoreConfig(): Promise<any> {
+    async getCoreConfig(langs?: string[]): Promise<any> {
         if (!this.core) return [];
         const schema = coreConfigSchema;
         if (!schema) return [];
@@ -57,7 +62,7 @@ export class PluginConfigManager {
         const mergedConfig: any[] = [];
         for (const key in schema.properties) {
             const propSchema = schema.properties[key];
-            mergedConfig.push(this.schemaToConfigItem(key, propSchema, mergedValue?.[key]));
+            mergedConfig.push(this.schemaToConfigItem(key, propSchema, mergedValue?.[key], langs));
         }
         return mergedConfig;
     }
@@ -194,9 +199,10 @@ export class PluginConfigManager {
 
     /**
      * 将 Schema 描述转换为前端可消费的配置项结构
+     * @param langs 语言优先级列表，用于解析配置项说明的 i18n 文案
      */
-    private schemaToConfigItem(key: string, schema: Schema<any>, value: any) {
-        const description = schema.description || key;
+    private schemaToConfigItem(key: string, schema: Schema<any>, value: any, langs?: string[]) {
+        const description = resolveDescription(schema, this.core?.i18n, langs) || key;
         const currentValue = value === undefined ? schema.defaultValue : value;
 
         // 枚举转下拉
@@ -234,7 +240,7 @@ export class PluginConfigManager {
                         description,
                         type: 'complex-array',
                         itemType: 'object',
-                        itemSchema: this.normalizeSchema(schema.items),
+                        itemSchema: this.normalizeSchema(schema.items, langs),
                     };
                 }
                 return {
@@ -250,7 +256,7 @@ export class PluginConfigManager {
                     value: currentValue ?? {},
                     description,
                     type: 'object-header',
-                    properties: this.normalizeSchemaProperties(schema.properties),
+                    properties: this.normalizeSchemaProperties(schema.properties, langs),
                 };
             default:
                 return {
@@ -264,32 +270,33 @@ export class PluginConfigManager {
 
     /**
      * 将 Schema 属性中的 defaultValue/enum 等字段转换为前端使用的格式
+     * @param langs 语言优先级列表，用于解析配置项说明的 i18n 文案
      */
-    private normalizeSchema(schema: Schema<any>) {
+    private normalizeSchema(schema: Schema<any>, langs?: string[]) {
         const normalized: any = {
             type: schema.type,
-            description: schema.description,
+            description: resolveDescription(schema, this.core?.i18n, langs),
             default: schema.defaultValue,
             enum: schema.enum,
         };
 
         if (schema.items) {
-            normalized.items = this.normalizeSchema(schema.items);
+            normalized.items = this.normalizeSchema(schema.items, langs);
         }
 
         if (schema.properties) {
-            normalized.properties = this.normalizeSchemaProperties(schema.properties);
+            normalized.properties = this.normalizeSchemaProperties(schema.properties, langs);
         }
 
         return normalized;
     }
 
-    private normalizeSchemaProperties(properties?: Record<string, Schema<any>>) {
+    private normalizeSchemaProperties(properties?: Record<string, Schema<any>>, langs?: string[]) {
         const normalizedProps: Record<string, any> = {};
         if (!properties) return normalizedProps;
 
         for (const [propKey, propSchema] of Object.entries(properties)) {
-            normalizedProps[propKey] = this.normalizeSchema(propSchema as Schema<any>);
+            normalizedProps[propKey] = this.normalizeSchema(propSchema as Schema<any>, langs);
         }
         return normalizedProps;
     }
