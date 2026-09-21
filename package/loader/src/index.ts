@@ -19,6 +19,15 @@ interface Plugin {
     config?: Schema<any>;
 }
 
+export interface PluginConfigEntry {
+    id: string;
+    moduleName: string;
+    config: any;
+    configKey: string;
+    enabled: boolean;
+    legacy: boolean;
+}
+
 export class PluginLoader {
     public core: Core;
     public config: any = null;
@@ -35,6 +44,57 @@ export class PluginLoader {
         this.core = core || new Core(this, undefined, false);
         this.isDev = process.env.NODE_ENV === 'development';
         Logger.setCore(this.core);
+    }
+
+    /**
+     * Normalize both the legacy `{ "package-name": { ...config } }` form and
+     * the named instance form `{ "instance-id": { module, config } }`.
+     */
+    public getPluginEntry(pluginId: string): PluginConfigEntry | undefined {
+        const plugins = this.config?.plugins;
+        if (!plugins || typeof plugins !== 'object') return undefined;
+
+        const configKey = Object.prototype.hasOwnProperty.call(plugins, pluginId)
+            ? pluginId
+            : Object.prototype.hasOwnProperty.call(plugins, `~${pluginId}`)
+                ? `~${pluginId}`
+                : undefined;
+        if (!configKey) return undefined;
+
+        const enabled = !configKey.startsWith('~');
+        const id = enabled ? configKey : configKey.substring(1);
+        const value = plugins[configKey];
+        const isInstance = value && typeof value === 'object' && !Array.isArray(value)
+            && typeof value.module === 'string';
+
+        return {
+            id,
+            moduleName: isInstance ? value.module : id,
+            config: isInstance ? (value.config ?? {}) : (value ?? {}),
+            configKey,
+            enabled,
+            legacy: !isInstance,
+        };
+    }
+
+    public setPluginConfig(pluginId: string, config: any): boolean {
+        const entry = this.getPluginEntry(pluginId);
+        if (!entry) return false;
+        if (entry.legacy) {
+            this.config.plugins[entry.configKey] = config;
+        } else {
+            this.config.plugins[entry.configKey].config = config;
+        }
+        return true;
+    }
+
+    private getEnabledPluginEntries(): PluginConfigEntry[] {
+        if (!this.config || typeof this.config.plugins !== 'object' || this.config.plugins === null) {
+            return [];
+        }
+        return Object.keys(this.config.plugins)
+            .map(key => this.getPluginEntry(key.startsWith('~') ? key.substring(1) : key)!)
+            .filter(entry => entry && entry.enabled);
     }
 
     /**
@@ -107,19 +167,16 @@ export class PluginLoader {
             return;
         }
 
-        const allPluginNames = Object.keys(this.config.plugins);
+        const allEntries = Object.keys(this.config.plugins)
+            .map(key => this.getPluginEntry(key.startsWith('~') ? key.substring(1) : key)!)
+            .filter(Boolean);
         this.pluginStatus = {}; // Reset status
 
-        for (const name of allPluginNames) {
-            if (name.startsWith('~')) {
-                const actualName = name.substring(1);
-                this.pluginStatus[actualName] = PluginStatus.DISABLED;
-            } else {
-                this.pluginStatus[name] = PluginStatus.PENDING;
-            }
+        for (const entry of allEntries) {
+            this.pluginStatus[entry.id] = entry.enabled ? PluginStatus.PENDING : PluginStatus.DISABLED;
         }
 
-        const enabledPlugins = allPluginNames.filter(name => !name.startsWith('~'));
+        const enabledPlugins = allEntries.filter(entry => entry.enabled).map(entry => entry.id);
 
         const currentlyLoaded = Object.keys(this.plugins);
         for (const loadedName of currentlyLoaded) {
@@ -212,13 +269,13 @@ export class PluginLoader {
 
             this.plugins[pluginName] = pluginInstance;
 
-            // ### NEW CONFIG LOGIC ###
-            const rawConfig = (this.config.plugins && this.config.plugins[pluginName]) || {};
-            const schema = pluginInstance.config || Schema.object({}); // The schema is exported as 'config'
-            const finalConfig = fallback(schema, rawConfig);
-            // Update the in-memory config with the fully resolved one
-            this.config.plugins[pluginName] = finalConfig;
-            // ### END NEW CONFIG LOGIC ###
+            const entry = this.getPluginEntry(pluginName);
+            if (!entry) {
+                throw new Error(`Plugin configuration not found for instance "${pluginName}".`);
+            }
+            const schema = pluginInstance.config || Schema.object({});
+            const finalConfig = fallback(schema, entry.config);
+            this.setPluginConfig(pluginName, finalConfig);
 
             const context = this.getContext(pluginName, {});
 
@@ -235,13 +292,14 @@ export class PluginLoader {
 
             if (this.isDev) {
                 let pluginPathToWatch: string | null = null;
+                const moduleName = entry.moduleName;
                 try {
-                    const packageJsonUrl = import.meta.resolve(`${pluginName}/package.json`);
+                    const packageJsonUrl = import.meta.resolve(`${moduleName}/package.json`);
                     const pkgJsonPath = fileURLToPath(packageJsonUrl);
                     pluginPathToWatch = path.dirname(pkgJsonPath);
                 } catch (e) {
-                    const localPluginPath = path.resolve(process.cwd(), pluginName);
-                    const localPluginPathInPlugins = path.resolve(process.cwd(), 'plugins', pluginName);
+                    const localPluginPath = path.resolve(process.cwd(), moduleName);
+                    const localPluginPathInPlugins = path.resolve(process.cwd(), 'plugins', moduleName);
                     if (fs.existsSync(localPluginPath)) {
                         pluginPathToWatch = localPluginPath;
                     } else if (fs.existsSync(localPluginPathInPlugins)) {
@@ -378,10 +436,11 @@ export class PluginLoader {
     }
 
     async loadModule(pluginName: string): Promise<Plugin> {
-        const pluginModule = await import(pluginName);
+        const entry = this.getPluginEntry(pluginName);
+        if (!entry) throw new Error(`Plugin configuration not found for instance "${pluginName}".`);
+        const pluginModule = await import(entry.moduleName);
         const context = this.getContext(pluginName, {});
-        const rawConfig = (this.config.plugins && this.config.plugins[pluginName]) || {};
-        return resolvePluginModule(pluginModule, context, rawConfig) as Plugin;
+        return resolvePluginModule(pluginModule, context, entry.config) as Plugin;
     }
 
     async checkPluginDependencies(pluginPath: string): Promise<boolean> {

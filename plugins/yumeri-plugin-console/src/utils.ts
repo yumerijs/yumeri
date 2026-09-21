@@ -33,7 +33,8 @@ export class PluginConfigManager {
      */
     async getPluginConfig(pluginName: string, langs?: string[]): Promise<any> {
         const actualPluginName = pluginName.startsWith('~') ? pluginName.substring(1) : pluginName;
-        const config = this.loader.config.plugins[actualPluginName] || {};
+        const entry = this.loader.getPluginEntry?.(actualPluginName);
+        const config = entry?.config ?? {};
 
         const pluginInstance = this.loader.plugins[actualPluginName];
         const schema = pluginInstance?.config;
@@ -42,7 +43,6 @@ export class PluginConfigManager {
             return [];
         }
 
-        // 将用户配置与 schema 默认值合并，避免缺少默认值导致前端结构错误
         const mergedValue = fallback(schema, config);
 
         const mergedConfig: any[] = [];
@@ -73,14 +73,8 @@ export class PluginConfigManager {
         const isDisabled = pluginName.startsWith('~');
 
         try {
-            // Update the in-memory configuration
-            if (isDisabled) {
-                this.loader.config.plugins[`~${actualPluginName}`] = config;
-            } else {
-                this.loader.config.plugins[actualPluginName] = config;
-            }
+            if (!this.loader.setPluginConfig(actualPluginName, config)) return false;
 
-            // Save the entire configuration to disk
             await this.loader.saveConfig();
 
             // Reload the plugin if needed
