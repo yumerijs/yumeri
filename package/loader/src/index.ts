@@ -2,12 +2,14 @@ import * as path from 'path';
 import { Core, Config, Logger, Context, PluginStatus, fallback, Schema, I18n, resolvePluginModule } from '@yumerijs/core';
 import * as fs from 'fs';
 import { promisify } from 'util';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
+import { createInterface } from 'readline/promises';
+import { stdin as input, stdout as output } from 'process';
 import { fileURLToPath } from 'url';
 import * as yaml from 'js-yaml';
 import * as chokidar from 'chokidar';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 // This interface should probably be in @yumerijs/types
 interface Plugin {
@@ -435,10 +437,96 @@ export class PluginLoader {
         this.pluginWatchers[pluginName] = watcher;
     }
 
+    private isMissingModuleError(error: unknown, moduleName: string): boolean {
+        const candidate = error as NodeJS.ErrnoException & { message?: string };
+        if (candidate?.code !== 'ERR_MODULE_NOT_FOUND') return false;
+        return typeof candidate.message === 'string' && candidate.message.includes(moduleName);
+    }
+
+    private isNpxInvocation(): boolean {
+        const argv = process.argv.map(value => value.toLowerCase());
+        const env = process.env;
+        return Boolean(
+            env.npm_config_npx_command ||
+            env.npm_command === 'exec' ||
+            argv.some(value => /(?:^|[\\/])npx(?:\.cmd)?$/.test(value)) ||
+            (env._ && /(?:^|[\\/])npx(?:\.cmd)?$/.test(env._.toLowerCase()))
+        );
+    }
+
+    private detectPackageManager(): string {
+        const cwd = process.cwd();
+        try {
+            const packageJsonPath = path.join(cwd, 'package.json');
+            if (fs.existsSync(packageJsonPath)) {
+                const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+                if (typeof packageJson.packageManager === 'string') {
+                    return packageJson.packageManager.split('@')[0];
+                }
+            }
+        } catch {
+            // Fall back to lockfile detection when package.json is unavailable or invalid.
+        }
+
+        if (fs.existsSync(path.join(cwd, 'pnpm-lock.yaml'))) return 'pnpm';
+        if (fs.existsSync(path.join(cwd, 'yarn.lock'))) return 'yarn';
+        if (fs.existsSync(path.join(cwd, 'bun.lockb')) || fs.existsSync(path.join(cwd, 'bun.lock'))) return 'bun';
+        return 'npm';
+    }
+
+    private async confirmPluginInstall(moduleName: string): Promise<boolean> {
+        if (!input.isTTY || !output.isTTY) {
+            this.logger.warn(`Plugin package "${moduleName}" is not installed and no interactive terminal is available.`);
+            return false;
+        }
+
+        const scope = this.isNpxInvocation() ? 'globally' : 'in the current project';
+        const readline = createInterface({ input, output });
+        try {
+            const answer = await readline.question(
+                `Plugin package "${moduleName}" is not installed. Install it ${scope}? [y/N] `
+            );
+            return /^(y|yes)$/i.test(answer.trim());
+        } finally {
+            readline.close();
+        }
+    }
+
+    private async installMissingPlugin(moduleName: string): Promise<void> {
+        const packageManager = this.detectPackageManager();
+        const global = this.isNpxInvocation();
+        const argsByManager: Record<string, string[]> = {
+            npm: global ? ['install', '--global', moduleName] : ['install', moduleName, '--save'],
+            yarn: global ? ['global', 'add', moduleName] : ['add', moduleName],
+            pnpm: global ? ['add', '--global', moduleName] : ['add', moduleName],
+            bun: global ? ['add', '--global', moduleName] : ['add', moduleName],
+        };
+        const args = argsByManager[packageManager] || argsByManager.npm;
+        const command = process.platform === 'win32' ? `${packageManager}.cmd` : packageManager;
+
+        this.logger.info(
+            `Installing missing plugin "${moduleName}" with ${command} ${args.join(' ')}` +
+            (global ? ' (global)' : '')
+        );
+        await execFileAsync(command, args, { cwd: process.cwd() });
+    }
+
+    private async importPluginModule(moduleName: string): Promise<any> {
+        try {
+            return await import(moduleName);
+        } catch (error) {
+            if (!this.isMissingModuleError(error, moduleName)) throw error;
+            const shouldInstall = await this.confirmPluginInstall(moduleName);
+            if (!shouldInstall) throw error;
+            await this.installMissingPlugin(moduleName);
+            return await import(moduleName);
+        }
+    }
+
     async loadModule(pluginName: string): Promise<Plugin> {
         const entry = this.getPluginEntry(pluginName);
         if (!entry) throw new Error(`Plugin configuration not found for instance "${pluginName}".`);
-        const pluginModule = await import(entry.moduleName);
+        const pluginModule = await this.importPluginModule(entry.moduleName);
         const context = this.getContext(pluginName, {});
         return resolvePluginModule(pluginModule, context, entry.config) as Plugin;
     }
@@ -448,18 +536,7 @@ export class PluginLoader {
     }
 
     async installPluginDependencies(pluginName: string): Promise<void> {
-        try {
-            this.logger.info(`Installing dependencies for plugin: ${pluginName}`);
-            const { stdout, stderr } = await execAsync(`npm install ${pluginName} --save`);
-            this.logger.info(`stdout: ${stdout}`);
-            if (stderr) {
-                this.logger.error(`stderr: ${stderr}`);
-            }
-            this.logger.info(`Dependencies installed for plugin: ${pluginName}`);
-        } catch (error: any) {
-            this.logger.error(`Error installing dependencies for plugin ${pluginName}:`, error);
-            throw error;
-        }
+        await this.installMissingPlugin(pluginName);
     }
 }
 
