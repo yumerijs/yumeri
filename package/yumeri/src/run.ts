@@ -19,41 +19,76 @@ function migrateConfig(yamlPath: string, jsonPath: string) {
   }
 }
 
+function getCliOptions(args: string[]) {
+  let configPath: string | undefined;
+  let appDir: string | undefined;
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === '--config' || arg === '-c') {
+      configPath = args[++index];
+      if (!configPath) {
+        throw new Error('Missing value for --config. Usage: yumeri --config <path>');
+      }
+      continue;
+    }
+    if (arg.startsWith('--config=')) {
+      configPath = arg.slice('--config='.length);
+      if (!configPath) {
+        throw new Error('Missing value for --config. Usage: yumeri --config <path>');
+      }
+      continue;
+    }
+    if (!arg.startsWith('-') && !appDir) {
+      appDir = arg;
+    }
+  }
+
+  return { configPath, appDir };
+}
+
 export async function runMain() {
   try {
     const loader = new PluginLoader()
 
     const cwd = process.cwd()
+    const cliOptions = getCliOptions(process.argv.slice(2));
     const jsonConfigPath = path.join(cwd, 'yumeri.json')
     const yamlConfigPath = path.join(cwd, 'config.yml')
 
-    if (fs.existsSync(yamlConfigPath) && !fs.existsSync(jsonConfigPath)) {
-      migrateConfig(yamlConfigPath, jsonConfigPath);
-    }
-
-    let configPathToLoad: string | null = null;
-
-    if (fs.existsSync(jsonConfigPath)) {
-      configPathToLoad = jsonConfigPath;
-    } else if (fs.existsSync(yamlConfigPath)) {
-      configPathToLoad = yamlConfigPath;
-    }
-
-    if (!configPathToLoad) {
-      if (fs.existsSync(yamlConfigPath + '.migrated')) {
-         console.error(`Configuration file 'yumeri.json' not found.`);
-      } else {
-         console.error('Configuration file (yumeri.json or config.yml) not found.');
+    if (cliOptions.configPath) {
+      const explicitConfigPath = path.resolve(cwd, cliOptions.configPath);
+      if (!fs.existsSync(explicitConfigPath)) {
+        throw new Error(`Configuration file not found: ${explicitConfigPath}`);
       }
-      process.exit(1);
+      await loader.loadConfig(explicitConfigPath);
+    } else {
+      if (fs.existsSync(yamlConfigPath) && !fs.existsSync(jsonConfigPath)) {
+        migrateConfig(yamlConfigPath, jsonConfigPath);
+      }
+
+      let configPathToLoad: string | null = null;
+
+      if (fs.existsSync(jsonConfigPath)) {
+        configPathToLoad = jsonConfigPath;
+      } else if (fs.existsSync(yamlConfigPath)) {
+        configPathToLoad = yamlConfigPath;
+      }
+
+      if (!configPathToLoad) {
+        if (fs.existsSync(yamlConfigPath + '.migrated')) {
+          throw new Error(`Configuration file 'yumeri.json' not found.`);
+        }
+        throw new Error('Configuration file (yumeri.json or config.yml) not found.');
+      }
+
+      await loader.loadConfig(configPathToLoad)
     }
-    
-    await loader.loadConfig(configPathToLoad)
 
     await loader.loadPlugins()
 
     // 加载本地 APP 模块
-    const appDir = process.argv[2] || 'dist'
+    const appDir = cliOptions.appDir || 'dist'
     const appPath = path.resolve(cwd, appDir)
     const indexPath = path.join(appPath, 'index.js')
 

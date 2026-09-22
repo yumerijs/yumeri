@@ -73,6 +73,8 @@ async function main() {
             .allowUnknownOptions()
             .action(startWorker)
 
+        cli.globalCommand.action(startWorker)
+        cli.option('--config, -c <path>', 'Path to the Yumeri configuration file')
         cli.help()
         cli.version(pkg.version)
 
