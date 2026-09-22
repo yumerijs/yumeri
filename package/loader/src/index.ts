@@ -193,6 +193,9 @@ export class PluginLoader {
             return;
         }
 
+        // Resolve and install every configured plugin before any plugin module is loaded.
+        await this.installMissingPluginModules(allEntries.filter(entry => entry.enabled));
+
         // 第一阶段：将 optional 与 depend 一样处理，尽量让可选服务先完成加载并注入。
         while (await this._loadPendingPlugins(true)) {
             // Continue scanning until no plugin can satisfy all required and optional dependencies.
@@ -496,7 +499,37 @@ export class PluginLoader {
         }
     }
 
+    private isPluginModuleResolvable(moduleName: string): boolean {
+        try {
+            import.meta.resolve(moduleName);
+            return true;
+        } catch (error) {
+            if (this.isMissingModuleError(error, moduleName)) return false;
+            throw error;
+        }
+    }
+
+    private async installMissingPluginModules(entries: PluginConfigEntry[]): Promise<void> {
+        const missingModules = [...new Set(entries.map(entry => entry.moduleName))]
+            .filter(moduleName => !this.isPluginModuleResolvable(moduleName));
+
+        for (const moduleName of missingModules) {
+            const shouldInstall = await this.confirmPluginInstall(moduleName);
+            if (!shouldInstall) continue;
+
+            try {
+                await this.installMissingPlugin(moduleName);
+            } catch (error) {
+                this.logger.error(`Failed to install missing plugin "${moduleName}":`, error);
+            }
+        }
+    }
+
     private async installMissingPlugin(moduleName: string): Promise<void> {
+        if (!/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/i.test(moduleName)) {
+            throw new Error(`Cannot automatically install invalid package name "${moduleName}".`);
+        }
+
         const packageManager = this.detectPackageManager();
         const global = this.isNpxInvocation();
         const argsByManager: Record<string, string[]> = {
@@ -512,19 +545,23 @@ export class PluginLoader {
             `Installing missing plugin "${moduleName}" with ${command} ${args.join(' ')}` +
             (global ? ' (global)' : '')
         );
+        // Windows command shims (for example npm.cmd) require cmd.exe; execFile
+        // otherwise fails before the package manager can start with spawn EINVAL.
+        if (process.platform === 'win32') {
+            await execFileAsync(process.env.ComSpec || 'cmd.exe', [
+                '/d',
+                '/s',
+                '/c',
+                `${command} ${args.join(' ')}`,
+            ], { cwd: process.cwd() });
+            return;
+        }
+
         await execFileAsync(command, args, { cwd: process.cwd() });
     }
 
     private async importPluginModule(moduleName: string): Promise<any> {
-        try {
-            return await import(moduleName);
-        } catch (error) {
-            if (!this.isMissingModuleError(error, moduleName)) throw error;
-            const shouldInstall = await this.confirmPluginInstall(moduleName);
-            if (!shouldInstall) throw error;
-            await this.installMissingPlugin(moduleName);
-            return await import(moduleName);
-        }
+        return await import(moduleName);
     }
 
     async loadModule(pluginName: string): Promise<Plugin> {
