@@ -16,6 +16,7 @@ interface Plugin {
     apply: (ctx: Context, config: Config) => Promise<void>;
     disable: (ctx: Context) => Promise<void>;
     depend: Array<string>;
+    optional?: Array<string>;
     provide: Array<string>;
     render?: string;
     config?: Schema<any>;
@@ -34,7 +35,7 @@ export class PluginLoader {
     public core: Core;
     public config: any = null;
     public logger = new Logger('loader');
-    public plugins: { [name: string]: Plugin & { depend?: string[]; provide?: string[] } } = {};
+    public plugins: { [name: string]: Plugin & { depend?: string[]; optional?: string[]; provide?: string[] } } = {};
     public pluginStatus: Record<string, PluginStatus> = {};
     private pluginWatchers: Record<string, chokidar.FSWatcher> = {};
     private pluginModules: { [name: string]: any } = {};
@@ -192,29 +193,23 @@ export class PluginLoader {
             return;
         }
 
-        let loadedInLastPass = true;
-        while (loadedInLastPass) {
-            loadedInLastPass = false;
-            for (const pluginName of enabledPlugins) {
-                if (this.pluginStatus[pluginName] === PluginStatus.ENABLED) {
-                    continue;
-                }
-                const success = await this.loadSinglePlugin(pluginName, false);
-                if (success) {
-                    loadedInLastPass = true;
-                }
-            }
+        // 第一阶段：将 optional 与 depend 一样处理，尽量让可选服务先完成加载并注入。
+        while (await this._loadPendingPlugins(true)) {
+            // Continue scanning until no plugin can satisfy all required and optional dependencies.
         }
 
-        await this._loadPendingPlugins();
+        // 第二阶段：严格扫描无法推进后，忽略尚未提供的 optional；depend 仍必须满足。
+        while (await this._loadPendingPlugins(false)) {
+            // Continue scanning in relaxed mode until only genuinely missing dependencies remain.
+        }
 
         const pendingPlugins = Object.keys(this.pluginStatus).filter(p => this.pluginStatus[p] === PluginStatus.PENDING);
         if (pendingPlugins.length > 0) {
-            // this.logger.warn('Some plugins could not be loaded due to unresolved dependencies:', pendingPlugins);
+            this.logger.warn('Some plugins could not be loaded due to unresolved required dependencies:', pendingPlugins);
         }
     }
 
-    public async loadSinglePlugin(pluginName: string, triggerPendingCheck: boolean = true, onlypending: boolean = false): Promise<boolean> {
+    public async loadSinglePlugin(pluginName: string, triggerPendingCheck: boolean = true, onlypending: boolean = false, requireOptionalDependencies: boolean = true): Promise<boolean> {
         if (!this.pluginStatus[pluginName]) {
             this.pluginStatus[pluginName] = PluginStatus.PENDING;
         }
@@ -262,7 +257,10 @@ export class PluginLoader {
                 }
             }
 
-            const deps = pluginInstance.depend || [];
+            const deps = [
+                ...(pluginInstance.depend || []),
+                ...(requireOptionalDependencies ? (pluginInstance.optional || []) : []),
+            ];
             const unmetDependencies = deps.filter(dep => !this.core.components[dep] && !this.core.services[dep]);
 
             if (unmetDependencies.length > 0) {
@@ -289,7 +287,7 @@ export class PluginLoader {
             this.pluginStatus[pluginName] = PluginStatus.ENABLED;
 
             if (triggerPendingCheck) {
-                await this._loadPendingPlugins();
+                await this._loadPendingPlugins(requireOptionalDependencies);
             }
 
             if (this.isDev) {
@@ -323,13 +321,16 @@ export class PluginLoader {
         }
     }
 
-    private async _loadPendingPlugins(): Promise<void> {
+    private async _loadPendingPlugins(requireOptionalDependencies: boolean = true): Promise<boolean> {
         const pendingPlugins = Object.keys(this.pluginStatus).filter(p => this.pluginStatus[p] === PluginStatus.PENDING);
-        if (pendingPlugins.length === 0) return;
+        let loadedAny = false;
 
         for (const pluginName of pendingPlugins) {
-            await this.loadSinglePlugin(pluginName, false);
+            const loaded = await this.loadSinglePlugin(pluginName, false, true, requireOptionalDependencies);
+            loadedAny ||= loaded;
         }
+
+        return loadedAny;
     }
 
     public async unloadPlugin(pluginNameToUnload: string, ispending = false): Promise<void> {
@@ -394,7 +395,10 @@ export class PluginLoader {
         this.logger.info(`Reloading plugin: "${pluginName}"...`);
         await this.reloadConfigFile();
         await this.unloadPlugin(pluginName, true);
-        const success = await this.loadSinglePlugin(pluginName, true, false);
+        let success = await this.loadSinglePlugin(pluginName, true, false, true);
+        if (!success) {
+            success = await this.loadSinglePlugin(pluginName, true, false, false);
+        }
         if (success) {
             this.logger.info(`Plugin "${pluginName}" reloaded successfully.`);
             this.core.emit('plugin-reloaded', pluginName);

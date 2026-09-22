@@ -21,6 +21,7 @@ export interface Plugin {
   apply?: (ctx: Context, config: Config) => Promise<void> | void;
   disable?: (ctx: Context) => Promise<void> | void;
   depend?: Array<string>;
+  optional?: Array<string>;
   provide?: Array<string>;
   render?: string;
   config?: Schema<any>;
@@ -32,6 +33,7 @@ type PluginModuleLike = Plugin | PluginConstructor | ((ctx: Context, config: Con
   apply?: ((ctx: Context, config: Config) => Promise<void> | void);
   disable?: (ctx: Context) => Promise<void> | void;
   depend?: Array<string>;
+  optional?: Array<string>;
   provide?: Array<string>;
   render?: string;
   config?: Schema<any>;
@@ -46,6 +48,7 @@ function isClassPlugin(value: unknown): value is PluginConstructor {
 function mergePluginMeta(target: Plugin, source: any): Plugin {
   if (!source || typeof source !== 'object') return target;
   if (target.depend == null && Array.isArray(source.depend)) target.depend = source.depend;
+  if (target.optional == null && Array.isArray(source.optional)) target.optional = source.optional;
   if (target.provide == null && Array.isArray(source.provide)) target.provide = source.provide;
   if (target.render == null && typeof source.render === 'string') target.render = source.render;
   if (target.config == null && source.config) target.config = source.config;
@@ -225,9 +228,9 @@ export class Core {
     const shortName = this.getShortPluginName(context.pluginname);
     context.module = plugin;
 
-    // 自动依赖注入
-    const depend = plugin.depend || [];
-    for (const name of depend) {
+    // 自动依赖注入：必需依赖始终由 loader 保证，optional 仅在已提供时注入。
+    const dependencies = [...(plugin.depend || []), ...(plugin.optional || [])];
+    for (const name of dependencies) {
       const component = this.getComponent(name);
       if (component) {
         context.inject(name, component);
