@@ -5,6 +5,8 @@
  **/
 
 import * as pcc from 'picocolors';
+import { createInterface } from 'readline/promises';
+import { stdin, stdout } from 'process';
 import { Core } from './core.js';
 type LogLevel = 'info' | 'warn' | 'error' | 'debug';
 const { createColors } = pcc;
@@ -83,5 +85,29 @@ export class Logger {
 
   error(...args: any[]) {
     this.log('E', ...args);
+  }
+
+  /**
+   * Display an interactive prompt and resolve with the entered text.
+   * The answer is deliberately not added to the log stream because it may be sensitive.
+   */
+  async input(question: string): Promise<string> {
+    if (!stdin.isTTY || !stdout.isTTY) {
+      throw new Error('Logger input requires an interactive terminal.');
+    }
+
+    const readline = createInterface({ input: stdin, output: stdout });
+    const timestamp = this.getTimestamp();
+    const prefix = `${pc.gray(timestamp)} [${pc.cyan('I')}] ${this.titleColor(this.title)} `;
+    try {
+      return await readline.question(`${prefix}${question}`);
+    } finally {
+      readline.close();
+    }
+  }
+
+  /** Alias for input(), for callers that prefer prompt terminology. */
+  async prompt(question: string): Promise<string> {
+    return await this.input(question);
   }
 }

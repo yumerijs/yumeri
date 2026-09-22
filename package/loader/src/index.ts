@@ -3,8 +3,6 @@ import { Core, Config, Logger, Context, PluginStatus, fallback, Schema, I18n, re
 import * as fs from 'fs';
 import { promisify } from 'util';
 import { execFile } from 'child_process';
-import { createInterface } from 'readline/promises';
-import { stdin as input, stdout as output } from 'process';
 import { fileURLToPath } from 'url';
 import * as yaml from 'js-yaml';
 import * as chokidar from 'chokidar';
@@ -42,6 +40,8 @@ export class PluginLoader {
     private configPath: string = '';
     private pluginContexts: Record<string, Context> = {};
     private isDev: boolean = false;
+    /** Install every missing configured plugin without prompting. */
+    public autoInstallMissingPlugins: boolean = false;
 
     constructor(core?: Core, private pluginsDir: string = 'plugins') {
         this.core = core || new Core(this, undefined, false);
@@ -164,10 +164,10 @@ export class PluginLoader {
 
 
 
-    async loadPlugins(): Promise<void> {
+    async loadPlugins(): Promise<boolean> {
         if (!this.config || typeof this.config.plugins !== 'object' || this.config.plugins === null) {
             this.logger.info('No plugins configuration found. No plugins to load.');
-            return;
+            return false;
         }
 
         const allEntries = Object.keys(this.config.plugins)
@@ -190,11 +190,15 @@ export class PluginLoader {
 
         if (enabledPlugins.length === 0) {
             this.logger.info('No enabled plugins found in configuration.');
-            return;
+            return false;
         }
 
         // Resolve and install every configured plugin before any plugin module is loaded.
-        await this.installMissingPluginModules(allEntries.filter(entry => entry.enabled));
+        const installedMissingPlugins = await this.installMissingPluginModules(allEntries.filter(entry => entry.enabled));
+        if (installedMissingPlugins) {
+            this.logger.info('Missing plugin packages were installed. A worker restart is required before loading plugins.');
+            return true;
+        }
 
         // 第一阶段：将 optional 与 depend 一样处理，尽量让可选服务先完成加载并注入。
         while (await this._loadPendingPlugins(true)) {
@@ -210,6 +214,8 @@ export class PluginLoader {
         if (pendingPlugins.length > 0) {
             this.logger.warn('Some plugins could not be loaded due to unresolved required dependencies:', pendingPlugins);
         }
+
+        return false;
     }
 
     public async loadSinglePlugin(pluginName: string, triggerPendingCheck: boolean = true, onlypending: boolean = false, requireOptionalDependencies: boolean = true): Promise<boolean> {
@@ -482,21 +488,16 @@ export class PluginLoader {
     }
 
     private async confirmPluginInstall(moduleName: string): Promise<boolean> {
-        if (!input.isTTY || !output.isTTY) {
+        if (!process.stdin.isTTY || !process.stdout.isTTY) {
             this.logger.warn(`Plugin package "${moduleName}" is not installed and no interactive terminal is available.`);
             return false;
         }
 
         const scope = this.isNpxInvocation() ? 'globally' : 'in the current project';
-        const readline = createInterface({ input, output });
-        try {
-            const answer = await readline.question(
-                `Plugin package "${moduleName}" is not installed. Install it ${scope}? [y/N] `
-            );
-            return /^(y|yes)$/i.test(answer.trim());
-        } finally {
-            readline.close();
-        }
+        const answer = await this.logger.input(
+            `Plugin package "${moduleName}" is not installed. Install it ${scope}? [y/N] `
+        );
+        return /^(y|yes)$/i.test(answer.trim());
     }
 
     private isPluginModuleResolvable(moduleName: string): boolean {
@@ -509,40 +510,60 @@ export class PluginLoader {
         }
     }
 
-    private async installMissingPluginModules(entries: PluginConfigEntry[]): Promise<void> {
+    private async installMissingPluginModules(entries: PluginConfigEntry[]): Promise<boolean> {
         const missingModules = [...new Set(entries.map(entry => entry.moduleName))]
             .filter(moduleName => !this.isPluginModuleResolvable(moduleName));
+        if (missingModules.length === 0) return false;
 
+        if (this.autoInstallMissingPlugins) {
+            this.logger.info(`Automatically installing missing plugin packages: ${missingModules.join(', ')}`);
+            try {
+                await this.installMissingPlugin(missingModules);
+                return true;
+            } catch (error) {
+                this.logger.error('Failed to automatically install missing plugin packages:', error);
+                return false;
+            }
+        }
+
+        let installedAny = false;
         for (const moduleName of missingModules) {
             const shouldInstall = await this.confirmPluginInstall(moduleName);
             if (!shouldInstall) continue;
 
             try {
                 await this.installMissingPlugin(moduleName);
+                installedAny = true;
             } catch (error) {
                 this.logger.error(`Failed to install missing plugin "${moduleName}":`, error);
             }
         }
+
+        return installedAny;
     }
 
-    private async installMissingPlugin(moduleName: string): Promise<void> {
-        if (!/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/i.test(moduleName)) {
-            throw new Error(`Cannot automatically install invalid package name "${moduleName}".`);
+    private async installMissingPlugin(moduleNames: string | string[]): Promise<void> {
+        const packages = Array.isArray(moduleNames) ? moduleNames : [moduleNames];
+        for (const moduleName of packages) {
+            if (!/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/i.test(moduleName)) {
+                throw new Error(`Cannot automatically install invalid package name "${moduleName}".`);
+            }
         }
 
         const packageManager = this.detectPackageManager();
         const global = this.isNpxInvocation();
         const argsByManager: Record<string, string[]> = {
-            npm: global ? ['install', '--global', moduleName] : ['install', moduleName, '--save'],
-            yarn: global ? ['global', 'add', moduleName] : ['add', moduleName],
-            pnpm: global ? ['add', '--global', moduleName] : ['add', moduleName],
-            bun: global ? ['add', '--global', moduleName] : ['add', moduleName],
+            npm: global ? ['install', '--global', ...packages] : ['install', ...packages, '--save'],
+            yarn: global ? ['global', 'add', ...packages] : ['add', ...packages],
+            pnpm: global ? ['add', '--global', ...packages] : ['add', ...packages],
+            bun: global ? ['add', '--global', ...packages] : ['add', ...packages],
         };
         const args = argsByManager[packageManager] || argsByManager.npm;
         const command = process.platform === 'win32' ? `${packageManager}.cmd` : packageManager;
+        const packageLabel = packages.map(moduleName => `"${moduleName}"`).join(', ');
 
         this.logger.info(
-            `Installing missing plugin "${moduleName}" with ${command} ${args.join(' ')}` +
+            `Installing missing plugin package${packages.length === 1 ? '' : 's'} ${packageLabel} with ${command} ${args.join(' ')}` +
             (global ? ' (global)' : '')
         );
         // Windows command shims (for example npm.cmd) require cmd.exe; execFile

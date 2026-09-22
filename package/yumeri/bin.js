@@ -9,6 +9,7 @@ const require = createRequire(import.meta.url)
 const pkg = require('./package.json')
 
 const __filename = fileURLToPath(import.meta.url)
+const WORKER_RESTART_EXIT_CODE = 10
 
 function startWorker() {
     const args = process.argv.slice(2)
@@ -36,7 +37,7 @@ function startWorker() {
             return
         }
 
-        if (code === 10) {
+        if (code === WORKER_RESTART_EXIT_CODE) {
             console.log('[Manager] Restarting.')
             setTimeout(startWorker, 2000)
             return
@@ -75,6 +76,7 @@ async function main() {
 
         cli.globalCommand.action(startWorker)
         cli.option('--config, -c <path>', 'Path to the Yumeri configuration file')
+        cli.option('--auto-install', 'Install all missing plugin packages without confirmation')
         cli.help()
         cli.version(pkg.version)
 

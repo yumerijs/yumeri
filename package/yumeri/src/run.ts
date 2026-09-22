@@ -5,6 +5,7 @@ import * as path from 'path'
 import * as yaml from 'js-yaml'
 import { pathToFileURL } from 'url'
 
+const WORKER_RESTART_EXIT_CODE = 10
 function migrateConfig(yamlPath: string, jsonPath: string) {
   try {
     console.log('Found config.yml, migrating to yumeri.json...');
@@ -22,6 +23,7 @@ function migrateConfig(yamlPath: string, jsonPath: string) {
 function getCliOptions(args: string[]) {
   let configPath: string | undefined;
   let appDir: string | undefined;
+  let autoInstall = false;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -39,12 +41,16 @@ function getCliOptions(args: string[]) {
       }
       continue;
     }
+    if (arg === '--auto-install') {
+      autoInstall = true;
+      continue;
+    }
     if (!arg.startsWith('-') && !appDir) {
       appDir = arg;
     }
   }
 
-  return { configPath, appDir };
+  return { configPath, appDir, autoInstall };
 }
 
 export async function runMain() {
@@ -53,6 +59,7 @@ export async function runMain() {
 
     const cwd = process.cwd()
     const cliOptions = getCliOptions(process.argv.slice(2));
+    loader.autoInstallMissingPlugins = cliOptions.autoInstall;
     const jsonConfigPath = path.join(cwd, 'yumeri.json')
     const yamlConfigPath = path.join(cwd, 'config.yml')
 
@@ -85,7 +92,12 @@ export async function runMain() {
       await loader.loadConfig(configPathToLoad)
     }
 
-    await loader.loadPlugins()
+    const restartRequired = await loader.loadPlugins()
+    if (restartRequired) {
+      console.log('Missing plugin packages were installed. Restarting the worker to load them.');
+      process.exitCode = WORKER_RESTART_EXIT_CODE;
+      return;
+    }
 
     // 加载本地 APP 模块
     const appDir = cliOptions.appDir || 'dist'
