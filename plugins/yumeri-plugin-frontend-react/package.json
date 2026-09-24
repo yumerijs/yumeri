@@ -1,0 +1,38 @@
+{
+  "name": "yumeri-plugin-frontend-react",
+  "version": "1.0.0",
+  "description": "React frontend framework service for Yumeri",
+  "main": "dist/index.js",
+  "dev": "src/index.ts",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "frontend",
+    "static"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc -p frontend/tsconfig.json --noEmit && vite build"
+  },
+  "keywords": [
+    "yumeri",
+    "react",
+    "frontend"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.15.19",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "@vitejs/plugin-react": "^4.4.1",
+    "typescript": "^6.0.3",
+    "vite": "^6.3.3"
+  },
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "peerDependencies": {
+    "yumeri": "^3.0.0"
+  },
+  "type": "module"
+}
