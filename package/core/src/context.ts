@@ -420,15 +420,15 @@ export class Context {
             });
         }
 
-        // 卸载子插件（异步即可，不必按顺序）
-        this.childPlugins.forEach(async (plugin, ctx) => {
+        // 卸载子插件
+        for (const [ctx, plugin] of this.childPlugins) {
             if (plugin?.disable) await plugin.disable(ctx);
-        });
+        }
 
         // 删除子上下文
-        this.childContexts.forEach((ctx) => {
-            if (ctx?.dispose) ctx.dispose();
-        });
+        for (const ctx of this.childContexts) {
+            await ctx.dispose();
+        }
 
         // 删除i18n
         if (this.i18ns?.length) {

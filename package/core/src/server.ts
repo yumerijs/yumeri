@@ -36,6 +36,7 @@ export class Server {
     private port: number;
     private host: string;
     private enableCors: boolean;
+    private enableWs: boolean;
     private httpServer: http.Server | null = null;
 
     constructor(core: Core, config: Partial<ServerConfig> = {}) {
@@ -43,6 +44,7 @@ export class Server {
         this.port = config.port ?? 14510;
         this.host = config.host ?? '0.0.0.0';
         this.enableCors = config.enableCors ?? true;
+        this.enableWs = config.enableWs ?? false;
     }
 
     /**
@@ -204,6 +206,12 @@ export class Server {
 
         // 处理 WebSocket 升级
         this.httpServer.on('upgrade', async (req, socket, head) => {
+            if (!this.enableWs) {
+                socket.write('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n');
+                socket.destroy();
+                return;
+            }
+
             const url = new URL(req.url || '/', `http://${req.headers.host}`);
             const pathname = url.pathname;
             const queryParams = url.searchParams;
