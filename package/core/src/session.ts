@@ -380,10 +380,32 @@ export class Session {
    * 获取请求体文本
    */
   public async getReqBody(req: IncomingMessage): Promise<string> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       let body = "";
-      req.on('data', chunk => body += chunk.toString());
-      req.on('end', () => resolve(body));
+      const cleanup = () => {
+        req.off('data', onData);
+        req.off('end', onEnd);
+        req.off('error', onError);
+        req.off('aborted', onAborted);
+      };
+      const onData = (chunk: Buffer | string) => body += chunk.toString();
+      const onEnd = () => {
+        cleanup();
+        resolve(body);
+      };
+      const onError = (error: Error) => {
+        cleanup();
+        reject(error);
+      };
+      const onAborted = () => {
+        cleanup();
+        reject(new Error('Request body was aborted.'));
+      };
+
+      req.on('data', onData);
+      req.once('end', onEnd);
+      req.once('error', onError);
+      req.once('aborted', onAborted);
     });
   }
 
