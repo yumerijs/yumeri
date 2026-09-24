@@ -114,6 +114,10 @@ export const enum PluginStatus {
 
 export class Core {
   public emitter = new EventEmitter();
+  private eventListeners: Map<string, Array<{
+    listener: (...args: any[]) => Promise<void>;
+    wrapped: (...args: any[]) => void;
+  }>> = new Map();
   public components: { [name: string]: any } = {};
   public services: { [name: string]: new (context: Context) => Service } = {};
   public routes: Record<string, Route> = {};
@@ -273,12 +277,16 @@ export class Core {
   }
 
   on(event: string, listener: (...args: any[]) => Promise<void>): void {
-    this.emitter.on(event, (...args) => {
+    const wrapped = (...args: any[]) => {
       // 包一层保证 async 可以被捕获
       Promise.resolve(listener(...args)).catch((err) => {
         console.error(`Error in event listener for "${event}":`, err);
       });
-    });
+    };
+    this.emitter.on(event, wrapped);
+    const listeners = this.eventListeners.get(event) || [];
+    listeners.push({ listener, wrapped });
+    this.eventListeners.set(event, listeners);
   }
 
   emit(event: string, ...payload: any): void {
@@ -287,9 +295,17 @@ export class Core {
 
   // 删除监听器
   off(event: string, listener: (...args: any[]) => Promise<void>): void {
-    // 原生 EventEmitter 必须删“同一个函数引用”
-    // 所以必须包装一致，这里我们直接用 listener 本体删
-    this.emitter.off(event, listener as any);
+    const listeners = this.eventListeners.get(event);
+    if (!listeners) return;
+
+    const index = listeners.findIndex(item => item.listener === listener);
+    if (index === -1) return;
+
+    const [{ wrapped }] = listeners.splice(index, 1);
+    this.emitter.off(event, wrapped);
+    if (listeners.length === 0) {
+      this.eventListeners.delete(event);
+    }
   }
 
   use(name: string, middleware: Middleware): Core {
