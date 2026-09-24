@@ -180,10 +180,22 @@ export class Server {
             };
 
             // 分发请求
-            if (route && route.allowedMethods.includes(req.method ?? 'GET')) {
+            if (route && route.hasHandler(req.method ?? 'GET')) {
                 await handleRoute(pathname);
-            } else if (rootroute && rootroute.allowedMethods.includes(req.method ?? 'GET')) {
+            } else if (route) {
+                res.writeHead(405, {
+                    'Allow': route.allowedMethods.filter(method => route.hasHandler(method)).join(', '),
+                    'Content-Type': 'text/plain',
+                });
+                res.end('Method Not Allowed');
+            } else if (rootroute && rootroute.hasHandler(req.method ?? 'GET')) {
                 await handleRoute('root');
+            } else if (rootroute) {
+                res.writeHead(405, {
+                    'Allow': rootroute.allowedMethods.filter(method => rootroute.hasHandler(method)).join(', '),
+                    'Content-Type': 'text/plain',
+                });
+                res.end('Method Not Allowed');
             } else {
                 res.writeHead(404, { 'Content-Type': 'text/plain' });
                 res.end('Not Found');

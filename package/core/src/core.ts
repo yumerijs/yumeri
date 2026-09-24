@@ -349,12 +349,13 @@ export class Core {
           continue;
         }
         try {
+          const requestStart = Date.now();
           this.emit('request:start', {
             path: pathname,
             route: routePath,
             method: session?.client?.req?.method,
             plugin: route.context?.pluginname,
-            start: Date.now(),
+            start: requestStart,
             sessionId: session?.sessionid,
           });
           const middlewares = [...Object.values(this.globalMiddlewares), ...(route.middlewares || [])];
@@ -390,7 +391,7 @@ export class Core {
             route: routePath,
             method: session?.client?.req?.method,
             plugin: route.context?.pluginname,
-            duration: Date.now() - (session as any)._startAt || undefined,
+            duration: Date.now() - requestStart,
             status: session?.status,
             sessionId: session?.sessionid,
           });
