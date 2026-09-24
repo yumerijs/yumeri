@@ -131,10 +131,10 @@ export class PluginLoader {
         return this.pluginContexts[pluginName];
     }
 
-    unregall(pluginName: string): void {
+    async unregall(pluginName: string): Promise<void> {
         const ctx = this.pluginContexts[pluginName];
         if (ctx) {
-            ctx.dispose();
+            await ctx.dispose();
             delete this.pluginContexts[pluginName];
         }
     }
@@ -382,7 +382,7 @@ export class PluginLoader {
             const plugin = this.plugins[pluginName];
             if (plugin && plugin.disable) await plugin.disable(this.getContext(pluginName));
 
-            this.unregall(pluginName);
+            await this.unregall(pluginName);
 
             delete this.plugins[pluginName];
             delete this.pluginModules[pluginName];
