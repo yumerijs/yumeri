@@ -59,6 +59,11 @@ export class SessionStorageProcessor {
     return this.storage;
   }
 
+  /**
+   * 加载会话数据
+   * @param sessionid 会话ID
+   * @returns 会话数据
+   */
   async load(sessionid: string): Promise<Record<string, any>> {
     const snapshot = await this.storage.get(this.getKey(sessionid));
     if (!snapshot) return {};
@@ -71,6 +76,11 @@ export class SessionStorageProcessor {
     return { ...(snapshot.data || {}) };
   }
 
+  /**
+   * 保存会话数据
+   * @param sessionid 会话ID
+   * @param data 会话数据
+   */
   async save(sessionid: string, data: Record<string, any>): Promise<void> {
     const key = this.getKey(sessionid);
     const now = Date.now();
@@ -87,10 +97,17 @@ export class SessionStorageProcessor {
     await this.storage.set(key, snapshot);
   }
 
+  /**
+   * 删除会话数据
+   * @param sessionid 会话ID
+   */
   async delete(sessionid: string): Promise<void> {
     await this.storage.delete(this.getKey(sessionid));
   }
 
+  /**
+   * 清空所有会话数据
+   */
   async clear(): Promise<void> {
     if (this.storage.clear) {
       await this.storage.clear();

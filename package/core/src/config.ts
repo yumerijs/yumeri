@@ -4,6 +4,12 @@ function isNullable(value: any) {
   return value === null || value === undefined
 }
 
+/**
+ * 根据 schema 的定义，为配置项提供默认值
+ * @param schema schema 定义
+ * @param config 当前配置
+ * @returns 填充默认值后的配置
+ */
 export function fallback<T>(schema: Schema<T>, config: T): T {
   if (!schema) return config;
 
@@ -29,6 +35,9 @@ export function fallback<T>(schema: Schema<T>, config: T): T {
   return result;
 }
 
+/**
+ * 配置 schema 类
+ */
 export class Schema<T = any> {
   _type?: T; // Phantom type
   type: string;
@@ -52,36 +61,81 @@ export class Schema<T = any> {
     this.enum = definition.enum;
   }
 
+  /**
+   * 创建一个字符串类型的配置 schema
+   * @param description 说明文字
+   * @returns 字符串类型的配置 schema
+   */
   static string(description?: string): Schema<string> {
     return new Schema({ type: 'string', description });
   }
 
+  /**
+   * 创建一个数字类型的配置 schema
+   * @param description 说明文字
+   * @returns 数字类型的配置 schema
+   */
   static number(description?: string): Schema<number> {
     return new Schema({ type: 'number', description });
   }
 
+  /**
+   * 创建一个布尔类型的配置 schema
+   * @param description 说明文字
+   * @returns 布尔类型的配置 schema
+   */
   static boolean(description?: string): Schema<boolean> {
     return new Schema({ type: 'boolean', description });
   }
 
+  /**
+   * 创建一个数组类型的配置 schema
+   * @param inner 数组元素的 schema
+   * @param description 说明文字
+   * @returns 数组类型的配置 schema
+   */
   static array<T>(inner: Schema<T>, description?: string): Schema<T[]> {
     return new Schema({ type: 'array', items: inner, description });
   }
 
+  /**
+   * 创建一个对象类型的配置 schema
+   * @param properties 对象的属性 schema
+   * @param description 说明文字
+   * @returns 对象类型的配置 schema
+   */
   static object<T extends {}>(properties: { [K in keyof T]: Schema<T[K]> }, description?: string): Schema<T> {
     return new Schema({ type: 'object', properties, description });
   }
 
+  /**
+   * 创建一个扩展的对象类型的配置 schema
+   * @param base 基础对象的 schema
+   * @param extension 扩展属性的 schema
+   * @param description 说明文字
+   * @returns 扩展的对象类型的配置 schema
+   */
   static extend<T extends {}, U extends {}>(base: Schema<T>, extension: { [K in keyof U]: Schema<U[K]> }, description?: string): Schema<T & U> {
     const combinedProperties = { ...base.properties, ...extension } as { [K in keyof (T & U)]: Schema<(T & U)[K]> };
     return new Schema({ type: 'object', properties: combinedProperties, description: description || base.description });
   }
 
+  /**
+   * 创建一个枚举类型的配置 schema
+   * @param values 枚举值列表
+   * @param description 说明文字
+   * @returns 枚举类型的配置 schema
+   */
   static enum<L extends string | number>(values: L[], description?: string): Schema<L> {
     const type = typeof values[0] === 'string' ? 'string' : typeof values[0] === 'number' ? 'number' : 'string'; // Infer type based on first value
     return new Schema({ type, enum: values, description });
   }
 
+  /**
+   * 将配置项标记为必填
+   * @param this 
+   * @returns 
+   */
   required(this: this): this {
     this.isRequired = true;
     return this;

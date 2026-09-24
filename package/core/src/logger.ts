@@ -65,24 +65,40 @@ export class Logger {
   }
 
 
+  /**
+   * 记录调试信息
+   * @param args 调试信息
+   */
   debug(...args: any[]) {
     if (Logger.level === 'debug') {
       this.log('D', ...args);
     }
   }
 
+  /**
+   * 记录信息
+   * @param args 信息内容
+   */
   info(...args: any[]) {
     if (Logger.level === 'info' || Logger.level === 'debug') {
       this.log('I', ...args);
     }
   }
 
+  /**
+   * 记录警告信息
+   * @param args 警告信息
+   */
   warn(...args: any[]) {
     if (Logger.level !== 'error') {
       this.log('W', ...args);
     }
   }
 
+  /**
+   * 记录错误信息
+   * @param args 错误信息
+   */
   error(...args: any[]) {
     this.log('E', ...args);
   }

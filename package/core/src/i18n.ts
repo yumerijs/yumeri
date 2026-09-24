@@ -14,6 +14,11 @@ export class I18n {
     this.fallback = fallback
   }
 
+  /**
+   * 注册翻译文本
+   * @param key 文本点
+   * @param lang 语言映射
+   */
   register(key: string | Record<string, any>, lang?: Record<string, string>) {
     if (typeof key === 'string' && lang) {
       if (!this.data[key]) this.data[key] = {}
@@ -23,6 +28,10 @@ export class I18n {
     }
   }
 
+  /**
+   * 设置回退语言
+   * @param fallback 回退语言数组
+   */
   setFallback(fallback: string[]) {
     this.fallback = fallback
   }

@@ -182,6 +182,10 @@ export class Core {
     }
   }
 
+  /**
+   * 添加渲染器
+   * @param renderer 渲染器实例
+   */
   public addRenderer(renderer: IRenderer): void {
     if (this.renderers.has(renderer.name)) {
       this.logger.warn(`Renderer "${renderer.name}" is already registered and will be overwritten.`);
@@ -189,6 +193,10 @@ export class Core {
     this.renderers.set(renderer.name, renderer);
   }
 
+  /**
+   * 设置存储实例
+   * @param storage 存储实例
+   */
   public setStorage(storage: SessionStorageProcessor | Storage<SessionStorageSnapshot>): void {
     if (storage instanceof SessionStorageProcessor) {
       this.storage = storage;
@@ -227,6 +235,12 @@ export class Core {
     return pluginName;
   }
 
+  /**
+   * 应用插件
+   * @param module 插件模块
+   * @param context 上下文
+   * @param config 配置
+   */
   public async plugin(module: PluginModuleLike, context: Context, config: Config): Promise<void> {
     const plugin = resolvePluginModule(module, context, config);
     const shortName = this.getShortPluginName(context.pluginname);
@@ -276,6 +290,11 @@ export class Core {
     delete this.services[name];
   }
 
+  /**
+   * 添加事件监听器
+   * @param event 事件名称
+   * @param listener 监听器函数
+   */
   on(event: string, listener: (...args: any[]) => Promise<void>): void {
     const wrapped = (...args: any[]) => {
       // 包一层保证 async 可以被捕获
@@ -289,6 +308,11 @@ export class Core {
     this.eventListeners.set(event, listeners);
   }
 
+  /**
+   * 触发事件
+   * @param event 事件名称
+   * @param payload 事件载荷
+   */
   emit(event: string, ...payload: any): void {
     this.emitter.emit(event, ...payload);
   }
@@ -308,17 +332,35 @@ export class Core {
     }
   }
 
+  /**
+   * 注册全局中间件
+   * @param name 中间件名称
+   * @param middleware 中间件函数
+   * @returns 
+   */
   use(name: string, middleware: Middleware): Core {
     this.globalMiddlewares[name] = middleware;
     return this;
   }
 
+  /**
+   * 注册路由
+   * @param path 路由路径
+   * @param context 上下文
+   * @returns 路由实例
+   */
   route(path: string, context: Context): Route {
     const route = new Route(path, context);
     this.routes[path] = route;
     return route;
   }
 
+  /**
+   * 注册钩子
+   * @param name 钩子名称
+   * @param hookname 钩子函数名称
+   * @param callback 钩子函数
+   */
   hook(name: string, hookname: string, callback: HookHandler): any {
     if (!this.hooks[name]) {
       this.hooks[name] = new Hook(name);
@@ -326,12 +368,23 @@ export class Core {
     this.hooks[name].add(hookname, callback);
   }
 
+  /**
+   * 注销钩子
+   * @param name 钩子名称
+   * @param hookname 钩子函数名称
+   */
   unhook(name: string, hookname: string): any {
     if (this.hooks[name]) {
       this.hooks[name].remove(hookname);
     }
   }
 
+  /**
+   * 执行钩子
+   * @param name 钩子名称
+   * @param args 钩子参数
+   * @returns 钩子执行结果
+   */
   async hookExecute(name: string, ...args: any[]): Promise<any[]> {
     if (this.hooks[name]) {
       return await this.hooks[name].trigger(...args);
@@ -339,6 +392,13 @@ export class Core {
     return [];
   }
 
+  /**
+   * 执行路由
+   * @param pathname 路由路径
+   * @param session 会话
+   * @param queryParams 查询参数
+   * @returns 
+   */
   async executeRoute(pathname: string, session: Session, queryParams: URLSearchParams): Promise<boolean> {
     for (const routePath in this.routes) {
       const route = this.routes[routePath];
