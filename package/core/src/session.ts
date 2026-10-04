@@ -75,6 +75,7 @@ export interface StaticCacheOptions {
 
 /** 响应体的数据类型分类 */
 type ResType = "plain" | "json" | "stream" | "buffer";
+type RedirectStatus = 301 | 302 | 303 | 307 | 308;
 
 /** 响应类型与具体数据结构的映射表 */
 interface BodyMap {
@@ -221,11 +222,22 @@ export class Session {
   get query() { return this.request.query; }
   /** 获取请求路径 */
   get pathname() { return this.request.pathname; }
+  /** 获取请求方法 */
+  get method() { return this.request.raw?.method || ''; }
+  /** 获取请求中的 User-Agent */
+  get userAgent() { return this.request.headers['user-agent'] || ''; }
+  /** 获取请求中的 Host */
+  get host() { return this.request.headers.host || ''; }
   /** 获取语言列表 */
   get languages() { return this.request.languages; }
   /** 获取请求协议 */
   get protocol() { return this.request.protocol; }
   set protocol(val: string) { this.request.protocol = val; }
+  /** 判断当前请求是否通过 HTTPS 访问 */
+  get isSecure() {
+    const forwardedProtocol = this.request.headers['x-forwarded-proto']?.split(',')[0].trim();
+    return (forwardedProtocol || this.protocol).toLowerCase() === 'https';
+  }
   /** 获取或设置响应状态码 */
   get status() { return this.response.status; }
   set status(val: number) { this.response.status = val; }
@@ -258,6 +270,56 @@ export class Session {
     this.response.body = body;
   }
 
+  /**
+   * 返回 JSON 响应
+   * @param data 要序列化的 JSON 数据
+   * @param status 可选的 HTTP 状态码
+   */
+  public json(data: any, status?: number): void {
+    if (status !== undefined) this.status = status;
+    this.setMime('json');
+    this.respond(data as BodyMap['json'], 'json');
+  }
+
+  /**
+   * 返回 HTML 响应
+   * @param content HTML 内容
+   * @param status 可选的 HTTP 状态码
+   */
+  public html(content: string, status?: number): void {
+    if (status !== undefined) this.status = status;
+    this.setMime('html');
+    this.respond(content, 'plain');
+  }
+
+  /**
+   * 返回纯文本响应
+   * @param content 文本内容
+   * @param status 可选的 HTTP 状态码
+   */
+  public plain(content: string, status?: number): void {
+    if (status !== undefined) this.status = status;
+    this.setMime('plain');
+    this.respond(content, 'plain');
+  }
+
+  /**
+   * 重定向客户端
+   * @param url 重定向目标地址
+   * @param status 重定向状态码，默认为 302
+   */
+  public redirect(url: string, status: RedirectStatus = 302): void {
+    this.status = status;
+    this.setHeader('Location', url);
+    this.respond('', 'plain');
+  }
+
+  /** 返回 204 No Content 响应 */
+  public noContent(): void {
+    this.status = 204;
+    this.respond('', 'plain');
+  }
+
   /** 获取响应类型 */
   get restype() {
     return this.response.type;
@@ -285,6 +347,44 @@ export class Session {
       options.path = '/';
     }
     this.response.cookies[name] = { value, options };
+  }
+
+  /**
+   * 清除客户端 Cookie
+   * @param name Cookie 键名
+   * @param options Cookie 配置，通常应与设置时保持一致
+   */
+  public removeCookie(name: string, options: CookieOptions = {}): void {
+    this.setCookie(name, '', { ...options, expires: new Date(0) });
+  }
+
+  /**
+   * 获取会话数据
+   * @param key 数据键名
+   * @param defaultValue 数据不存在时返回的默认值
+   */
+  public getData<T>(key: string, defaultValue?: T): T | undefined {
+    return this.data[key] === undefined ? defaultValue : this.data[key] as T;
+  }
+
+  /**
+   * 设置响应头
+   * @param name 响应头名称
+   * @param value 响应头值
+   */
+  public setHeader(name: string, value: string | number): void {
+    this.response.headers[name] = value;
+  }
+
+  /**
+   * 获取响应头
+   * @param name 响应头名称，不区分大小写
+   */
+  public getHeader(name: string): any {
+    if (name in this.response.headers) return this.response.headers[name];
+    const lowerName = name.toLowerCase();
+    const entry = Object.entries(this.response.headers).find(([key]) => key.toLowerCase() === lowerName);
+    return entry?.[1];
   }
 
   /**
