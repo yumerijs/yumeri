@@ -158,6 +158,10 @@ export class Server {
                 }
 
                 res.writeHead(session.status ?? 200, head);
+                if (session.body === undefined || session.body === null) {
+                    res.end();
+                    return;
+                }
 
                 // 根据响应类型输出内容
                 switch (session.restype) {
