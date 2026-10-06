@@ -6,6 +6,7 @@ import { URL } from 'url';
 import { Stream } from 'stream';
 import { Context } from './context.js';
 import { resolveVirtualAsset } from '@yumerijs/types';
+import { AppError } from './error.js';
 
 
 const logger = new Logger('server');
@@ -126,6 +127,22 @@ export class Server {
                 let matched = false;
                 try {
                     matched = await this.core.executeRoute(routePath, session, queryParams);
+                } catch (err) {
+                    if (err instanceof AppError) {
+                        session.status = err.statusCode;
+                        session.body = {
+                            error: err.errorCode,
+                            message: err.message,
+                            details: err.details,
+                        };
+                    } else {
+                        logger.error('Unexpected error during route execution:', err);
+                        session.status = 500;
+                        session.body = {
+                            error: 'INTERNAL_SERVER_ERROR',
+                            message: 'An unexpected error occurred.',
+                        };
+                    }
                 } finally {
                     if (matched) {
                         await session.saveData(true);
