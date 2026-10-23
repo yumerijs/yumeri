@@ -19,9 +19,9 @@
     "@hirarijs/loader-ts": "^1.0.20",
     "@hirarijs/loader-tsx": "^1.0.0",
     "@hirarijs/loader-vue": "^1.0.0",
-    "@yumerijs/scripts": "workspace:^",
+    "@yumerijs/scripts": "*",
     "yumeri": "^3.0.0",
-    "yumeri-plugin-console": "workspace:^"
+    "yumeri-plugin-console": "*"
   },
   "devDependencies": {
     "@types/fs-extra": "^11",

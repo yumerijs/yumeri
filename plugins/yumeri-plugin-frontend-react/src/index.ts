@@ -179,11 +179,6 @@ export function apply(ctx: Context, pluginConfig: FrontendReactConfig) {
   });
 
   ctx.route(`/${basePath}`).methods('GET').action((session: Session) => {
-    session.status = 302;
-    session.head.Location = `/${basePath}/`;
-    session.respond('', 'plain');
-  });
-  ctx.route(`/${basePath}/`).methods('GET').action((session: Session) => {
     const index = path.join(staticRoot, 'index.html');
     session.setMime('text/html; charset=utf-8');
     session.file(index, { maxAge: 0, etag: true });
