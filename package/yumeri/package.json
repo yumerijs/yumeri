@@ -32,7 +32,7 @@
   "devDependencies": {
     "@types/formidable": "^3.4.5",
     "@types/js-yaml": "^4.0.9",
-    "@types/node": "^22.13.10",
+    "@types/node": "^26.6.6",
     "typescript": "^6.0.3"
   },
   "dependencies": {

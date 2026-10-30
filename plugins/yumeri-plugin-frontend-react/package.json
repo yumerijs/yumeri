@@ -20,7 +20,7 @@
   ],
   "license": "MIT",
   "devDependencies": {
-    "@types/node": "^22.15.19",
+    "@types/node": "^26.6.6",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^4.4.1",
